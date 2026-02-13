@@ -145,6 +145,15 @@ const QueuePage: React.FC = () => {
                 </button>
               )}
               
+              {/* Development/Demo button to skip queue */}
+              <button 
+                onClick={handleProceedToSeating}
+                className="skip-queue-btn"
+                style={{ backgroundColor: '#10b981', color: 'white' }}
+              >
+                Skip Queue (Demo)
+              </button>
+              
               <button 
                 onClick={handleLeaveQueue}
                 className="leave-queue-btn"
