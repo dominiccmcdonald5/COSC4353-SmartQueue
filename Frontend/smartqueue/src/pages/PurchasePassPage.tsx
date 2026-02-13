@@ -24,9 +24,9 @@ const PurchasePassPage: React.FC = () => {
       price: 29.99,
       duration: '3 months',
       features: [
-        'Skip up to 50% of the queue',
-        'Early access to select concerts',
-        'Email notifications for new events',
+        'Skip the line until 25% venue capacity is filled',
+        'Priority queue placement over regular users',
+        'Email notifications for new concerts',
         'Basic customer support',
       ],
     },
@@ -37,30 +37,14 @@ const PurchasePassPage: React.FC = () => {
       duration: '6 months',
       recommended: true,
       features: [
-        'Skip up to 80% of the queue',
-        'Priority access to all concerts',
-        'Exclusive presale opportunities',
+        'Skip the line until 50% venue capacity is filled',
+        'Same priority power as Silver, longer duration',
+        'Priority queue placement over regular users',
         'SMS and email notifications',
         'Premium customer support',
         'Refund protection on cancelled events',
       ],
-    },
-    {
-      id: 'platinum',
-      name: 'Platinum Pass',
-      price: 99.99,
-      duration: '12 months',
-      features: [
-        'Skip directly to front 10% of queue',
-        'VIP early access (1 hour before general queue)',
-        'Exclusive access to premium seats',
-        'Personal concert recommendations',
-        'Priority customer support',
-        'Full refund protection',
-        'Complimentary seat upgrades when available',
-        'Access to exclusive member events',
-      ],
-    },
+    }
   ];
 
   const handleSelectPlan = (planId: string) => {
@@ -97,15 +81,11 @@ const PurchasePassPage: React.FC = () => {
 
   return (
     <div className="purchase-pass-page">
-      <header className="pass-header">
-        <Link to="/home" className="back-link">← Back to Home</Link>
-        <h1>Premium Passes</h1>
-      </header>
-
       <main className="pass-main">
         <section className="hero-section">
-          <h2>Skip the Queue with Premium Passes</h2>
-          <p>Get priority access to the hottest concerts and never wait in long queues again!</p>
+          <Link to="/home" className="back-link">← Back to Home</Link>
+          <h2>Purchase Premium Passes</h2>
+          <p>Skip the line and get priority access to tickets. Jump ahead of regular users until venue capacity thresholds are reached!</p>
         </section>
 
         <section className="benefits-section">
@@ -113,23 +93,23 @@ const PurchasePassPage: React.FC = () => {
           <div className="benefits-grid">
             <div className="benefit-item">
               <div className="benefit-icon">⚡</div>
-              <h4>Skip the Wait</h4>
-              <p>Jump ahead in queues and get to ticket selection faster</p>
+              <h4>Skip the Line</h4>
+              <p>Jump ahead of regular users until venue capacity thresholds are met</p>
             </div>
             <div className="benefit-item">
-              <div className="benefit-icon">🎫</div>
-              <h4>Early Access</h4>
-              <p>Get first access to tickets before general public</p>
+              <div className="benefit-icon">🎯</div>
+              <h4>Guaranteed Access</h4>
+              <p>Get priority placement in queue based on your pass level</p>
             </div>
             <div className="benefit-item">
-              <div className="benefit-icon">⭐</div>
-              <h4>Premium Support</h4>
-              <p>Get dedicated customer support when you need it</p>
+              <div className="benefit-icon">⏰</div>
+              <h4>Save Time</h4>
+              <p>Spend less time waiting and more time enjoying concerts</p>
             </div>
             <div className="benefit-item">
               <div className="benefit-icon">🔔</div>
               <h4>Priority Notifications</h4>
-              <p>Be the first to know about new concerts and presales</p>
+              <p>Get notified first when new concerts become available</p>
             </div>
           </div>
         </section>
@@ -218,20 +198,20 @@ const PurchasePassPage: React.FC = () => {
           <h3>Frequently Asked Questions</h3>
           <div className="faq-list">
             <div className="faq-item">
-              <h4>How does queue skipping work?</h4>
-              <p>Premium pass holders are automatically moved ahead in the queue based on their pass level. You'll see your improved position immediately when joining a queue.</p>
+              <h4>How does line skipping work?</h4>
+              <p>Pass holders skip ahead of regular users until venue capacity thresholds are reached. Silver passes work until 25% capacity, Gold until 50%, and Platinum until 75%.</p>
+            </div>
+            <div className="faq-item">
+              <h4>What's the difference between Silver and Gold?</h4>
+              <p>Both Silver and Gold have the same line-skipping power, but Gold lasts longer (6 months vs 3 months) and includes additional perks like refund protection.</p>
             </div>
             <div className="faq-item">
               <h4>When do my benefits start?</h4>
-              <p>Your premium pass benefits are active immediately after purchase and will appear on your next queue join.</p>
+              <p>Your pass benefits are active immediately after purchase and will appear when you join your next concert queue.</p>
             </div>
             <div className="faq-item">
-              <h4>Can I upgrade my pass later?</h4>
-              <p>Yes! You can upgrade to a higher tier at any time. The difference in price will be prorated based on your remaining time.</p>
-            </div>
-            <div className="faq-item">
-              <h4>What happens if a concert is cancelled?</h4>
-              <p>Gold and Platinum pass holders receive full refund protection for cancelled events, while Silver pass holders receive partial refunds.</p>
+              <h4>What happens when capacity thresholds are reached?</h4>
+              <p>Once your pass threshold is hit, you'll be placed in the regular queue with other users. The earlier you join, the better your position will be.</p>
             </div>
           </div>
         </section>
