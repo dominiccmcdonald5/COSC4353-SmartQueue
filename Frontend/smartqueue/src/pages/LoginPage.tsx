@@ -27,7 +27,7 @@ const LoginPage: React.FC = () => {
   return (
     <div className="login-page">
       <div className="login-container">
-        <h1>Welcome to SmartQueue</h1>
+        <h1>Welcome to ticketQ</h1>
         <p>Sign in to your account</p>
         
         <form onSubmit={handleSubmit} className="login-form">

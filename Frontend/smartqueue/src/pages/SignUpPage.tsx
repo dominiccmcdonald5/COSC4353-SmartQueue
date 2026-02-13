@@ -4,7 +4,8 @@ import { useAuth } from '../context/AuthContext';
 
 const SignUpPage: React.FC = () => {
   const [formData, setFormData] = useState({
-    name: '',
+    firstName: '',
+    lastName : '',
     email: '',
     password: '',
     confirmPassword: '',
@@ -36,7 +37,7 @@ const SignUpPage: React.FC = () => {
     }
 
     try {
-      await signup(formData.email, formData.password, formData.name);
+      await signup(formData.email, formData.password, formData.firstName, formData.lastName);
       navigate('/home');
     } catch (error) {
       setError('Failed to create account. Please try again.');
@@ -46,17 +47,29 @@ const SignUpPage: React.FC = () => {
   return (
     <div className="signup-page">
       <div className="signup-container">
-        <h1>Join SmartQueue</h1>
+        <h1>Join ticketQ</h1>
         <p>Create your account to start queuing for concerts</p>
         
         <form onSubmit={handleSubmit} className="signup-form">
           <div className="form-group">
-            <label htmlFor="name">Full Name</label>
+            <label htmlFor="firstName">First Name</label>
             <input
               type="text"
-              id="name"
-              name="name"
-              value={formData.name}
+              id="firstName"
+              name="firstNameame"
+              value={formData.firstName}
+              onChange={handleChange}
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="name">Last Name</label>
+            <input
+              type="text"
+              id="lastName"
+              name="lastName"
+              value={formData.lastName}
               onChange={handleChange}
               required
             />
