@@ -56,7 +56,7 @@ const SignUpPage: React.FC = () => {
             <input
               type="text"
               id="firstName"
-              name="firstNameame"
+              name="firstName"
               value={formData.firstName}
               onChange={handleChange}
               required
@@ -64,7 +64,7 @@ const SignUpPage: React.FC = () => {
           </div>
 
           <div className="form-group">
-            <label htmlFor="name">Last Name</label>
+            <label htmlFor="lastName">Last Name</label>
             <input
               type="text"
               id="lastName"

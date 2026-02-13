@@ -188,7 +188,7 @@ button:disabled {
 
 .login-form button, .signup-form button {
   width: 100%;
-  background-color: #6366f1;
+  background-color: #B388EB;
   color: white;
   padding: 0.875rem;
   margin-top: 1rem;
@@ -200,7 +200,7 @@ button:disabled {
 }
 
 .signup-link a, .login-link a {
-  color: #6366f1;
+  color: #8093F1;
   text-decoration: none;
   font-weight: 500;
 }
