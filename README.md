@@ -12,4 +12,4 @@ npm install
 npm run dev
 ```
 
-hi
+hello
