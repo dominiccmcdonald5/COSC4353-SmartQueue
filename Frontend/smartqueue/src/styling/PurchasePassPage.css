@@ -103,6 +103,7 @@
 .benefit-icon {
   font-size: 3rem;
   margin-bottom: 1rem;
+  color: #8093F1;
 }
 
 .plans-section {
@@ -201,9 +202,25 @@
 }
 
 .checkmark {
-  color: #10b981;
+  color: #8093F1;
   font-weight: bold;
   flex-shrink: 0;
+}
+
+.capacity-explanation {
+  margin-top: 1rem;
+  margin-bottom: 1.5rem;
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+  border-top: 1px solid #f3f4f6;
+}
+
+.capacity-text {
+  font-size: 0.8rem;
+  color: #6b7280;
+  margin: 0;
+  font-style: italic;
+  line-height: 1.4;
 }
 
 .select-plan-btn {
@@ -225,6 +242,22 @@
 .select-plan-btn.selected {
   background: #6366f1;
   color: white;
+}
+
+.priority-note {
+  margin-top: 2rem;
+  text-align: center;
+  padding: 1rem;
+  background: #f8fafc;
+  border-radius: 8px;
+  border-left: 4px solid #8093F1;
+}
+
+.note-text {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #4b5563;
+  line-height: 1.5;
 }
 
 .checkout-section {
