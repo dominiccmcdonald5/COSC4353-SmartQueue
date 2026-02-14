@@ -42,13 +42,6 @@
   background-color: #e0e7ff;
 }
 
-.logout-btn {
-  background-color: #ef4444;
-  color: white;
-  padding: 0.5rem 1rem;
-  border-radius: 6px;
-}
-
 .home-main {
   max-width: 1200px;
   margin: 0 auto;

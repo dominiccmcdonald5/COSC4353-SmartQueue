@@ -70,10 +70,9 @@ const HomePage: React.FC = () => {
     <div className="home-page">
       <header className="home-header">
         <div className="header-content">
-          <h1>SmartQueue</h1>
+          <h1>ticketQ</h1>
           <div className="user-info">
-            <span>Welcome, {user?.name}!</span>
-            <Link to="/dashboard" className="dashboard-link">Dashboard</Link>
+            <Link to="/dashboard" className="dashboard-link">User Dashboard</Link>
             <Link to="/purchase-pass" className="pass-link">Get Premium Pass</Link>
             <button onClick={handleLogout} className="logout-btn">Logout</button>
           </div>
@@ -82,8 +81,8 @@ const HomePage: React.FC = () => {
 
       <main className="home-main">
         <section className="hero">
-          <h2>Discover Amazing Concerts</h2>
-          <p>Join the queue and secure your tickets for the hottest shows</p>
+          <h1><span>Welcome, {user?.name}!</span></h1>
+          <p>Join the queue and secure tickets for your favorite artists</p>
         </section>
 
         <section className="concerts-grid">
