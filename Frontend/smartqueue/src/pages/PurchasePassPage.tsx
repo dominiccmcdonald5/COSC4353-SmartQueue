@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { FaBolt, FaBullseye, FaClock, FaCheck } from 'react-icons/fa';
+import '../styling/PurchasePassPage.css';
 
 interface PassPlan {
   id: string;
@@ -21,28 +23,20 @@ const PurchasePassPage: React.FC = () => {
     {
       id: 'silver',
       name: 'Silver Pass',
-      price: 29.99,
-      duration: '3 months',
+      price: 9.99,
+      duration: 'month',
       features: [
         'Skip the line until 25% venue capacity is filled',
-        'Priority queue placement over regular users',
-        'Email notifications for new concerts',
-        'Basic customer support',
       ],
     },
     {
       id: 'gold',
       name: 'Gold Pass',
-      price: 49.99,
-      duration: '6 months',
+      price: 19.99,
+      duration: 'month',
       recommended: true,
       features: [
         'Skip the line until 50% venue capacity is filled',
-        'Same priority power as Silver, longer duration',
-        'Priority queue placement over regular users',
-        'SMS and email notifications',
-        'Premium customer support',
-        'Refund protection on cancelled events',
       ],
     }
   ];
@@ -85,31 +79,26 @@ const PurchasePassPage: React.FC = () => {
         <section className="hero-section">
           <Link to="/home" className="back-link">← Back to Home</Link>
           <h2>Purchase Premium Passes</h2>
-          <p>Skip the line and get priority access to tickets. Jump ahead of regular users until venue capacity thresholds are reached!</p>
+          <p>Skip the line and get priority access to tickets!</p>
         </section>
 
         <section className="benefits-section">
           <h3>Why Get a Premium Pass?</h3>
           <div className="benefits-grid">
             <div className="benefit-item">
-              <div className="benefit-icon">⚡</div>
+              <div className="benefit-icon"><FaBolt /></div>
               <h4>Skip the Line</h4>
-              <p>Jump ahead of regular users until venue capacity thresholds are met</p>
+              <p>Jump ahead of regular users until venue capacity thresholds are met!</p>
             </div>
             <div className="benefit-item">
-              <div className="benefit-icon">🎯</div>
+              <div className="benefit-icon"><FaBullseye /></div>
               <h4>Guaranteed Access</h4>
-              <p>Get priority placement in queue based on your pass level</p>
+              <p>Get priority placement in queue based on your pass level!</p>
             </div>
             <div className="benefit-item">
-              <div className="benefit-icon">⏰</div>
+              <div className="benefit-icon"><FaClock /></div>
               <h4>Save Time</h4>
-              <p>Spend less time waiting and more time enjoying concerts</p>
-            </div>
-            <div className="benefit-item">
-              <div className="benefit-icon">🔔</div>
-              <h4>Priority Notifications</h4>
-              <p>Get notified first when new concerts become available</p>
+              <p>Spend less time waiting and more time enjoying concerts!</p>
             </div>
           </div>
         </section>
@@ -139,11 +128,20 @@ const PurchasePassPage: React.FC = () => {
                   <ul>
                     {plan.features.map((feature, index) => (
                       <li key={index}>
-                        <span className="checkmark">✓</span>
+                        <span className="checkmark"><FaCheck /></span>
                         {feature}
                       </li>
                     ))}
                   </ul>
+                  
+                  <div className="capacity-explanation">
+                    <p className="capacity-text">
+                      {plan.id === 'silver' 
+                        ? 'You\'ll skip the entire line until 25% of tickets are sold, then the pass stops working.'
+                        : 'You\'ll skip the entire line until 50% of tickets are sold, then the pass stops working.'
+                      }
+                    </p>
+                  </div>
                 </div>
 
                 <button 
@@ -157,6 +155,12 @@ const PurchasePassPage: React.FC = () => {
                 </button>
               </div>
             ))}
+          </div>
+          
+          <div className="priority-note">
+            <p className="note-text">
+              <em>Both Silver and Gold Passes hold the same priority level - Gold simply works until 50% venue capacity is reached, while Silver stops at 25% capacity.</em>
+            </p>
           </div>
         </section>
 
@@ -194,27 +198,6 @@ const PurchasePassPage: React.FC = () => {
           </section>
         )}
 
-        <section className="faq-section">
-          <h3>Frequently Asked Questions</h3>
-          <div className="faq-list">
-            <div className="faq-item">
-              <h4>How does line skipping work?</h4>
-              <p>Pass holders skip ahead of regular users until venue capacity thresholds are reached. Silver passes work until 25% capacity, Gold until 50%, and Platinum until 75%.</p>
-            </div>
-            <div className="faq-item">
-              <h4>What's the difference between Silver and Gold?</h4>
-              <p>Both Silver and Gold have the same line-skipping power, but Gold lasts longer (6 months vs 3 months) and includes additional perks like refund protection.</p>
-            </div>
-            <div className="faq-item">
-              <h4>When do my benefits start?</h4>
-              <p>Your pass benefits are active immediately after purchase and will appear when you join your next concert queue.</p>
-            </div>
-            <div className="faq-item">
-              <h4>What happens when capacity thresholds are reached?</h4>
-              <p>Once your pass threshold is hit, you'll be placed in the regular queue with other users. The earlier you join, the better your position will be.</p>
-            </div>
-          </div>
-        </section>
       </main>
     </div>
   );

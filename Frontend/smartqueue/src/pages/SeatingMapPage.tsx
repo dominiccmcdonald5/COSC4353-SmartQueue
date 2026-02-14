@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
+import '../styling/SeatingMapPage.css';
 
 interface Seat {
   id: string;
