@@ -73,7 +73,7 @@ const UserDashboard: React.FC = () => {
   return (
     <div className="dashboard-page">
       <header className="dashboard-header">
-        <div className="header-content">
+        <div className="dashboard-header-content">
           <Link to="/home" className="back-link">← Back to Home</Link>
           <h1>My Dashboard</h1>
           <button onClick={logout} className="logout-btn">Logout</button>
