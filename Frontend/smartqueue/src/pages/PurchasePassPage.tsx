@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import '../styling/PurchasePassPage.css';
 
 interface PassPlan {
   id: string;
@@ -85,7 +86,7 @@ const PurchasePassPage: React.FC = () => {
         <section className="hero-section">
           <Link to="/home" className="back-link">← Back to Home</Link>
           <h2>Purchase Premium Passes</h2>
-          <p>Skip the line and get priority access to tickets. Jump ahead of regular users until venue capacity thresholds are reached!</p>
+          <p>Skip the line and get priority access to tickets!</p>
         </section>
 
         <section className="benefits-section">
@@ -105,11 +106,6 @@ const PurchasePassPage: React.FC = () => {
               <div className="benefit-icon">⏰</div>
               <h4>Save Time</h4>
               <p>Spend less time waiting and more time enjoying concerts</p>
-            </div>
-            <div className="benefit-item">
-              <div className="benefit-icon">🔔</div>
-              <h4>Priority Notifications</h4>
-              <p>Get notified first when new concerts become available</p>
             </div>
           </div>
         </section>
