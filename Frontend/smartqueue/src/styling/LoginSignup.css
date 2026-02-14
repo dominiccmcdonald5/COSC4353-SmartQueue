@@ -1,0 +1,49 @@
+/* Login & Signup Pages */
+.login-page, .signup-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.login-container, .signup-container {
+  background: white;
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  max-width: 400px;
+}
+
+.login-container h1, .signup-container h1 {
+  text-align: center;
+  margin-bottom: 0.5rem;
+  color: #1f2937;
+  font-size: 2rem;
+}
+
+.login-container p, .signup-container p {
+  text-align: center;
+  color: #6b7280;
+  margin-bottom: 2rem;
+}
+
+.login-form button, .signup-form button {
+  width: 100%;
+  background-color: #6366f1;
+  color: white;
+  padding: 0.875rem;
+  margin-top: 1rem;
+}
+
+.signup-link, .login-link {
+  text-align: center;
+  margin-top: 1.5rem;
+}
+
+.signup-link a, .login-link a {
+  color: #6366f1;
+  text-decoration: none;
+  font-weight: 500;
+}
