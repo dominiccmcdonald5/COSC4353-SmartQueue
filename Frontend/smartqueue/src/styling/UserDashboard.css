@@ -10,6 +10,54 @@
   margin-bottom: 2rem;
 }
 
+.dashboard-header-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 1rem;
+}
+
+.dashboard-header-content h1 {
+  margin: 0;
+  color: #1f2937;
+  font-size: 1.8rem;
+  text-align: center;
+  flex: 1;
+}
+
+.back-link {
+  text-decoration: none;
+  color: #6366f1;
+  font-weight: 500;
+  padding: 2.5rem 2.5rem;
+  border-radius: 6px;
+  transition: background-color 0.2s;
+  margin: 1.5rem;
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+}
+
+.back-link:hover {
+  background-color: #f3f4f6;
+}
+
+.logout-btn {
+  background-color: #ef4444;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  margin: 0.5rem;
+}
+
+.logout-btn:hover {
+  background-color: #dc2626;
+}
+
 .dashboard-main {
   max-width: 1200px;
   margin: 0 auto;
@@ -22,6 +70,15 @@
   border-radius: 12px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   margin-bottom: 2rem;
+}
+
+.dashboard-profile-info h2 {
+  color: #1f2937;
+  margin-bottom: 0.5rem;
+}
+
+.dashboard-profile-info p {
+  color: #6b7280;
 }
 
 .dashboard-tabs {
@@ -63,6 +120,58 @@
   background: #f8fafc;
   border-radius: 8px;
   border: 1px solid #e5e7eb;
+}
+
+.dashboard-concert-info {
+  flex: 1;
+}
+
+.dashboard-concert-info h4 {
+  color: #1f2937;
+  margin-bottom: 0.5rem;
+}
+
+.artist {
+  color: #6b7280;
+  font-size: 0.9rem;
+  margin-bottom: 0.25rem;
+}
+
+.date {
+  color: #9ca3af;
+  font-size: 0.8rem;
+}
+
+.dashboard-queue-info {
+  text-align: right;
+}
+
+.status {
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+
+.status.completed {
+  color: #10b981;
+}
+
+.status.in-progress {
+  color: #f59e0b;
+}
+
+.status.cancelled {
+  color: #ef4444;
+}
+
+.wait-time {
+  color: #6b7280;
+  font-size: 0.9rem;
+  margin-bottom: 0.25rem;
+}
+
+.tickets {
+  color: #6b7280;
+  font-size: 0.9rem;
 }
 
 .user-stats {
