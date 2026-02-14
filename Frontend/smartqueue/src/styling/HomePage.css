@@ -1,0 +1,172 @@
+/* Home Page */
+.home-page {
+  min-height: 100vh;
+}
+
+.home-header {
+  background: white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  padding: 1rem 0;
+  margin-bottom: 2rem;
+}
+
+.header-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.home-header h1 {
+  color: #6366f1;
+  font-size: 2rem;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.dashboard-link, .pass-link {
+  color: #6366f1;
+  text-decoration: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  transition: background-color 0.2s;
+}
+
+.dashboard-link:hover, .pass-link:hover {
+  background-color: #e0e7ff;
+}
+
+.logout-btn {
+  background-color: #ef4444;
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+}
+
+.home-main {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+.hero {
+  text-align: center;
+  margin-bottom: 3rem;
+}
+
+.hero h2 {
+  font-size: 2.5rem;
+  color: #1f2937;
+  margin-bottom: 1rem;
+}
+
+.hero p {
+  font-size: 1.2rem;
+  color: #6b7280;
+}
+
+.concerts-grid h3 {
+  font-size: 2rem;
+  margin-bottom: 2rem;
+  color: #1f2937;
+}
+
+.concerts-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 2rem;
+}
+
+/* Concert Cards */
+.concert-card {
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.concert-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+.concert-image {
+  position: relative;
+  height: 200px;
+  background: linear-gradient(45deg, #667eea, #764ba2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 1.2rem;
+}
+
+.status-badge {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.status-badge.available {
+  background-color: #10b981;
+  color: white;
+}
+
+.status-badge.queue-active {
+  background-color: #f59e0b;
+  color: white;
+}
+
+.status-badge.sold-out {
+  background-color: #ef4444;
+  color: white;
+}
+
+.concert-info {
+  padding: 1.5rem;
+}
+
+.concert-info h4 {
+  font-size: 1.3rem;
+  margin-bottom: 0.5rem;
+  color: #1f2937;
+}
+
+.concert-info .artist {
+  color: #6366f1;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+
+.concert-info .venue,
+.concert-info .date,
+.concert-info .price {
+  color: #6b7280;
+  margin-bottom: 0.25rem;
+  font-size: 0.9rem;
+}
+
+.concert-actions {
+  margin-top: 1rem;
+}
+
+.join-queue-btn.active {
+  background-color: #f59e0b;
+}
+
+.sold-out-btn {
+  background-color: #9ca3af;
+  color: white;
+  cursor: not-allowed;
+}

@@ -1,0 +1,345 @@
+/* Purchase Pass Page */
+.purchase-pass-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 2rem 0;
+}
+
+.pass-header {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1rem;
+  margin-bottom: 2rem;
+  display: flex;
+  justify-content: center;
+}
+
+.back-button-container {
+  background: white;
+  padding: 1rem;
+  border-radius: 12px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  display: inline-block;
+}
+
+.pass-main {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+.hero-section {
+  background: white;
+  padding: 3rem 2rem;
+  margin-bottom: 3rem;
+  border-radius: 12px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  text-align: center;
+  position: relative;
+}
+
+.hero-section .back-link {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  display: inline-block;
+  padding: 0.75rem 1.5rem;
+  background-color: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  text-decoration: none;
+  color: #6366f1;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.hero-section .back-link:hover {
+  background-color: #e0e7ff;
+  text-decoration: none;
+}
+
+.hero-section h2 {
+  color: #1f2937;
+  margin-bottom: 1rem;
+  margin-top: 0.5rem;
+  font-size: 2.5rem;
+}
+
+.hero-section p {
+  color: #6b7280;
+  font-size: 1.3rem;
+}
+
+.benefits-section {
+  background: white;
+  padding: 3rem 2rem;
+  margin-bottom: 3rem;
+  border-radius: 12px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+.benefits-section h3 {
+  text-align: center;
+  color: #1f2937;
+  margin-bottom: 2rem;
+  font-size: 2.5rem;
+}
+
+.benefits-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 2rem;
+  margin: 2rem 0;
+}
+
+.benefit-item {
+  text-align: center;
+  padding: 1.5rem;
+  background: #f8fafc;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+}
+
+.benefit-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.plans-section {
+  background: white;
+  padding: 3rem 2rem;
+  margin-bottom: 3rem;
+  border-radius: 12px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+.plans-section h3 {
+  text-align: center;
+  color: #1f2937;
+  margin-bottom: 2rem;
+}
+
+.plans-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2rem;
+  margin: 2rem 0;
+}
+
+.plan-card {
+  background: #f8fafc;
+  border: 2px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 2rem;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.plan-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+.plan-card.recommended {
+  border-color: #6366f1;
+  transform: scale(1.05);
+  background: white;
+}
+
+.plan-card.selected {
+  border-color: #6366f1;
+  background-color: #f8faff;
+}
+
+.recommended-badge {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #6366f1;
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.plan-header h4 {
+  color: #1f2937;
+  margin-bottom: 1rem;
+}
+
+.plan-price {
+  margin: 1rem 0;
+}
+
+.plan-price .price {
+  font-size: 3rem;
+  font-weight: bold;
+  color: #1f2937;
+}
+
+.plan-price .duration {
+  color: #6b7280;
+  font-size: 1rem;
+}
+
+.plan-features ul {
+  list-style: none;
+  text-align: left;
+  margin: 2rem 0;
+}
+
+.plan-features li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.checkmark {
+  color: #10b981;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+
+.select-plan-btn {
+  width: 100%;
+  padding: 0.75rem;
+  border: 2px solid #6366f1;
+  background: transparent;
+  color: #6366f1;
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.select-plan-btn:hover {
+  background: #6366f1;
+  color: white;
+}
+
+.select-plan-btn.selected {
+  background: #6366f1;
+  color: white;
+}
+
+.checkout-section {
+  background: white;
+  padding: 3rem 2rem;
+  margin-bottom: 3rem;
+  border-radius: 12px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+.checkout-container {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.checkout-summary {
+  background: #f8fafc;
+  padding: 2rem;
+  border-radius: 8px;
+  margin-bottom: 2rem;
+}
+
+.checkout-summary h3 {
+  color: #1f2937;
+  margin-bottom: 1rem;
+}
+
+.user-info p {
+  color: #6b7280;
+  margin-bottom: 1rem;
+}
+
+.selected-plan-info h4 {
+  color: #1f2937;
+  margin-bottom: 0.5rem;
+}
+
+.total-price {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #1f2937;
+  text-align: center;
+  margin-top: 1rem;
+}
+
+.checkout-actions {
+  text-align: center;
+}
+
+.purchase-btn {
+  width: 100%;
+  max-width: 300px;
+  padding: 1rem 2rem;
+  font-size: 1.1rem;
+  margin-bottom: 1rem;
+  background-color: #6366f1;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.purchase-btn:hover:not(:disabled) {
+  background-color: #5b21b6;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+}
+
+.purchase-btn:disabled {
+  background-color: #9ca3af;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.terms {
+  font-size: 0.9rem;
+  color: #6b7280;
+  text-align: center;
+}
+
+.faq-section {
+  background: white;
+  padding: 3rem 2rem;
+  border-radius: 12px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+.faq-section h3 {
+  text-align: center;
+  color: #1f2937;
+  margin-bottom: 2rem;
+}
+
+.faq-list {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.faq-item {
+  background: #f8fafc;
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  border: 1px solid #e5e7eb;
+}
+
+.faq-item h4 {
+  color: #1f2937;
+  margin-bottom: 0.5rem;
+}
+
+.faq-item p {
+  color: #6b7280;
+  margin: 0;
+}
