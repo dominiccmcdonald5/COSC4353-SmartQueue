@@ -20,7 +20,7 @@
 }
 
 .home-header h1 {
-  color: #6366f1;
+  color: #C96DE8;
   font-size: 2rem;
 }
 
@@ -40,6 +40,13 @@
 
 .dashboard-link:hover, .pass-link:hover {
   background-color: #e0e7ff;
+}
+
+.logout-btn {
+  background-color: #8093F1;
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
 }
 
 .home-main {
