@@ -3,15 +3,6 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import '../styling/PassPurchasePage.css';
 
-interface PassPlan {
-  id: string;
-  name: string;
-  price: number;
-  duration: string;
-  features: string[];
-  recommended?: boolean;
-}
-
 const PassPurchasePage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -19,7 +10,7 @@ const PassPurchasePage: React.FC = () => {
   const [processing, setProcessing] = useState(false);
 
   // Get plan data from navigation state
-  const { selectedPlan, planType } = location.state || {};
+  const { selectedPlan } = location.state || {};
 
   const [formData, setFormData] = useState({
     cardNumber: '',
@@ -91,7 +82,7 @@ const PassPurchasePage: React.FC = () => {
               <h4>{selectedPlan.name}</h4>
               <p className="plan-duration">{selectedPlan.duration} access</p>
               <ul className="plan-features">
-                {selectedPlan.features.map((feature, index) => (
+                {selectedPlan.features.map((feature: string, index: number) => (
                   <li key={index}>{feature}</li>
                 ))}
               </ul>
