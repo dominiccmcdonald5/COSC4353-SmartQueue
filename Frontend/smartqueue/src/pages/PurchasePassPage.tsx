@@ -48,25 +48,13 @@ const PurchasePassPage: React.FC = () => {
   const handlePurchase = async () => {
     if (!selectedPlan) return;
 
-    setProcessing(true);
-
-    try {
-      // TODO: Replace with actual payment processing API call
-      // Simulate payment processing
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Navigate back to home with success message
-      navigate('/home', { 
-        state: { 
-          message: 'Premium pass purchased successfully! You now have priority access to queues.' 
-        }
-      });
-    } catch (error) {
-      console.error('Purchase failed:', error);
-      // Handle purchase failure
-    } finally {
-      setProcessing(false);
-    }
+    // Navigate to dedicated pass purchase page
+    navigate('/purchase-pass/checkout', { 
+      state: { 
+        selectedPlan: getSelectedPlan(),
+        planType: 'premium-pass'
+      }
+    });
   };
 
   const getSelectedPlan = () => {
@@ -173,8 +161,7 @@ const PurchasePassPage: React.FC = () => {
                   <p>Account: {user?.name} ({user?.email})</p>
                 </div>
                 <div className="selected-plan-info">
-                  <h4>{getSelectedPlan()?.name}</h4>
-                  <p>{getSelectedPlan()?.duration} access</p>
+                  <h4>{getSelectedPlan()?.name} / {getSelectedPlan()?.duration}</h4>
                   <div className="total-price">
                     <span>Total: ${getSelectedPlan()?.price}</span>
                   </div>
@@ -189,10 +176,6 @@ const PurchasePassPage: React.FC = () => {
                 >
                   {processing ? 'Processing...' : `Purchase ${getSelectedPlan()?.name}`}
                 </button>
-                <p className="terms">
-                  By purchasing, you agree to our terms and conditions. 
-                  Pass benefits apply immediately after purchase.
-                </p>
               </div>
             </div>
           </section>

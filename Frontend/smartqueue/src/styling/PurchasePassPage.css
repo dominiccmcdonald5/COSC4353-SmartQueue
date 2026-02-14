@@ -275,19 +275,35 @@
 
 .checkout-summary {
   background: #f8fafc;
-  padding: 2rem;
+  padding: 1.5rem;
   border-radius: 8px;
   margin-bottom: 2rem;
+  text-align: center;
 }
 
 .checkout-summary h3 {
   color: #1f2937;
+  margin-bottom: 0.5rem;
+}
+
+.user-info {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 0;
   margin-bottom: 1rem;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .user-info p {
   color: #6b7280;
-  margin-bottom: 1rem;
+  margin: 1rem;
+  text-align: center;
+  width: 100%;
+  line-height: 1.4;
 }
 
 .selected-plan-info h4 {
