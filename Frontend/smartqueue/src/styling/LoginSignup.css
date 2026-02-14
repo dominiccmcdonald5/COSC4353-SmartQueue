@@ -4,7 +4,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #8093F1 0%, #C96DE8 100%);
 }
 
 .login-container, .signup-container {
@@ -20,18 +20,19 @@
   text-align: center;
   margin-bottom: 0.5rem;
   color: #1f2937;
+  font-family: 'Tahoma', sans-serif;
   font-size: 2rem;
 }
 
 .login-container p, .signup-container p {
   text-align: center;
-  color: #6b7280;
+  color: #8093F1;
   margin-bottom: 2rem;
 }
 
 .login-form button, .signup-form button {
   width: 100%;
-  background-color: #6366f1;
+  background-color: #8093F1;
   color: white;
   padding: 0.875rem;
   margin-top: 1rem;
@@ -43,7 +44,7 @@
 }
 
 .signup-link a, .login-link a {
-  color: #6366f1;
+  color: #B388EB;
   text-decoration: none;
   font-weight: 500;
 }
