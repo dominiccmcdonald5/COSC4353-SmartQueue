@@ -1,0 +1,180 @@
+/* Login & Signup Pages */
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #8093F1 0%, #C96DE8 100%);
+}
+
+.signup-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+}
+
+
+/* =========================
+   LOGIN PAGE STYLES
+========================= */
+.login-page .login-container {
+  background: white;
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  max-width: 400px; 
+}
+
+.login-page h1 {
+  text-align: center;
+  margin-bottom: 0.5rem;
+  color: #C96DE8;
+  font-family: 'Tahoma', sans-serif;
+  font-size: 2rem;
+}
+
+.login-page p {
+  text-align: center;
+  color: #8093F1;
+  margin-bottom: 2rem;
+}
+
+.login-form .form-group {
+  margin-bottom: 1rem;
+}
+
+.login-form label {
+  display: block;
+  margin-bottom: 0.25rem;
+  color: #555;
+}
+
+.login-form input {
+  width: 100%;
+  padding: 0.5rem;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+}
+
+.login-form button {
+  width: 100%;
+  background-color: #C96DE8;
+  color: white;
+  padding: 0.875rem;
+  margin-top: 1rem;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.error-message {
+  color: red;
+  margin-top: 0.5rem;
+}
+
+.signup-link {
+  text-align: center;
+  margin-top: 1.5rem;
+}
+
+.signup-link a {
+  color: #B388EB;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+/* TWO-COLUMN Signup Container */
+.signup-page .signup-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr; 
+  width: 900px;                  
+  min-height: 500px;
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 20px 25px 45px -35px black;
+}
+
+/* Left side */
+.signup-page .signup-left {
+  background: linear-gradient(135deg, #8093F1 0%, #C96DE8 100%);
+  color: white;
+  padding: 60px 40px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.signup-page .signup-left h1 {
+  font-size: 2.5rem;
+  margin-bottom: 15px;
+  text-shadow: 1px 1px 1px #000000;
+}
+
+.signup-page .signup-left p {
+  font-size: 1.1rem;
+  color: white;
+}
+
+/* Right side */
+.signup-page .signup-right {
+  padding: 50px 40px;
+}
+
+.signup-page .signup-right h1 {
+  text-align: left;
+  color: #C96DE8;
+  font-family: 'Tahoma', sans-serif;
+  font-size: 2rem;
+  margin-bottom: 1rem;
+}
+
+/* Form */
+.signup-form .form-group {
+  margin-bottom: 1rem;
+}
+
+.signup-form label {
+  display: block;
+  margin-bottom: 0.25rem;
+  color: #555;
+}
+
+.signup-form input {
+  width: 100%;
+  padding: 0.5rem;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+}
+
+.signup-form button {
+  width: 100%;
+  background-color: #C96DE8;
+  color: white;
+  padding: 0.875rem;
+  margin-top: 1rem;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+/* Error message */
+.error-message {
+  color: red;
+  margin-top: 0.5rem;
+}
+
+/* Sign-in link */
+.login-link {
+  text-align: center;
+  margin-top: 1.5rem;
+}
+
+.login-link a {
+  color: #B388EB;
+  text-decoration: none;
+  font-weight: 500;
+}
