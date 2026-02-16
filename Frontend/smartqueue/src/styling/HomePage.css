@@ -1,10 +1,11 @@
 /* Home Page */
 .home-page {
   min-height: 100vh;
+  background-color: white;
 }
 
 .home-header {
-  background: white;
+  background: linear-gradient(75deg, #ECB8FF, #8093F1);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   padding: 1rem 0;
   margin-bottom: 2rem;
@@ -20,8 +21,11 @@
 }
 
 .home-header h1 {
-  color: #6366f1;
+  color: white;
   font-size: 2rem;
+  font-family: 'Tahoma', sans-serif;
+  font-style: italic; /* keep??? */
+  text-shadow: 1px 1px 1px #000000;
 }
 
 .user-info {
@@ -31,7 +35,7 @@
 }
 
 .dashboard-link, .pass-link {
-  color: #6366f1;
+  color: #8093F1;
   text-decoration: none;
   padding: 0.5rem 1rem;
   border-radius: 6px;
@@ -40,6 +44,13 @@
 
 .dashboard-link:hover, .pass-link:hover {
   background-color: #e0e7ff;
+}
+
+.logout-btn {
+  background-color: #8093F1;
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
 }
 
 .home-main {
@@ -93,7 +104,7 @@
 .concert-image {
   position: relative;
   height: 200px;
-  background: linear-gradient(45deg, #667eea, #764ba2);
+  background: linear-gradient(45deg, #8093F1, #C96DE8);
   display: flex;
   align-items: center;
   justify-content: center;
