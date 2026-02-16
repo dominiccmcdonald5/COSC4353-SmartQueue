@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import '../styling/LoginSignup.css';
 
 const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -27,7 +28,7 @@ const LoginPage: React.FC = () => {
   return (
     <div className="login-page">
       <div className="login-container">
-        <h1>Welcome to SmartQueue</h1>
+        <h1>Welcome to ticketQ</h1>
         <p>Sign in to your account</p>
         
         <form onSubmit={handleSubmit} className="login-form">

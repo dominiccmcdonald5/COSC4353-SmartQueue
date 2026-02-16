@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { FaBolt, FaBullseye, FaClock, FaCheck } from 'react-icons/fa';
+import '../styling/PurchasePassPage.css';
 
 interface PassPlan {
   id: string;
@@ -15,52 +17,28 @@ const PurchasePassPage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
-  const [processing, setProcessing] = useState(false);
+  const [processing] = useState(false);
 
   const passPlan: PassPlan[] = [
     {
       id: 'silver',
       name: 'Silver Pass',
-      price: 29.99,
-      duration: '3 months',
+      price: 9.99,
+      duration: 'month',
       features: [
-        'Skip up to 50% of the queue',
-        'Early access to select concerts',
-        'Email notifications for new events',
-        'Basic customer support',
+        'Skip the line until 25% venue capacity is filled',
       ],
     },
     {
       id: 'gold',
       name: 'Gold Pass',
-      price: 49.99,
-      duration: '6 months',
+      price: 19.99,
+      duration: 'month',
       recommended: true,
       features: [
-        'Skip up to 80% of the queue',
-        'Priority access to all concerts',
-        'Exclusive presale opportunities',
-        'SMS and email notifications',
-        'Premium customer support',
-        'Refund protection on cancelled events',
+        'Skip the line until 50% venue capacity is filled',
       ],
-    },
-    {
-      id: 'platinum',
-      name: 'Platinum Pass',
-      price: 99.99,
-      duration: '12 months',
-      features: [
-        'Skip directly to front 10% of queue',
-        'VIP early access (1 hour before general queue)',
-        'Exclusive access to premium seats',
-        'Personal concert recommendations',
-        'Priority customer support',
-        'Full refund protection',
-        'Complimentary seat upgrades when available',
-        'Access to exclusive member events',
-      ],
-    },
+    }
   ];
 
   const handleSelectPlan = (planId: string) => {
@@ -70,25 +48,13 @@ const PurchasePassPage: React.FC = () => {
   const handlePurchase = async () => {
     if (!selectedPlan) return;
 
-    setProcessing(true);
-
-    try {
-      // TODO: Replace with actual payment processing API call
-      // Simulate payment processing
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Navigate back to home with success message
-      navigate('/home', { 
-        state: { 
-          message: 'Premium pass purchased successfully! You now have priority access to queues.' 
-        }
-      });
-    } catch (error) {
-      console.error('Purchase failed:', error);
-      // Handle purchase failure
-    } finally {
-      setProcessing(false);
-    }
+    // Navigate to dedicated pass purchase page
+    navigate('/purchase-pass/checkout', { 
+      state: { 
+        selectedPlan: getSelectedPlan(),
+        planType: 'premium-pass'
+      }
+    });
   };
 
   const getSelectedPlan = () => {
@@ -97,39 +63,30 @@ const PurchasePassPage: React.FC = () => {
 
   return (
     <div className="purchase-pass-page">
-      <header className="pass-header">
-        <Link to="/home" className="back-link">← Back to Home</Link>
-        <h1>Premium Passes</h1>
-      </header>
-
       <main className="pass-main">
         <section className="hero-section">
-          <h2>Skip the Queue with Premium Passes</h2>
-          <p>Get priority access to the hottest concerts and never wait in long queues again!</p>
+          <Link to="/home" className="back-link">← Back to Home</Link>
+          <h2>Purchase Premium Passes</h2>
+          <p>Skip the line and get priority access to tickets!</p>
         </section>
 
         <section className="benefits-section">
           <h3>Why Get a Premium Pass?</h3>
           <div className="benefits-grid">
             <div className="benefit-item">
-              <div className="benefit-icon">⚡</div>
-              <h4>Skip the Wait</h4>
-              <p>Jump ahead in queues and get to ticket selection faster</p>
+              <div className="benefit-icon"><FaBolt /></div>
+              <h4>Skip the Line</h4>
+              <p>Jump ahead of regular users until venue capacity thresholds are met!</p>
             </div>
             <div className="benefit-item">
-              <div className="benefit-icon">🎫</div>
-              <h4>Early Access</h4>
-              <p>Get first access to tickets before general public</p>
+              <div className="benefit-icon"><FaBullseye /></div>
+              <h4>Guaranteed Access</h4>
+              <p>Get priority placement in queue based on your pass level!</p>
             </div>
             <div className="benefit-item">
-              <div className="benefit-icon">⭐</div>
-              <h4>Premium Support</h4>
-              <p>Get dedicated customer support when you need it</p>
-            </div>
-            <div className="benefit-item">
-              <div className="benefit-icon">🔔</div>
-              <h4>Priority Notifications</h4>
-              <p>Be the first to know about new concerts and presales</p>
+              <div className="benefit-icon"><FaClock /></div>
+              <h4>Save Time</h4>
+              <p>Spend less time waiting and more time enjoying concerts!</p>
             </div>
           </div>
         </section>
@@ -159,11 +116,20 @@ const PurchasePassPage: React.FC = () => {
                   <ul>
                     {plan.features.map((feature, index) => (
                       <li key={index}>
-                        <span className="checkmark">✓</span>
+                        <span className="checkmark"><FaCheck /></span>
                         {feature}
                       </li>
                     ))}
                   </ul>
+                  
+                  <div className="capacity-explanation">
+                    <p className="capacity-text">
+                      {plan.id === 'silver' 
+                        ? 'You\'ll skip the entire line until 25% of tickets are sold, then the pass stops working.'
+                        : 'You\'ll skip the entire line until 50% of tickets are sold, then the pass stops working.'
+                      }
+                    </p>
+                  </div>
                 </div>
 
                 <button 
@@ -178,6 +144,12 @@ const PurchasePassPage: React.FC = () => {
               </div>
             ))}
           </div>
+          
+          <div className="priority-note">
+            <p className="note-text">
+              <em>Both Silver and Gold Passes hold the same priority level - Gold simply works until 50% venue capacity is reached, while Silver stops at 25% capacity.</em>
+            </p>
+          </div>
         </section>
 
         {selectedPlan && (
@@ -189,8 +161,7 @@ const PurchasePassPage: React.FC = () => {
                   <p>Account: {user?.name} ({user?.email})</p>
                 </div>
                 <div className="selected-plan-info">
-                  <h4>{getSelectedPlan()?.name}</h4>
-                  <p>{getSelectedPlan()?.duration} access</p>
+                  <h4>{getSelectedPlan()?.name} / {getSelectedPlan()?.duration}</h4>
                   <div className="total-price">
                     <span>Total: ${getSelectedPlan()?.price}</span>
                   </div>
@@ -205,36 +176,11 @@ const PurchasePassPage: React.FC = () => {
                 >
                   {processing ? 'Processing...' : `Purchase ${getSelectedPlan()?.name}`}
                 </button>
-                <p className="terms">
-                  By purchasing, you agree to our terms and conditions. 
-                  Pass benefits apply immediately after purchase.
-                </p>
               </div>
             </div>
           </section>
         )}
 
-        <section className="faq-section">
-          <h3>Frequently Asked Questions</h3>
-          <div className="faq-list">
-            <div className="faq-item">
-              <h4>How does queue skipping work?</h4>
-              <p>Premium pass holders are automatically moved ahead in the queue based on their pass level. You'll see your improved position immediately when joining a queue.</p>
-            </div>
-            <div className="faq-item">
-              <h4>When do my benefits start?</h4>
-              <p>Your premium pass benefits are active immediately after purchase and will appear on your next queue join.</p>
-            </div>
-            <div className="faq-item">
-              <h4>Can I upgrade my pass later?</h4>
-              <p>Yes! You can upgrade to a higher tier at any time. The difference in price will be prorated based on your remaining time.</p>
-            </div>
-            <div className="faq-item">
-              <h4>What happens if a concert is cancelled?</h4>
-              <p>Gold and Platinum pass holders receive full refund protection for cancelled events, while Silver pass holders receive partial refunds.</p>
-            </div>
-          </div>
-        </section>
       </main>
     </div>
   );

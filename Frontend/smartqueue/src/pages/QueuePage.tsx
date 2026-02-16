@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import '../styling/QueuePage.css';
 
 interface QueueStatus {
   position: number;
@@ -144,6 +145,15 @@ const QueuePage: React.FC = () => {
                   Proceed to Seat Selection
                 </button>
               )}
+              
+              {/* Development/Demo button to skip queue */}
+              <button 
+                onClick={handleProceedToSeating}
+                className="skip-queue-btn"
+                style={{ backgroundColor: '#10b981', color: 'white' }}
+              >
+                Skip Queue (Demo)
+              </button>
               
               <button 
                 onClick={handleLeaveQueue}

@@ -1,0 +1,181 @@
+/* Payment Page */
+.payment-page {
+  min-height: 100vh;
+  padding: 2rem 1rem;
+}
+
+.payment-header {
+  max-width: 1000px;
+  margin: 0 auto 2rem;
+}
+
+.payment-main {
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.payment-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3rem;
+  margin-bottom: 2rem;
+}
+
+.order-summary,
+.payment-form {
+  background: white;
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.order-summary h2,
+.payment-form h2 {
+  color: #1f2937;
+  margin-bottom: 1.5rem;
+}
+
+.concert-info {
+  margin-bottom: 2rem;
+}
+
+.concert-info h3 {
+  color: #1f2937;
+  margin-bottom: 0.5rem;
+}
+
+.concert-info p {
+  color: #6b7280;
+}
+
+.selected-seats {
+  margin-bottom: 2rem;
+}
+
+.selected-seats h4 {
+  color: #1f2937;
+  margin-bottom: 1rem;
+}
+
+.seat-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.pricing-breakdown {
+  border-top: 1px solid #e5e7eb;
+  padding-top: 1rem;
+  margin-top: 1rem;
+}
+
+.price-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.price-row.total {
+  font-weight: bold;
+  font-size: 1.2rem;
+  border-top: 1px solid #e5e7eb;
+  padding-top: 0.5rem;
+  margin-top: 0.5rem;
+  color: #1f2937;
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: #374151;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.form-row {
+  display: flex;
+  gap: 1rem;
+}
+
+.form-row .form-group {
+  flex: 1;
+}
+
+.error {
+  color: #ef4444;
+  font-size: 0.8rem;
+  margin-top: 0.25rem;
+  display: block;
+}
+
+.pay-button {
+  width: 100%;
+  background-color: #6366f1;
+  color: white;
+  padding: 1rem 2rem;
+  border-radius: 8px;
+  border: none;
+  font-size: 1.1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 2rem;
+}
+
+.pay-button:hover:not(:disabled) {
+  background-color: #5b21b6;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+}
+
+.pay-button:disabled {
+  background-color: #9ca3af;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.security-notice {
+  text-align: center;
+  margin-top: 2rem;
+  padding: 1rem;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.security-notice p {
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
+/* Mobile Responsiveness for Payment */
+@media (max-width: 768px) {
+  .payment-container {
+    grid-template-columns: 1fr;
+  }
+  
+  .form-row {
+    flex-direction: column;
+  }
+}

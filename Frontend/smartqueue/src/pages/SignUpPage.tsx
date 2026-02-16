@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import '../styling/LoginSignup.css';
 
 const SignUpPage: React.FC = () => {
   const [formData, setFormData] = useState({
-    name: '',
+    firstName: '',
+    lastName : '',
     email: '',
     password: '',
     confirmPassword: '',
@@ -36,7 +38,7 @@ const SignUpPage: React.FC = () => {
     }
 
     try {
-      await signup(formData.email, formData.password, formData.name);
+      await signup(formData.email, formData.password, formData.firstName, formData.lastName);
       navigate('/home');
     } catch (error) {
       setError('Failed to create account. Please try again.');
@@ -45,23 +47,44 @@ const SignUpPage: React.FC = () => {
 
   return (
     <div className="signup-page">
-      <div className="signup-container">
-        <h1>Join SmartQueue</h1>
-        <p>Create your account to start queuing for concerts</p>
-        
+    <div className="signup-container">
+
+      {/* Left Column */}
+      <div className="signup-left">
+        <h1>Join ticketQ</h1>
+        <p>Create your account to find tickets for your favorite artists</p>
+      </div>
+
+      {/* Right Column */}
+      <div className="signup-right">
+        <h1>Create Account</h1>
+
         <form onSubmit={handleSubmit} className="signup-form">
+
           <div className="form-group">
-            <label htmlFor="name">Full Name</label>
+            <label htmlFor="firstName">First Name</label>
             <input
               type="text"
-              id="name"
-              name="name"
-              value={formData.name}
+              id="firstName"
+              name="firstName"
+              value={formData.firstName}
               onChange={handleChange}
               required
             />
           </div>
-          
+
+          <div className="form-group">
+            <label htmlFor="lastName">Last Name</label>
+            <input
+              type="text"
+              id="lastName"
+              name="lastName"
+              value={formData.lastName}
+              onChange={handleChange}
+              required
+            />
+          </div>
+
           <div className="form-group">
             <label htmlFor="email">Email</label>
             <input
@@ -73,7 +96,7 @@ const SignUpPage: React.FC = () => {
               required
             />
           </div>
-          
+
           <div className="form-group">
             <label htmlFor="password">Password</label>
             <input
@@ -86,7 +109,7 @@ const SignUpPage: React.FC = () => {
               minLength={6}
             />
           </div>
-          
+
           <div className="form-group">
             <label htmlFor="confirmPassword">Confirm Password</label>
             <input
@@ -98,19 +121,23 @@ const SignUpPage: React.FC = () => {
               required
             />
           </div>
-          
+
           {error && <div className="error-message">{error}</div>}
-          
+
           <button type="submit" disabled={isLoading}>
             {isLoading ? 'Creating Account...' : 'Sign Up'}
           </button>
+
         </form>
-        
+
         <p className="login-link">
           Already have an account? <Link to="/login">Sign in here</Link>
         </p>
+
       </div>
+
     </div>
+  </div>
   );
 };
 

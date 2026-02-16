@@ -1,4 +1,3 @@
-import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -12,6 +11,7 @@ import QueuePage from './pages/QueuePage';
 import SeatingMapPage from './pages/SeatingMapPage';
 import PaymentPage from './pages/PaymentPage';
 import PurchasePassPage from './pages/PurchasePassPage';
+import PassPurchasePage from './pages/PassPurchasePage';
 
 import './App.css';
 
@@ -59,6 +59,12 @@ function App() {
             <Route path="/purchase-pass" element={
               <ProtectedRoute>
                 <PurchasePassPage />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/purchase-pass/checkout" element={
+              <ProtectedRoute>
+                <PassPurchasePage />
               </ProtectedRoute>
             } />
             

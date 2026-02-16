@@ -155,13 +155,175 @@ button:disabled {
   background-color: #dc2626;
 }
 
-/* Login & Signup Pages */
+/* Responsive Design */
+@media (max-width: 768px) {
+  .form-row {
+    flex-direction: column;
+  }
+  
+  .header-content {
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .user-info {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  line-height: 1.6;
+  color: #333;
+  background-color: #f8fafc;
+}
+
+#root {
+  height: 100%;
+  width: 100%;
+}
+
+.App {
+  min-height: 100vh;
+  width: 100%;
+}
+
+/* Common Components */
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  color: #6366f1;
+  text-decoration: none;
+  font-weight: 500;
+  margin-bottom: 1rem;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  transition: background-color 0.2s;
+}
+
+.back-link:hover {
+  background-color: #e0e7ff;
+}
+
+/* Loading State */
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 50vh;
+  font-size: 1.2rem;
+  color: #6b7280;
+}
+
+/* Error States */
+.error-message {
+  color: #ef4444;
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  margin: 0.5rem 0;
+  font-size: 0.9rem;
+}
+
+/* Form Styles */
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: #374151;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.form-row {
+  display: flex;
+  gap: 1rem;
+}
+
+.form-row .form-group {
+  flex: 1;
+}
+
+/* Button Styles */
+button {
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 500;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  padding: 0.75rem 1.5rem;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.primary-btn, .join-queue-btn, .proceed-btn, .purchase-btn {
+  background-color: #6366f1;
+  color: white;
+}
+
+.primary-btn:hover:not(:disabled),
+.join-queue-btn:hover:not(:disabled),
+.proceed-btn:hover:not(:disabled),
+.purchase-btn:hover:not(:disabled) {
+  background-color: #5b21b6;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+}
+
+.secondary-btn {
+  background-color: #e5e7eb;
+  color: #374151;
+}
+
+.secondary-btn:hover:not(:disabled) {
+  background-color: #d1d5db;
+}
+
+.danger-btn, .leave-queue-btn {
+  background-color: #ef4444;
+  color: white;
+}
+
+.danger-btn:hover:not(:disabled),
+.leave-queue-btn:hover:not(:disabled) {
+  background-color: #dc2626;
+}
+
+/* Login & Signup Pages 
 .login-page, .signup-page {
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #8093F1 0%, #C96DE8 100%);
 }
 
 .login-container, .signup-container {
@@ -176,7 +338,7 @@ button:disabled {
 .login-container h1, .signup-container h1 {
   text-align: center;
   margin-bottom: 0.5rem;
-  color: #1f2937;
+  color: #8E38AB;
   font-size: 2rem;
 }
 
@@ -188,7 +350,7 @@ button:disabled {
 
 .login-form button, .signup-form button {
   width: 100%;
-  background-color: #6366f1;
+  background-color: #B388EB;
   color: white;
   padding: 0.875rem;
   margin-top: 1rem;
@@ -200,12 +362,13 @@ button:disabled {
 }
 
 .signup-link a, .login-link a {
-  color: #6366f1;
+  color: #8093F1;
   text-decoration: none;
   font-weight: 500;
 }
+  */
 
-/* Home Page */
+/* Home Page 
 .home-page {
   min-height: 100vh;
 }
@@ -250,7 +413,7 @@ button:disabled {
 }
 
 .logout-btn {
-  background-color: #ef4444;
+  background-color: #8093F1;
   color: white;
   padding: 0.5rem 1rem;
   border-radius: 6px;
@@ -289,8 +452,9 @@ button:disabled {
   grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
   gap: 2rem;
 }
+  */
 
-/* Concert Cards */
+/* Concert Cards 
 .concert-card {
   background: white;
   border-radius: 12px;
@@ -377,6 +541,7 @@ button:disabled {
   color: white;
   cursor: not-allowed;
 }
+  */
 
 /* Dashboard Styles */
 .dashboard-page {
@@ -643,6 +808,25 @@ button:disabled {
 /* Purchase Pass Page */
 .purchase-pass-page {
   min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 2rem 0;
+}
+
+.pass-header {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1rem;
+  margin-bottom: 2rem;
+  display: flex;
+  justify-content: center;
+}
+
+.back-button-container {
+  background: white;
+  padding: 1rem;
+  border-radius: 12px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  display: inline-block;
 }
 
 .pass-main {
@@ -652,9 +836,60 @@ button:disabled {
 }
 
 .hero-section {
-  text-align: center;
-  padding: 3rem 0;
+  background: white;
+  padding: 3rem 2rem;
   margin-bottom: 3rem;
+  border-radius: 12px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  text-align: center;
+  position: relative;
+}
+
+.hero-section .back-link {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  display: inline-block;
+  padding: 0.75rem 1.5rem;
+  background-color: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  text-decoration: none;
+  color: #6366f1;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.hero-section .back-link:hover {
+  background-color: #e0e7ff;
+  text-decoration: none;
+}
+
+.hero-section h2 {
+  color: #1f2937;
+  margin-bottom: 1rem;
+  margin-top: 0.5rem;
+  font-size: 2.5rem;
+}
+
+.hero-section p {
+  color: #6b7280;
+  font-size: 1.3rem;
+}
+
+.benefits-section {
+  background: white;
+  padding: 3rem 2rem;
+  margin-bottom: 3rem;
+  border-radius: 12px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+.benefits-section h3 {
+  text-align: center;
+  color: #1f2937;
+  margin-bottom: 2rem;
+  font-size: 2.5rem;
 }
 
 .benefits-grid {
@@ -667,14 +902,28 @@ button:disabled {
 .benefit-item {
   text-align: center;
   padding: 1.5rem;
-  background: white;
+  background: #f8fafc;
   border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e5e7eb;
 }
 
 .benefit-icon {
   font-size: 3rem;
   margin-bottom: 1rem;
+}
+
+.plans-section {
+  background: white;
+  padding: 3rem 2rem;
+  margin-bottom: 3rem;
+  border-radius: 12px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+.plans-section h3 {
+  text-align: center;
+  color: #1f2937;
+  margin-bottom: 2rem;
 }
 
 .plans-grid {
@@ -685,7 +934,7 @@ button:disabled {
 }
 
 .plan-card {
-  background: white;
+  background: #f8fafc;
   border: 2px solid #e5e7eb;
   border-radius: 12px;
   padding: 2rem;
@@ -703,6 +952,7 @@ button:disabled {
 .plan-card.recommended {
   border-color: #6366f1;
   transform: scale(1.05);
+  background: white;
 }
 
 .plan-card.selected {
@@ -777,6 +1027,103 @@ button:disabled {
 .select-plan-btn.selected {
   background: #6366f1;
   color: white;
+}
+
+.checkout-section {
+  background: white;
+  padding: 3rem 2rem;
+  margin-bottom: 3rem;
+  border-radius: 12px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+.checkout-container {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.checkout-summary {
+  background: #f8fafc;
+  padding: 2rem;
+  border-radius: 8px;
+  margin-bottom: 2rem;
+}
+
+.checkout-summary h3 {
+  color: #1f2937;
+  margin-bottom: 1rem;
+}
+
+.user-info p {
+  color: #6b7280;
+  margin-bottom: 1rem;
+}
+
+.selected-plan-info h4 {
+  color: #1f2937;
+  margin-bottom: 0.5rem;
+}
+
+.total-price {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #1f2937;
+  text-align: center;
+  margin-top: 1rem;
+}
+
+.checkout-actions {
+  text-align: center;
+}
+
+.purchase-btn {
+  width: 100%;
+  max-width: 300px;
+  padding: 1rem 2rem;
+  font-size: 1.1rem;
+  margin-bottom: 1rem;
+}
+
+.terms {
+  font-size: 0.9rem;
+  color: #6b7280;
+  text-align: center;
+}
+
+.faq-section {
+  background: white;
+  padding: 3rem 2rem;
+  border-radius: 12px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+.faq-section h3 {
+  text-align: center;
+  color: #1f2937;
+  margin-bottom: 2rem;
+}
+
+.faq-list {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.faq-item {
+  background: #f8fafc;
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  border: 1px solid #e5e7eb;
+}
+
+.faq-item h4 {
+  color: #1f2937;
+  margin-bottom: 0.5rem;
+}
+
+.faq-item p {
+  color: #6b7280;
+  margin: 0;
 }
 
 /* Responsive Design */
