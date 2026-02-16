@@ -317,7 +317,7 @@ button:disabled {
   background-color: #dc2626;
 }
 
-/* Login & Signup Pages */
+/* Login & Signup Pages 
 .login-page, .signup-page {
   min-height: 100vh;
   display: flex;
@@ -338,7 +338,7 @@ button:disabled {
 .login-container h1, .signup-container h1 {
   text-align: center;
   margin-bottom: 0.5rem;
-  color: #1f2937;
+  color: #8E38AB;
   font-size: 2rem;
 }
 
@@ -366,8 +366,9 @@ button:disabled {
   text-decoration: none;
   font-weight: 500;
 }
+  */
 
-/* Home Page */
+/* Home Page 
 .home-page {
   min-height: 100vh;
 }
@@ -451,8 +452,9 @@ button:disabled {
   grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
   gap: 2rem;
 }
+  */
 
-/* Concert Cards */
+/* Concert Cards 
 .concert-card {
   background: white;
   border-radius: 12px;
@@ -539,6 +541,7 @@ button:disabled {
   color: white;
   cursor: not-allowed;
 }
+  */
 
 /* Dashboard Styles */
 .dashboard-page {
