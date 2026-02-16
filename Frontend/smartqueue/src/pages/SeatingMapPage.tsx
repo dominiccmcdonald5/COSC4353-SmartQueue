@@ -23,7 +23,7 @@ const SeatingMapPage: React.FC = () => {
   const [sections, setSections] = useState<SeatingSection[]>([]);
   const [selectedSeats, setSelectedSeats] = useState<Seat[]>([]);
   const [loading, setLoading] = useState(true);
-  const [concertInfo, setConcertInfo] = useState({
+  const [concertInfo] = useState({
     name: 'Summer Music Festival',
     artist: 'Various Artists',
     date: '2026-07-15',

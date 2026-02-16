@@ -17,7 +17,7 @@ const PurchasePassPage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
-  const [processing, setProcessing] = useState(false);
+  const [processing] = useState(false);
 
   const passPlan: PassPlan[] = [
     {
