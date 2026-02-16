@@ -1,143 +1,72 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import '../styling/LoginSignup.css';
 
-const SignUpPage: React.FC = () => {
-  const [formData, setFormData] = useState({
-    firstName: '',
-    lastName : '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-  });
+const LoginPage: React.FC = () => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const { signup, isLoading } = useAuth();
+  const { login, isLoading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
+  const from = location.state?.from?.pathname || '/home';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
-      return;
-    }
-
-    if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters long');
-      return;
-    }
-
     try {
-      await signup(formData.email, formData.password, formData.firstName, formData.lastName);
-      navigate('/home');
+      await login(email, password);
+      navigate(from, { replace: true });
     } catch (error) {
-      setError('Failed to create account. Please try again.');
+      setError('Invalid email or password');
     }
   };
 
   return (
-    <div className="signup-page">
-      <div className="signup-container">
-
-        {/* Left Column */}
-        <div className="signup-left">
-          <h1>Join ticketQ</h1>
-          <p>Create your account to start queuing for concerts</p>
-        </div>
-
-        {/* Right Column */}
-        <div className="signup-right">
-          <h1>Sign Up</h1>
-
-          <form onSubmit={handleSubmit} className="signup-form">
-
-            <div className="form-group">
-              <label htmlFor="firstName">First Name</label>
-              <input
-                type="text"
-                id="firstName"
-                name="firstName"
-                value={formData.firstName}
-                onChange={handleChange}
-                required
-              />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="lastName">Last Name</label>
-              <input
-                type="text"
-                id="lastName"
-                name="lastName"
-                value={formData.lastName}
-                onChange={handleChange}
-                required
-              />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="email">Email</label>
-              <input
-                type="email"
-                id="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                required
-              />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="password">Password</label>
-              <input
-                type="password"
-                id="password"
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                required
-                minLength={6}
-              />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="confirmPassword">Confirm Password</label>
-              <input
-                type="password"
-                id="confirmPassword"
-                name="confirmPassword"
-                value={formData.confirmPassword}
-                onChange={handleChange}
-                required
-              />
-            </div>
-
-            {error && <div className="error-message">{error}</div>}
-
-            <button type="submit" disabled={isLoading}>
-              {isLoading ? 'Creating Account...' : 'Sign Up'}
-            </button>
-
-          </form>
-
-          <p className="login-link">
-            Already have an account? <Link to="/login">Sign in here</Link>
-          </p>
-        </div>
-
+    <div className="login-page">
+      <div className="login-container">
+        <h1>Welcome to ticketQ</h1>
+        <p>Sign in to your account</p>
+        
+        <form onSubmit={handleSubmit} className="login-form">
+          <div className="form-group">
+            <label htmlFor="email">Email</label>
+            <input
+              type="email"
+              id="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
+          
+          <div className="form-group">
+            <label htmlFor="password">Password</label>
+            <input
+              type="password"
+              id="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
+          
+          {error && <div className="error-message">{error}</div>}
+          
+          <button type="submit" disabled={isLoading}>
+            {isLoading ? 'Signing in...' : 'Sign In'}
+          </button>
+        </form>
+        
+        <p className="signup-link">
+          Don't have an account? <Link to="/signup">Sign up here</Link>
+        </p>
       </div>
     </div>
   );
 };
 
-export default SignUpPage;
+export default LoginPage;

@@ -7,11 +7,89 @@
   background: linear-gradient(135deg, #8093F1 0%, #C96DE8 100%);
 }
 
+.login-page, .signup-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #8093F1 0%, #C96DE8 100%);
+}
+
+/* =========================
+   LOGIN PAGE STYLES
+========================= */
+.login-page .login-container {
+  background: white;
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  max-width: 400px; /* keeps it boxed */
+}
+
+.login-page h1 {
+  text-align: center;
+  margin-bottom: 0.5rem;
+  color: #8E38AB;
+  font-family: 'Tahoma', sans-serif;
+  font-size: 2rem;
+}
+
+.login-page p {
+  text-align: center;
+  color: #8093F1;
+  margin-bottom: 2rem;
+}
+
+.login-form .form-group {
+  margin-bottom: 1rem;
+}
+
+.login-form label {
+  display: block;
+  margin-bottom: 0.25rem;
+  color: #555;
+}
+
+.login-form input {
+  width: 100%;
+  padding: 0.5rem;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+}
+
+.login-form button {
+  width: 100%;
+  background-color: #8093F1;
+  color: white;
+  padding: 0.875rem;
+  margin-top: 1rem;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.error-message {
+  color: red;
+  margin-top: 0.5rem;
+}
+
+.signup-link {
+  text-align: center;
+  margin-top: 1.5rem;
+}
+
+.signup-link a {
+  color: #B388EB;
+  text-decoration: none;
+  font-weight: 500;
+}
+
 /* TWO-COLUMN Signup Container */
-.signup-container {
+.signup-page .signup-container {
   display: grid;
-  grid-template-columns: 1fr 1fr; /* two equal columns */
-  width: 900px;                  /* wider than single column */
+  grid-template-columns: 1fr 1fr; 
+  width: 900px;                  
   min-height: 500px;
   background: white;
   border-radius: 12px;
@@ -20,7 +98,7 @@
 }
 
 /* Left side */
-.signup-left {
+.signup-page .signup-left {
   background: #8E38AB;
   color: white;
   padding: 60px 40px;
@@ -29,22 +107,22 @@
   justify-content: center;
 }
 
-.signup-left h1 {
+.signup-page .signup-left h1 {
   font-size: 2.5rem;
   margin-bottom: 15px;
 }
 
-.signup-left p {
+.signup-page .signup-left p {
   font-size: 1.1rem;
   color: #F3E6FF;
 }
 
 /* Right side */
-.signup-right {
+.signup-page .signup-right {
   padding: 50px 40px;
 }
 
-.signup-right h1 {
+.signup-page .signup-right h1 {
   text-align: left;
   color: #8E38AB;
   font-family: 'Tahoma', sans-serif;
