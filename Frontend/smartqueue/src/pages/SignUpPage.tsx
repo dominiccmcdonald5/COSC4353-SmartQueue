@@ -47,11 +47,20 @@ const SignUpPage: React.FC = () => {
 
   return (
     <div className="signup-page">
-      <div className="signup-container">
+    <div className="signup-container">
+
+      {/* Left Column */}
+      <div className="signup-left">
         <h1>Join ticketQ</h1>
         <p>Create your account to start queuing for concerts</p>
-        
+      </div>
+
+      {/* Right Column */}
+      <div className="signup-right">
+        <h1>Sign Up</h1>
+
         <form onSubmit={handleSubmit} className="signup-form">
+
           <div className="form-group">
             <label htmlFor="firstName">First Name</label>
             <input
@@ -75,7 +84,7 @@ const SignUpPage: React.FC = () => {
               required
             />
           </div>
-          
+
           <div className="form-group">
             <label htmlFor="email">Email</label>
             <input
@@ -87,7 +96,7 @@ const SignUpPage: React.FC = () => {
               required
             />
           </div>
-          
+
           <div className="form-group">
             <label htmlFor="password">Password</label>
             <input
@@ -100,7 +109,7 @@ const SignUpPage: React.FC = () => {
               minLength={6}
             />
           </div>
-          
+
           <div className="form-group">
             <label htmlFor="confirmPassword">Confirm Password</label>
             <input
@@ -112,19 +121,23 @@ const SignUpPage: React.FC = () => {
               required
             />
           </div>
-          
+
           {error && <div className="error-message">{error}</div>}
-          
+
           <button type="submit" disabled={isLoading}>
             {isLoading ? 'Creating Account...' : 'Sign Up'}
           </button>
+
         </form>
-        
+
         <p className="login-link">
           Already have an account? <Link to="/login">Sign in here</Link>
         </p>
+
       </div>
+
     </div>
+  </div>
   );
 };
 

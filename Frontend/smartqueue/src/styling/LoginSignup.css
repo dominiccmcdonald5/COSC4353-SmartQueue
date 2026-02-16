@@ -7,43 +7,93 @@
   background: linear-gradient(135deg, #8093F1 0%, #C96DE8 100%);
 }
 
-.login-container, .signup-container {
+/* TWO-COLUMN Signup Container */
+.signup-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr; /* two equal columns */
+  width: 900px;                  /* wider than single column */
+  min-height: 500px;
   background: white;
-  padding: 2rem;
   border-radius: 12px;
+  overflow: hidden;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-  width: 100%;
-  max-width: 400px;
 }
 
-.login-container h1, .signup-container h1 {
-  text-align: center;
-  margin-bottom: 0.5rem;
+/* Left side */
+.signup-left {
+  background: #8E38AB;
+  color: white;
+  padding: 60px 40px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.signup-left h1 {
+  font-size: 2.5rem;
+  margin-bottom: 15px;
+}
+
+.signup-left p {
+  font-size: 1.1rem;
+  color: #F3E6FF;
+}
+
+/* Right side */
+.signup-right {
+  padding: 50px 40px;
+}
+
+.signup-right h1 {
+  text-align: left;
   color: #8E38AB;
   font-family: 'Tahoma', sans-serif;
   font-size: 2rem;
+  margin-bottom: 1rem;
 }
 
-.login-container p, .signup-container p {
-  text-align: center;
-  color: #8093F1;
-  margin-bottom: 2rem;
+/* Form */
+.signup-form .form-group {
+  margin-bottom: 1rem;
 }
 
-.login-form button, .signup-form button {
+.signup-form label {
+  display: block;
+  margin-bottom: 0.25rem;
+  color: #555;
+}
+
+.signup-form input {
+  width: 100%;
+  padding: 0.5rem;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+}
+
+.signup-form button {
   width: 100%;
   background-color: #8093F1;
   color: white;
   padding: 0.875rem;
   margin-top: 1rem;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
 }
 
-.signup-link, .login-link {
+/* Error message */
+.error-message {
+  color: red;
+  margin-top: 0.5rem;
+}
+
+/* Sign-in link */
+.login-link {
   text-align: center;
   margin-top: 1.5rem;
 }
 
-.signup-link a, .login-link a {
+.login-link a {
   color: #B388EB;
   text-decoration: none;
   font-weight: 500;
