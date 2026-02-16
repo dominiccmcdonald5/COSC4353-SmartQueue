@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { GiPoliceBadge } from 'react-icons/gi';
+import { FaTicketAlt, FaClock, FaMusic, FaDollarSign, FaChartLine, FaTrophy } from 'react-icons/fa';
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell } from 'recharts';
+import { ResponsivePie } from '@nivo/pie';
 import '../styling/UserDashboard.css';
 
 interface QueueHistory {
@@ -33,6 +36,20 @@ const UserDashboard: React.FC = () => {
 
   // Mock user pass status - replace with actual user data
   const userPassStatus: PassStatus = 'gold' as PassStatus;
+
+  // Mock data for enhanced stats
+  const topGenres = [
+    { name: 'Pop', count: 2, percentage: 25, fill: '#9ca3af' },     // 2nd place (left)
+    { name: 'Rock', count: 4, percentage: 50, fill: '#f59e0b' },    // 1st place (middle)
+    { name: 'Jazz', count: 2, percentage: 25, fill: '#cd7f32' },    // 3rd place (right)
+  ];
+
+  const spendingByConcert = [
+    { id: 'Summer Rock Festival', label: 'Summer Rock Festival', value: 150, color: '#667eea' },
+    { id: 'Pop Stars Live', label: 'Pop Stars Live', value: 120, color: '#764ba2' },
+    { id: 'Jazz Night', label: 'Jazz Night', value: 80, color: '#10b981' },
+    { id: 'Indie Showcase', label: 'Indie Showcase', value: 100, color: '#f59e0b' },
+  ];
 
   useEffect(() => {
     // TODO: Replace with actual API calls
@@ -72,7 +89,7 @@ const UserDashboard: React.FC = () => {
       favoriteGenre: 'Rock',
       totalSpent: 850,
     };
-
+    
     setQueueHistory(mockHistory);
     setUserStats(mockStats);
   }, []);
@@ -174,42 +191,123 @@ const UserDashboard: React.FC = () => {
         {activeTab === 'stats' && userStats && (
           <section className="user-stats">
             <h3>Your Concert Statistics</h3>
-            <div className="stats-grid">
-              <div className="stat-card">
-                <h4>Total Queues Joined</h4>
-                <p className="stat-number">{userStats.totalQueues}</p>
+            
+            {/* Success Rate Container */}
+            <div className="stats-container success-container">
+              <div className="pie-chart-container">
+                <div className="success-pie-chart">
+                  <div 
+                    className="pie-chart-circle"
+                    style={{
+                      background: `conic-gradient(
+                        #10b981 0deg ${(userStats.successfulPurchases / userStats.totalQueues) * 360}deg,
+                        #e5e7eb ${(userStats.successfulPurchases / userStats.totalQueues) * 360}deg 360deg
+                      )`
+                    }}
+                  >
+                    <div className="pie-chart-center">
+                      <span className="success-percentage">
+                        {Math.round((userStats.successfulPurchases / userStats.totalQueues) * 100)}%
+                      </span>
+                      <span className="success-label">Success Rate</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="success-details">
+                  <h4>Performance Level</h4>
+                  <p className="performance-level">
+                    {Math.round((userStats.successfulPurchases / userStats.totalQueues) * 100) >= 80 ? 'Expert' :
+                     Math.round((userStats.successfulPurchases / userStats.totalQueues) * 100) >= 60 ? 'Advanced' :
+                     Math.round((userStats.successfulPurchases / userStats.totalQueues) * 100) >= 40 ? 'Intermediate' : 'Beginner'}
+                  </p>
+                  <div className="queue-stats">
+                    <div className="queue-stat">
+                      <span className="stat-value">{userStats.totalQueues}</span>
+                      <span className="stat-label">Total Queues</span>
+                    </div>
+                    <div className="queue-stat">
+                      <span className="stat-value">{userStats.successfulPurchases}</span>
+                      <span className="stat-label">Successful</span>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="stat-card">
-                <h4>Successful Purchases</h4>
-                <p className="stat-number">{userStats.successfulPurchases}</p>
+            </div>
+
+            {/* Genre Podium Container */}
+            <div className="stats-container podium-container">
+              <h4>Top Genres</h4>
+              <div className="recharts-podium">
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart
+                    data={topGenres}
+                    margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+                  >
+                    <XAxis 
+                      dataKey="name" 
+                      tick={{ fontSize: 14, fontWeight: 'bold' }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <YAxis hide />
+                    <Bar 
+                      dataKey="count" 
+                      radius={[8, 8, 0, 0]}
+                      label={{ position: 'top', fontSize: 14, fontWeight: 'bold' }}
+                    >
+                      {topGenres.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+                <div className="podium-labels">
+                  <div className="podium-rank">
+                    <FaTrophy style={{ color: '#f59e0b', fontSize: '1.5rem' }} />
+                    <span>1st Place</span>
+                  </div>
+                </div>
               </div>
-              <div className="stat-card">
-                <h4>Average Wait Time</h4>
-                <p className="stat-number">{userStats.averageWaitTime}</p>
-              </div>
-              <div className="stat-card">
-                <h4>Favorite Genre</h4>
-                <p className="stat-number">{userStats.favoriteGenre}</p>
-              </div>
-              <div className="stat-card">
-                <h4>Total Spent</h4>
-                <p className="stat-number">${userStats.totalSpent}</p>
-              </div>
-              <div className="stat-card">
-                <h4>Success Rate</h4>
-                <p className="stat-number">
-                  {Math.round((userStats.successfulPurchases / userStats.totalQueues) * 100)}%
-                </p>
+            </div>
+
+            {/* Spending Pie Chart Container */}
+            <div className="stats-container spending-container">
+              <div className="spending-chart-container">
+                <div className="spending-total">
+                  <h4>Total Spending</h4>
+                  <p className="total-amount">${userStats.totalSpent}</p>
+                  <p className="spending-instruction">Hover over the chart to see breakdown</p>
+                </div>
+                <div className="custom-pie-container">
+                  <div 
+                    className="custom-pie-chart"
+                    style={{
+                      background: `conic-gradient(
+                        ${spendingByConcert[0].color} 0deg ${(spendingByConcert[0].value / userStats.totalSpent) * 360}deg,
+                        ${spendingByConcert[1].color} ${(spendingByConcert[0].value / userStats.totalSpent) * 360}deg ${((spendingByConcert[0].value + spendingByConcert[1].value) / userStats.totalSpent) * 360}deg,
+                        ${spendingByConcert[2].color} ${((spendingByConcert[0].value + spendingByConcert[1].value) / userStats.totalSpent) * 360}deg ${((spendingByConcert[0].value + spendingByConcert[1].value + spendingByConcert[2].value) / userStats.totalSpent) * 360}deg,
+                        ${spendingByConcert[3].color} ${((spendingByConcert[0].value + spendingByConcert[1].value + spendingByConcert[2].value) / userStats.totalSpent) * 360}deg 360deg
+                      )`
+                    }}
+                  >
+                    <div className="pie-center">
+                      <FaDollarSign className="pie-center-icon" />
+                    </div>
+                  </div>
+                  <div className="pie-legend">
+                    {spendingByConcert.map((item, index) => (
+                      <div key={index} className="legend-item" title={`${item.label}: $${item.value}`}>
+                        <div className="legend-dot" style={{ backgroundColor: item.color }}></div>
+                        <span className="legend-label">{item.label}</span>
+                        <span className="legend-value">${item.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           </section>
         )}
-
-        <section className="dashboard-actions">
-          <Link to="/purchase-pass" className="action-link">
-            Upgrade to Premium Pass
-          </Link>
-        </section>
 
         {/* Badge Popup Modal */}
         {showBadgePopup && badgeInfo && (
