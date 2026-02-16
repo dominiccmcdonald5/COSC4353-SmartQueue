@@ -1,5 +1,5 @@
 /* Login & Signup Pages */
-.login-page, .signup-page {
+.login-page {
   min-height: 100vh;
   display: flex;
   align-items: center;
@@ -7,13 +7,14 @@
   background: linear-gradient(135deg, #8093F1 0%, #C96DE8 100%);
 }
 
-.login-page, .signup-page {
+.signup-page {
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #8093F1 0%, #C96DE8 100%);
+  background: white;
 }
+
 
 /* =========================
    LOGIN PAGE STYLES
@@ -24,7 +25,7 @@
   border-radius: 12px;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
   width: 100%;
-  max-width: 400px; /* keeps it boxed */
+  max-width: 400px; 
 }
 
 .login-page h1 {
@@ -94,12 +95,12 @@
   background: white;
   border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  box-shadow: 20px 25px 45px -35px black;
 }
 
 /* Left side */
 .signup-page .signup-left {
-  background: #8E38AB;
+  background: #C96DE8;
   color: white;
   padding: 60px 40px;
   display: flex;

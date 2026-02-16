@@ -52,12 +52,12 @@ const SignUpPage: React.FC = () => {
       {/* Left Column */}
       <div className="signup-left">
         <h1>Join ticketQ</h1>
-        <p>Create your account to start queuing for concerts</p>
+        <p>Create your account to find tickets for your favorite artists</p>
       </div>
 
       {/* Right Column */}
       <div className="signup-right">
-        <h1>Sign Up</h1>
+        <h1>Create Account</h1>
 
         <form onSubmit={handleSubmit} className="signup-form">
 
