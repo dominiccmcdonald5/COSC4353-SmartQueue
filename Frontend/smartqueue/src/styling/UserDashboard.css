@@ -1,6 +1,8 @@
 /* Dashboard Styles */
 .dashboard-page {
   min-height: 100vh;
+  background: linear-gradient(135deg, #8093F1 0%, #C96DE8 100%);
+  padding: 0 0 2rem 0;
 }
 
 .dashboard-header {
@@ -225,4 +227,128 @@
 .action-link:hover {
   background-color: #6366f1;
   color: white;
+}
+
+/* Pass Badge Styles */
+.user-name-section {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.pass-badge-icon {
+  font-size: 1.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-left: 0.5rem;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+}
+
+.pass-badge-icon:hover {
+  transform: scale(1.1);
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
+}
+
+.popup-badge-icon {
+  font-size: 1.25rem;
+  margin-right: 0.5rem;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+}
+
+/* Badge Popup Modal */
+.badge-popup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.badge-popup {
+  background: white;
+  border-radius: 12px;
+  max-width: 400px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+.badge-popup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.badge-popup-header h3 {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: #1f2937;
+}
+
+.close-popup {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: #6b7280;
+  padding: 0.25rem;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.close-popup:hover {
+  background-color: #f3f4f6;
+  color: #374151;
+}
+
+.badge-popup-content {
+  padding: 1.5rem;
+}
+
+.badge-description {
+  color: #4b5563;
+  margin-bottom: 1rem;
+  line-height: 1.5;
+}
+
+.badge-popup-content h4 {
+  color: #1f2937;
+  margin-bottom: 0.75rem;
+  font-size: 1rem;
+}
+
+.badge-benefits {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.badge-benefits li {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #f3f4f6;
+  color: #4b5563;
+  display: flex;
+  align-items: center;
+}
+
+.badge-benefits li:last-child {
+  border-bottom: none;
+}
+
+.badge-benefits li::before {
+  content: "✓";
+  color: #10b981;
+  font-weight: bold;
+  margin-right: 0.75rem;
+  flex-shrink: 0;
 }

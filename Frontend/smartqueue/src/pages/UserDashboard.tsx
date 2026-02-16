@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { GiPoliceBadge } from 'react-icons/gi';
 import '../styling/UserDashboard.css';
 
 interface QueueHistory {
@@ -21,11 +22,17 @@ interface UserStats {
   totalSpent: number;
 }
 
+type PassStatus = 'none' | 'silver' | 'gold';
+
 const UserDashboard: React.FC = () => {
   const { user, logout } = useAuth();
   const [queueHistory, setQueueHistory] = useState<QueueHistory[]>([]);
   const [userStats, setUserStats] = useState<UserStats | null>(null);
   const [activeTab, setActiveTab] = useState<'history' | 'stats'>('history');
+  const [showBadgePopup, setShowBadgePopup] = useState(false);
+
+  // Mock user pass status - replace with actual user data
+  const userPassStatus: PassStatus = 'gold' as PassStatus;
 
   useEffect(() => {
     // TODO: Replace with actual API calls
@@ -70,6 +77,27 @@ const UserDashboard: React.FC = () => {
     setUserStats(mockStats);
   }, []);
 
+  const getBadgeInfo = () => {
+    switch (userPassStatus) {
+      case 'silver':
+        return {
+          label: 'Silver',
+          color: '#c0c0c0',
+          description: 'Skip the line until 25% venue capacity is filled',
+        };
+      case 'gold':
+        return {
+          label: 'Gold',
+          color: '#ffd700',
+          description: 'Skip the line until 50% venue capacity is filled',
+        };
+      default:
+        return null;
+    }
+  };
+
+  const badgeInfo = getBadgeInfo();
+
   return (
     <div className="dashboard-page">
       <header className="dashboard-header">
@@ -83,7 +111,19 @@ const UserDashboard: React.FC = () => {
       <main className="dashboard-main">
         <div className="user-profile">
           <div className="profile-info">
-            <h2>Welcome back, {user?.name}!</h2>
+            <div className="user-name-section">
+              <h2>
+                Welcome back, {user?.name}!
+                {badgeInfo && (
+                  <GiPoliceBadge 
+                    className="pass-badge-icon"
+                    style={{ color: badgeInfo.color }}
+                    onClick={() => setShowBadgePopup(true)}
+                    title={`Click to see ${badgeInfo.label} pass details`}
+                  />
+                )}
+              </h2>
+            </div>
             <p>{user?.email}</p>
           </div>
         </div>
@@ -170,6 +210,32 @@ const UserDashboard: React.FC = () => {
             Upgrade to Premium Pass
           </Link>
         </section>
+
+        {/* Badge Popup Modal */}
+        {showBadgePopup && badgeInfo && (
+          <div className="badge-popup-overlay" onClick={() => setShowBadgePopup(false)}>
+            <div className="badge-popup" onClick={(e) => e.stopPropagation()}>
+              <div className="badge-popup-header">
+                <h3>
+                  <GiPoliceBadge 
+                    className="popup-badge-icon"
+                    style={{ color: badgeInfo.color }}
+                  />
+                  {badgeInfo.label} Pass Status
+                </h3>
+                <button 
+                  className="close-popup"
+                  onClick={() => setShowBadgePopup(false)}
+                >
+                  ×
+                </button>
+              </div>
+              <div className="badge-popup-content">
+                <p className="badge-description">{badgeInfo.description}</p>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
