@@ -977,3 +977,330 @@
     gap: 1rem;
   }
 }
+
+/* Enhanced Queue History Styles */
+.queue-history {
+  margin-top: 2rem;
+}
+
+.queue-history h3 {
+  color: #333;
+  margin-bottom: 1.5rem;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.history-item {
+  background: white;
+  border-radius: 20px;
+  padding: 2rem;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  border: 1px solid rgba(0,0,0,0.05);
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  overflow: visible;
+}
+
+.history-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+}
+
+.history-item * {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* Queue Status Indicator */
+.queue-status-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 120px;
+  height: 180px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.queue-status-indicator.secured {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+}
+
+.queue-status-indicator.pending {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: white;
+}
+
+.queue-status-indicator.sold-out {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: white;
+}
+
+.queue-status-indicator .status-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: currentColor;
+  margin-bottom: 0.75rem;
+  opacity: 0.9;
+}
+
+.queue-status-indicator .status-text {
+  text-align: center;
+  line-height: 1.2;
+}
+
+/* Concert Image */
+.concert-image {
+  flex-shrink: 0;
+  width: 240px;
+  height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+}
+
+.concert-image img {
+  width: 240px;
+  height: 180px;
+  border-radius: 16px;
+  object-fit: cover;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  display: block;
+}
+
+/* Concert Details */
+.concert-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.concert-main-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.concert-name {
+  margin: 0;
+  color: #1a1a1a;
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.concert-artist {
+  margin: 0;
+  color: #666;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.concert-meta {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.concert-genre,
+.concert-date {
+  font-size: 1rem;
+  padding: 0.5rem 1rem;
+  border-radius: 25px;
+  font-weight: 600;
+}
+
+.concert-genre {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+}
+
+.concert-date {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.status-badge {
+  display: flex !important;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 25px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.status-badge.completed {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+}
+
+.status-badge.in-progress {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: white;
+}
+
+.status-badge.cancelled {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: white;
+}
+
+.queue-metrics-inline {
+  display: flex;
+  gap: 1.5rem;
+  margin-top: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.metric-inline {
+  font-size: 1rem;
+  color: #374151;
+  font-weight: 600;
+  background: #f9fafb;
+  padding: 0.5rem 1rem;
+  border-radius: 15px;
+  border: 1px solid #e5e7eb;
+}
+
+/* Queue Status Info */
+.queue-status-info {
+  display: flex !important;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1.5rem;
+  min-width: 200px;
+  flex-shrink: 0;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.status-badge {
+  display: flex !important;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1.5rem;
+  border-radius: 30px;
+  font-weight: 700;
+  font-size: 1rem;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.status-badge.completed {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+}
+
+.status-badge.in-progress {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: white;
+}
+
+.status-badge.cancelled {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: white;
+}
+
+.status-icon {
+  font-size: 1rem;
+}
+
+.queue-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: flex-end;
+}
+
+.metric-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.metric-label {
+  font-size: 0.875rem;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 700;
+}
+
+.metric-value {
+  font-size: 1.1rem;
+  color: #374151;
+  font-weight: 700;
+  background: #f9fafb;
+  padding: 0.5rem 1rem;
+  border-radius: 15px;
+  border: 1px solid #e5e7eb;
+}
+
+/* Responsive Design for Queue History */
+@media (max-width: 768px) {
+  .history-item {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1.5rem;
+    padding: 1.5rem;
+  }
+  
+  .concert-image {
+    align-self: center;
+  }
+  
+  .concert-image img {
+    width: 120px;
+    height: 120px;
+  }
+  
+  .concert-name {
+    font-size: 1.3rem;
+    text-align: center;
+  }
+  
+  .concert-artist {
+    font-size: 1.1rem;
+    text-align: center;
+  }
+  
+  .concert-meta {
+    justify-content: center;
+  }
+  
+  .queue-status-info {
+    align-items: center;
+    min-width: auto;
+  }
+  
+  .queue-metrics {
+    flex-direction: row;
+    justify-content: center;
+    gap: 2rem;
+  }
+  
+  .metric-item {
+    align-items: center;
+  }
+}

@@ -11,10 +11,13 @@ interface QueueHistory {
   id: string;
   concertName: string;
   artist: string;
+  genre: string;
   date: string;
   status: 'completed' | 'cancelled' | 'in-progress';
   waitTime: string;
   ticketsPurchased?: number;
+  imageUrl: string;
+  queueStatus: 'secured' | 'pending' | 'sold-out';
 }
 
 interface UserStats {
@@ -59,26 +62,35 @@ const UserDashboard: React.FC = () => {
         id: '1',
         concertName: 'Summer Music Festival',
         artist: 'Various Artists',
+        genre: 'Rock',
         date: '2026-07-15',
         status: 'completed',
         waitTime: '45 minutes',
         ticketsPurchased: 2,
+        imageUrl: 'https://via.placeholder.com/80x80/667eea/ffffff?text=🎸',
+        queueStatus: 'secured',
       },
       {
         id: '2',
         concertName: 'Rock Night',
         artist: 'The Electric Band',
+        genre: 'Rock',
         date: '2026-06-20',
         status: 'in-progress',
         waitTime: '12 minutes',
+        imageUrl: 'https://via.placeholder.com/80x80/f59e0b/ffffff?text=⚡',
+        queueStatus: 'pending',
       },
       {
         id: '3',
         concertName: 'Pop Extravaganza',
         artist: 'PopStar',
+        genre: 'Pop',
         date: '2026-05-10',
         status: 'cancelled',
         waitTime: '23 minutes',
+        imageUrl: 'https://via.placeholder.com/80x80/ec4899/ffffff?text=🎤',
+        queueStatus: 'sold-out',
       },
     ];
 
@@ -166,20 +178,43 @@ const UserDashboard: React.FC = () => {
             <div className="history-list">
               {queueHistory.map((item) => (
                 <div key={item.id} className="history-item">
-                  <div className="concert-info">
-                    <h4>{item.concertName}</h4>
-                    <p className="artist">{item.artist}</p>
-                    <p className="date">{new Date(item.date).toLocaleDateString()}</p>
+                  <div className="concert-image">
+                    <img src={item.imageUrl} alt={item.concertName} />
                   </div>
-                  <div className="queue-info">
-                    <div className={`status ${item.status}`}>
-                      {item.status === 'completed' && '✅ Completed'}
-                      {item.status === 'in-progress' && '⏳ In Progress'}
-                      {item.status === 'cancelled' && '❌ Cancelled'}
+                  <div className="concert-details">
+                    <div className="concert-main-info">
+                      <h4 className="concert-name">{item.concertName}</h4>
+                      <p className="concert-artist">{item.artist}</p>
+                      <div className="concert-meta">
+                        <span className="concert-genre">{item.genre}</span>
+                        <span className="concert-date">{new Date(item.date).toLocaleDateString()}</span>
+                      </div>
+                      <div className="queue-metrics-inline">
+                        <span className="metric-inline">Wait Time: {item.waitTime}</span>
+                        {item.ticketsPurchased && (
+                          <span className="metric-inline">Tickets: {item.ticketsPurchased}</span>
+                        )}
+                      </div>
                     </div>
-                    <p className="wait-time">Wait Time: {item.waitTime}</p>
-                    {item.ticketsPurchased && (
-                      <p className="tickets">Tickets Purchased: {item.ticketsPurchased}</p>
+                  </div>
+                  <div className={`queue-status-indicator ${item.queueStatus}`}>
+                    {item.queueStatus === 'secured' && (
+                      <>
+                        <span className="status-dot"></span>
+                        <span className="status-text">Secured</span>
+                      </>
+                    )}
+                    {item.queueStatus === 'pending' && (
+                      <>
+                        <span className="status-dot"></span>
+                        <span className="status-text">In Queue</span>
+                      </>
+                    )}
+                    {item.queueStatus === 'sold-out' && (
+                      <>
+                        <span className="status-dot"></span>
+                        <span className="status-text">Sold Out</span>
+                      </>
                     )}
                   </div>
                 </div>
@@ -261,12 +296,6 @@ const UserDashboard: React.FC = () => {
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
-                <div className="podium-labels">
-                  <div className="podium-rank">
-                    <FaTrophy style={{ color: '#f59e0b', fontSize: '1.5rem' }} />
-                    <span>1st Place</span>
-                  </div>
-                </div>
               </div>
             </div>
 
