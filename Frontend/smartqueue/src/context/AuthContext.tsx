@@ -64,7 +64,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const signup = async (email: string, password: string, name: string) => {
+  const signup = async (email: string, name: string) => {
     setIsLoading(true);
     try {
       // TODO: Replace with actual API call
