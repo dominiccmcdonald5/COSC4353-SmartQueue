@@ -2,9 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { GiPoliceBadge } from 'react-icons/gi';
-import { FaTicketAlt, FaClock, FaMusic, FaDollarSign, FaChartLine, FaTrophy } from 'react-icons/fa';
+import { FaDollarSign } from 'react-icons/fa';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell } from 'recharts';
-import { ResponsivePie } from '@nivo/pie';
 import '../styling/UserDashboard.css';
 
 interface QueueHistory {
