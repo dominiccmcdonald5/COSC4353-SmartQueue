@@ -587,7 +587,7 @@ button:disabled {
   color: white;
 }
 
-/* Queue Page */
+/* Queue Page 
 .queue-page {
   min-height: 100vh;
   padding: 2rem 1rem;
@@ -653,6 +653,7 @@ button:disabled {
   justify-content: center;
   margin: 2rem 0;
 }
+*/
 
 /* Seating Map */
 .seating-page {
