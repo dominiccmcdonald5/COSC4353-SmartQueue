@@ -28,29 +28,40 @@
   text-shadow: 1px 1px 1px #000000;
 }
 
-.user-info {
+.home-page .user-info {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 0;
+  margin-bottom: 1rem;
+  text-align: center;
   display: flex;
   align-items: center;
-  gap: 1rem;
+  justify-content: center;
 }
 
 .dashboard-link, .pass-link {
   color: #8093F1;
-  text-decoration: none;
+  border: none;
   padding: 0.5rem 1rem;
   border-radius: 6px;
-  transition: background-color 0.2s;
+  cursor: pointer;
+  margin: 0.5rem;
+  transition: 0.2s;
 }
 
 .dashboard-link:hover, .pass-link:hover {
-  background-color: #e0e7ff;
+  background-color: #f3e8ff;
 }
 
 .logout-btn {
-  background-color: #8093F1;
+  background-color: #ef4444;
   color: white;
+  border: none;
   padding: 0.5rem 1rem;
   border-radius: 6px;
+  cursor: pointer;
+  margin: 0.5rem;
 }
 
 .home-main {
@@ -166,7 +177,7 @@
 .home-page .concert-info .artist {
   color: #6366f1;
   font-weight: 600;
-  margin-bottom: rem;
+  margin-bottom: .25rem;
 }
 
 .home-page .concert-info .venue,
