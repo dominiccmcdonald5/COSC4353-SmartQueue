@@ -34,6 +34,8 @@
   color: #C96DE8;
   font-family: 'Tahoma', sans-serif;
   font-size: 2rem;
+  font-style: italic;
+  text-shadow: 1px .5px .5px #555;
 }
 
 .login-page p {
@@ -112,6 +114,8 @@
   font-size: 2.5rem;
   margin-bottom: 15px;
   text-shadow: 1px 1px 1px #000000;
+  font-style: italic;
+  font-family: 'Tahoma', sans-serif;
 }
 
 .signup-page .signup-left p {
@@ -130,6 +134,7 @@
   font-family: 'Tahoma', sans-serif;
   font-size: 2rem;
   margin-bottom: 1rem;
+  text-shadow: 1px .5px .5px #555;
 }
 
 /* Form */
