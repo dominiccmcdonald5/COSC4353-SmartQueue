@@ -587,7 +587,7 @@ button:disabled {
   color: white;
 }
 
-/* Queue Page */
+/* Queue Page 
 .queue-page {
   min-height: 100vh;
   padding: 2rem 1rem;
@@ -653,6 +653,7 @@ button:disabled {
   justify-content: center;
   margin: 2rem 0;
 }
+*/
 
 /* Seating Map */
 .seating-page {
@@ -805,10 +806,10 @@ button:disabled {
   margin-top: 0.5rem;
 }
 
-/* Purchase Pass Page */
+/* Purchase Pass Page 
 .purchase-pass-page {
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(75deg, #ECB8FF, #8093F1);
   padding: 2rem 0;
 }
 
@@ -1125,6 +1126,8 @@ button:disabled {
   color: #6b7280;
   margin: 0;
 }
+
+*/
 
 /* Responsive Design */
 @media (max-width: 768px) {

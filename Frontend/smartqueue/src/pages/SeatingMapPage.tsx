@@ -2,6 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import '../styling/SeatingMapPage.css';
 
+/** Concert details by ID — matches HomePage concert list so seating shows the correct concert */
+function getConcertById(concertId: string | undefined): { name: string; artist: string; date: string; venue: string } | null {
+  if (!concertId) return null;
+  const concerts: Record<string, { name: string; artist: string; date: string; venue: string }> = {
+    '1': { name: 'Summer Music Festival', artist: 'Various Artists', date: '2026-07-15', venue: 'Central Park' },
+    '2': { name: 'Rock Night', artist: 'The Electric Band', date: '2026-06-20', venue: 'Madison Square Garden' },
+    '3': { name: 'Jazz Evening', artist: 'Miles & Friends', date: '2026-05-30', venue: 'Blue Note' },
+  };
+  return concerts[concertId] ?? null;
+}
+
 interface Seat {
   id: string;
   section: string;
@@ -15,6 +26,18 @@ interface SeatingSection {
   name: string;
   seats: Seat[];
   color: string;
+  /** For Main/Side/Rear: 'left' | 'center' | 'right' | 'behind'. Omit for single-block sections. */
+  subsection?: 'left' | 'center' | 'right' | 'behind';
+}
+
+function groupSeatsByRow(seats: Seat[]): Record<string, Seat[]> {
+  const byRow: Record<string, Seat[]> = {};
+  seats.forEach((seat) => {
+    if (!byRow[seat.row]) byRow[seat.row] = [];
+    byRow[seat.row].push(seat);
+  });
+  Object.keys(byRow).forEach((row) => byRow[row].sort((a, b) => Number(a.seatNumber) - Number(b.seatNumber)));
+  return byRow;
 }
 
 const SeatingMapPage: React.FC = () => {
@@ -23,58 +46,44 @@ const SeatingMapPage: React.FC = () => {
   const [sections, setSections] = useState<SeatingSection[]>([]);
   const [selectedSeats, setSelectedSeats] = useState<Seat[]>([]);
   const [loading, setLoading] = useState(true);
-  const [concertInfo] = useState({
-    name: 'Summer Music Festival',
-    artist: 'Various Artists',
-    date: '2026-07-15',
-    venue: 'Central Park',
-  });
+  const [hoveredSeat, setHoveredSeat] = useState<Seat | null>(null);
+  const [popupPos, setPopupPos] = useState<{ x: number; y: number } | null>(null);
+  const [concertInfo, setConcertInfo] = useState<{ name: string; artist: string; date: string; venue: string } | null>(null);
 
   useEffect(() => {
-    // TODO: Replace with actual API call
-    // Mock seating data
+    const concert = getConcertById(concertId);
+    setConcertInfo(concert ? { name: concert.name, artist: concert.artist, date: concert.date, venue: concert.venue } : null);
+  }, [concertId]);
+  const concertNotFound = concertId && concertInfo === null;
+
+  useEffect(() => {
+    if (!concertId) return;
+    // TODO: Replace with actual API call — Main / Side / Rear layout
     setTimeout(() => {
-      const mockSections: SeatingSection[] = [
-        {
-          name: 'VIP Section',
-          color: '#FFD700',
-          seats: Array.from({ length: 20 }, (_, i) => ({
-            id: `vip-${i + 1}`,
-            section: 'VIP',
-            row: String.fromCharCode(65 + Math.floor(i / 5)),
-            seatNumber: String((i % 5) + 1),
-            price: 200,
-            status: Math.random() > 0.7 ? 'taken' : 'available',
-          })),
-        },
-        {
-          name: 'Premium Section',
-          color: '#C0C0C0',
-          seats: Array.from({ length: 50 }, (_, i) => ({
-            id: `premium-${i + 1}`,
-            section: 'Premium',
-            row: String.fromCharCode(65 + Math.floor(i / 10)),
-            seatNumber: String((i % 10) + 1),
-            price: 150,
-            status: Math.random() > 0.6 ? 'taken' : 'available',
-          })),
-        },
-        {
-          name: 'General Admission',
-          color: '#CD7F32',
-          seats: Array.from({ length: 100 }, (_, i) => ({
-            id: `general-${i + 1}`,
-            section: 'General',
-            row: String.fromCharCode(65 + Math.floor(i / 20)),
-            seatNumber: String((i % 20) + 1),
-            price: 85,
-            status: Math.random() > 0.5 ? 'taken' : 'available',
-          })),
-        },
-      ];
+      const rand = (p: number) => (Math.random() > p ? 'taken' : 'available') as 'taken' | 'available';
+      const mockSections: SeatingSection[] = [];
+
+      // Single block — 11 rows (A–K), 12 seats per side (24 per row), center walkway
+      const rows = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'];
+      const seatsPerSide = 12;
+      const mainSeats: Seat[] = [];
+      rows.forEach((row, ri) => {
+        for (let s = 1; s <= seatsPerSide * 2; s++) {
+          mainSeats.push({
+            id: `main-${concertId}-${row}-${s}`,
+            section: 'Orchestra',
+            row,
+            seatNumber: String(s),
+            price: 100 - ri * 6,
+            status: rand(0.5),
+          });
+        }
+      });
+      mockSections.push({ name: 'Orchestra', seats: mainSeats, color: '#64748b', subsection: 'center' });
+
       setSections(mockSections);
       setLoading(false);
-    }, 1000);
+    }, 800);
   }, [concertId]);
 
   const handleSeatClick = (seat: Seat) => {
@@ -107,6 +116,17 @@ const SeatingMapPage: React.FC = () => {
     return selectedSeats.reduce((total, seat) => total + seat.price, 0);
   };
 
+  const handleSeatMouseEnter = (seat: Seat, e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setHoveredSeat(seat);
+    setPopupPos({ x: rect.left + rect.width / 2, y: rect.top });
+  };
+
+  const handleSeatMouseLeave = () => {
+    setHoveredSeat(null);
+    setPopupPos(null);
+  };
+
   const handleProceedToPayment = () => {
     if (selectedSeats.length === 0) return;
     
@@ -123,6 +143,34 @@ const SeatingMapPage: React.FC = () => {
     );
   }
 
+  if (!concertId) {
+    return (
+      <div className="seating-page">
+        <header className="seating-header">
+          <Link to="/" className="back-link">← Back to Home</Link>
+          <h1>Select Your Seats</h1>
+        </header>
+        <main className="seating-main">
+          <p className="concert-info">No concert selected.</p>
+        </main>
+      </div>
+    );
+  }
+
+  if (concertNotFound) {
+    return (
+      <div className="seating-page">
+        <header className="seating-header">
+          <Link to="/" className="back-link">← Back to Home</Link>
+          <h1>Select Your Seats</h1>
+        </header>
+        <main className="seating-main">
+          <p className="concert-info">Concert not found.</p>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="seating-page">
       <header className="seating-header">
@@ -131,59 +179,194 @@ const SeatingMapPage: React.FC = () => {
       </header>
 
       <main className="seating-main">
-        <div className="concert-info">
-          <h2>{concertInfo.name}</h2>
-          <p>{concertInfo.artist} • {concertInfo.venue} • {new Date(concertInfo.date).toLocaleDateString()}</p>
-        </div>
+        {concertInfo && (
+          <div className="concert-info">
+            <h2>{concertInfo.name}</h2>
+            <p>{concertInfo.artist} • {concertInfo.venue} • {new Date(concertInfo.date).toLocaleDateString()}</p>
+          </div>
+        )}
 
-        <div className="seating-container">
-          <div className="stage">
-            <div className="stage-label">STAGE</div>
+        <div className="seating-layout">
+        <div className="seating-container auditorium-view">
+          <div className="auditorium-stage">
+            <div className="proscenium-left" />
+            <div className="stage-content">
+              <div className="stage-curtain" />
+              <div className="stage-apron">
+                <div className="footlights" />
+                <span className="stage-label">STAGE</span>
+              </div>
+            </div>
+            <div className="proscenium-right" />
           </div>
 
-          <div className="seating-map">
-            {sections.map((section) => (
-              <div key={section.name} className="seating-section">
-                <h3 className="section-title" style={{ color: section.color }}>
-                  {section.name}
-                </h3>
-                <div className="seats-grid">
-                  {section.seats.map((seat) => (
-                    <div
-                      key={seat.id}
-                      className={`seat ${seat.status}`}
-                      onClick={() => handleSeatClick(seat)}
-                      title={`${seat.section} ${seat.row}${seat.seatNumber} - $${seat.price}`}
-                    >
-                      {seat.row}{seat.seatNumber}
-                    </div>
-                  ))}
+          {hoveredSeat && popupPos && (
+            <div
+              className="seat-popup"
+              style={{
+                left: popupPos.x,
+                top: popupPos.y,
+              }}
+              role="tooltip"
+            >
+              <span className="seat-popup-row">Row {hoveredSeat.row}</span>
+              <span className="seat-popup-seat">Seat {hoveredSeat.seatNumber}</span>
+              <span className="seat-popup-price">${hoveredSeat.price}</span>
+            </div>
+          )}
+          <div className="seating-map-wrap">
+            <div className="seating-map-spacer" aria-hidden />
+            <div className="seating-map venue-chart">
+            {/* Front block + block behind — center walkway in each row */}
+            {sections
+              .filter((s) => s.name === 'Orchestra')
+              .map((section) => (
+                <div key={section.name} className="venue-section" data-section={section.name}>
+                  <div className="venue-rows">
+                    {(() => {
+                      const byRow = groupSeatsByRow(section.seats);
+                      const rowOrder = Object.keys(byRow).sort((a, b) => (a < b ? -1 : 1));
+                      return rowOrder.map((row) => {
+                        const rowSeats = byRow[row];
+                        const mid = Math.floor(rowSeats.length / 2);
+                        const leftSeats = rowSeats.slice(0, mid);
+                        const rightSeats = rowSeats.slice(mid);
+                        return (
+                          <div key={row} className="seat-row straight-row row-with-aisle">
+                            <span className="row-label">{row}</span>
+                            <div className="seat-group">
+                              {leftSeats.map((seat) => (
+                                <div
+                                  key={seat.id}
+                                  className={`seat ${seat.status}`}
+                                  onClick={() => handleSeatClick(seat)}
+                                  onMouseEnter={(e) => handleSeatMouseEnter(seat, e)}
+                                  onMouseLeave={handleSeatMouseLeave}
+                                >
+                                  {seat.seatNumber}
+                                </div>
+                              ))}
+                            </div>
+                            <div className="aisle" aria-label="Walkway" />
+                            <div className="seat-group">
+                              {rightSeats.map((seat) => (
+                                <div
+                                  key={seat.id}
+                                  className={`seat ${seat.status}`}
+                                  onClick={() => handleSeatClick(seat)}
+                                  onMouseEnter={(e) => handleSeatMouseEnter(seat, e)}
+                                  onMouseLeave={handleSeatMouseLeave}
+                                >
+                                  {seat.seatNumber}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                </div>
+              ))}
+
+            {/* Side — left & right */}
+            {sections.filter((s) => s.name === 'Side').length > 0 && (
+              <div className="venue-section side-row">
+                <div className="subsection-row">
+                  {['left', 'right'].map((sub) => {
+                    const section = sections.find((s) => s.name === 'Side' && s.subsection === sub);
+                    if (!section) return null;
+                    const byRow = groupSeatsByRow(section.seats);
+                    const rowOrder = Object.keys(byRow).sort((a, b) => (a < b ? -1 : 1));
+                    return (
+                      <div key={`loge-${sub}`} className="subsection-block">
+                        <div className="venue-rows">
+                          {rowOrder.map((row) => {
+                            const rowSeats = byRow[row];
+                            return (
+                              <div key={row} className="seat-row straight-row">
+                                <span className="row-label">{row}</span>
+                                {rowSeats.map((seat) => (
+                                  <div
+                                    key={seat.id}
+                                    className={`seat ${seat.status}`}
+                                    onClick={() => handleSeatClick(seat)}
+                                    onMouseEnter={(e) => handleSeatMouseEnter(seat, e)}
+                                    onMouseLeave={handleSeatMouseLeave}
+                                  >
+                                    {seat.seatNumber}
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
-            ))}
+            )}
+
+            {/* Rear — back */}
+            {sections
+              .filter((s) => s.name === 'Rear')
+              .map((section) => (
+                <div key={section.name} className="venue-section" data-section={section.name}>
+                  <div className="venue-rows">
+                    {(() => {
+                      const byRow = groupSeatsByRow(section.seats);
+                      const rowOrder = Object.keys(byRow).sort((a, b) => (a < b ? -1 : 1));
+                      return rowOrder.map((row) => {
+                        const rowSeats = byRow[row];
+                        return (
+                          <div key={row} className="seat-row straight-row">
+                            <span className="row-label">{row}</span>
+                            {rowSeats.map((seat) => (
+                              <div
+                                key={seat.id}
+                                className={`seat ${seat.status}`}
+                                onClick={() => handleSeatClick(seat)}
+                                onMouseEnter={(e) => handleSeatMouseEnter(seat, e)}
+                                onMouseLeave={handleSeatMouseLeave}
+                              >
+                                {seat.seatNumber}
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                </div>
+              ))}
+          </div>
+            <div className="seating-map-spacer" aria-hidden />
           </div>
 
           <div className="seating-legend">
-            <div className="legend-item">
-              <div className="seat available"></div>
-              <span>Available</span>
-            </div>
-            <div className="legend-item">
-              <div className="seat selected"></div>
-              <span>Selected</span>
-            </div>
-            <div className="legend-item">
-              <div className="seat taken"></div>
-              <span>Taken</span>
-            </div>
-            <div className="legend-item">
-              <div className="seat reserved"></div>
-              <span>Reserved</span>
+            <div className="legend-availability">
+              <div className="legend-item">
+                <div className="seat available" />
+                <span>Available</span>
+              </div>
+              <div className="legend-item">
+                <div className="seat selected" />
+                <span>Selected</span>
+              </div>
+              <div className="legend-item">
+                <div className="seat taken" />
+                <span>Taken</span>
+              </div>
+              <div className="legend-item">
+                <div className="seat reserved" />
+                <span>Reserved</span>
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="selection-summary">
+        <aside className="selection-summary">
           <div className="selected-seats">
             <h3>Selected Seats ({selectedSeats.length}/4)</h3>
             {selectedSeats.length === 0 ? (
@@ -192,7 +375,7 @@ const SeatingMapPage: React.FC = () => {
               <div className="seats-list">
                 {selectedSeats.map((seat) => (
                   <div key={seat.id} className="selected-seat">
-                    <span>{seat.section} {seat.row}{seat.seatNumber}</span>
+                    <span>Seat {seat.row}{seat.seatNumber}</span>
                     <span>${seat.price}</span>
                   </div>
                 ))}
@@ -213,6 +396,7 @@ const SeatingMapPage: React.FC = () => {
               Proceed to Payment
             </button>
           </div>
+        </aside>
         </div>
       </main>
     </div>

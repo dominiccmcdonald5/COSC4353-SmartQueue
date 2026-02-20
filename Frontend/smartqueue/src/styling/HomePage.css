@@ -28,18 +28,26 @@
   text-shadow: 1px 1px 1px #000000;
 }
 
-.user-info {
+.home-page .user-info {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 0;
+  margin-bottom: 1rem;
+  text-align: center;
   display: flex;
   align-items: center;
-  gap: 1rem;
+  justify-content: center;
 }
 
 .dashboard-link, .admin-link, .pass-link {
   color: #8093F1;
-  text-decoration: none;
+  border: none;
   padding: 0.5rem 1rem;
   border-radius: 6px;
-  transition: background-color 0.2s;
+  cursor: pointer;
+  margin: 0.5rem;
+  transition: 0.2s;
 }
 
 .dashboard-link:hover, .admin-link:hover, .pass-link:hover {
@@ -47,10 +55,13 @@
 }
 
 .logout-btn {
-  background-color: #8093F1;
+  background-color: #ef4444;
   color: white;
+  border: none;
   padding: 0.5rem 1rem;
   border-radius: 6px;
+  cursor: pointer;
+  margin: 0.5rem;
 }
 
 .home-main {
@@ -88,88 +99,126 @@
 }
 
 /* Concert Cards */
-.concert-card {
-  background: white;
-  border-radius: 12px;
+.home-page .concert-card {
+  background: #f3e8ff;
+  border-radius: 18px;
   overflow: hidden;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+  display: flex;
+  flex-direction: column;
 }
 
-.concert-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+.home-page .concert-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.12);
 }
 
-.concert-image {
+.home-page .concert-image {
   position: relative;
-  height: 200px;
+  width: 100%;
+  height: 220px;
+  overflow: hidden;
   background: linear-gradient(45deg, #8093F1, #C96DE8);
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
-  font-size: 1.2rem;
+  font-size: 1.2rem; 
 }
 
-.status-badge {
+.home-page .concert-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.home-page .status-badge {
   position: absolute;
   top: 1rem;
   right: 1rem;
-  padding: 0.25rem 0.75rem;
-  border-radius: 20px;
+  padding: 0.4rem 1rem;
+  border-radius: 999px;
   font-size: 0.8rem;
-  font-weight: 500;
+  font-weight: 600;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.15);
 }
 
-.status-badge.available {
+.home-page .status-badge.available {
   background-color: #10b981;
   color: white;
 }
 
-.status-badge.queue-active {
+.home-page .status-badge.queue-active {
   background-color: #f59e0b;
   color: white;
 }
 
-.status-badge.sold-out {
+.home-page .status-badge.sold-out {
   background-color: #ef4444;
   color: white;
 }
 
-.concert-info {
-  padding: 1.5rem;
+.home-page .concert-info {
+  width: 100%;
+  height: 100%;
+  padding: 1.8rem;
+  background: transparent;
+  flex-grow: 1;
+  margin: 0;
 }
 
-.concert-info h4 {
+.home-page .concert-info h4 {
   font-size: 1.3rem;
   margin-bottom: 0.5rem;
   color: #1f2937;
 }
 
-.concert-info .artist {
+.home-page .concert-info .artist {
   color: #6366f1;
-  font-weight: 500;
-  margin-bottom: 0.5rem;
+  font-weight: 600;
+  margin-bottom: .25rem;
 }
 
-.concert-info .venue,
-.concert-info .date,
-.concert-info .price {
+.home-page .concert-info .venue,
+.home-page .concert-info .date,
+.home-page .concert-info .price {
   color: #6b7280;
   margin-bottom: 0.25rem;
   font-size: 0.9rem;
 }
 
-.concert-actions {
-  margin-top: 1rem;
+.home-page .concert-actions {
+  margin-top: 1.2rem;
 }
 
-.join-queue-btn.active {
-  background-color: #f59e0b;
+.home-page .join-queue-btn {
+  width: 100%;
+  padding: 0.75rem;
+  border-radius: 10px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  background: linear-gradient(90deg, #8093F1, #C96DE8);
+  color: white;
+  transition: transform 0.15s ease, opacity 0.15s ease;
 }
 
-.sold-out-btn {
+.home-page .join-queue-btn:hover {
+  transform: translateY(-2px);
+  opacity: 0.95;
+}
+
+.home-page .join-queue-btn.active {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+}
+
+.home-page .sold-out-btn {
+  width: 100%;
+  padding: 0.75rem;
+  border-radius: 10px;
+  border: none;
+  font-weight: 600;
   background-color: #9ca3af;
   color: white;
   cursor: not-allowed;
