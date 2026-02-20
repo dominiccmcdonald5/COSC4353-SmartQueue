@@ -52,7 +52,7 @@ const SignUpPage: React.FC = () => {
       {/* Left Column */}
       <div className="signup-left">
         <h1>Join ticketQ</h1>
-        <p>Create your account to find tickets for your favorite artists</p>
+        <p>Create your account to find and secure tickets to see your favorite artists</p>
       </div>
 
       {/* Right Column */}
