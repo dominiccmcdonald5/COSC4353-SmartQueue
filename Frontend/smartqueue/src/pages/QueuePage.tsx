@@ -3,6 +3,17 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import '../styling/QueuePage.css';
 
+/** Concert by ID — same IDs as HomePage (1=Summer, 2=Rock Night, 3=Jazz) */
+function getConcertById(concertId: string | undefined): { name: string; artist: string; date: string; venue: string } | null {
+  if (!concertId) return null;
+  const concerts: Record<string, { name: string; artist: string; date: string; venue: string }> = {
+    '1': { name: 'Summer Music Festival', artist: 'Various Artists', date: '2026-07-15', venue: 'Central Park' },
+    '2': { name: 'Rock Night', artist: 'The Electric Band', date: '2026-06-20', venue: 'Madison Square Garden' },
+    '3': { name: 'Jazz Evening', artist: 'Miles & Friends', date: '2026-05-30', venue: 'Blue Note' },
+  };
+  return concerts[concertId] ?? null;
+}
+
 interface QueueStatus {
   position: number;
   totalInQueue: number;
@@ -25,16 +36,20 @@ const QueuePage: React.FC = () => {
     if (!concertId) return;
 
     // TODO: Replace with actual API call
-    // Mock data for demonstration
+    const concert = getConcertById(concertId);
+    if (!concert) {
+      setLoading(false);
+      return;
+    }
     setTimeout(() => {
       const mockQueueStatus: QueueStatus = {
         position: Math.floor(Math.random() * 1000) + 1,
         totalInQueue: 2500,
         estimatedWaitTime: `${Math.floor(Math.random() * 60) + 10} minutes`,
-        concertName: 'Summer Music Festival',
-        artist: 'Various Artists',
-        date: '2026-07-15',
-        venue: 'Central Park',
+        concertName: concert.name,
+        artist: concert.artist,
+        date: concert.date,
+        venue: concert.venue,
       };
       setQueueStatus(mockQueueStatus);
       setIsInQueue(true);
