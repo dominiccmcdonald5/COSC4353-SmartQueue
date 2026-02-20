@@ -2,6 +2,7 @@
 .queue-page {
   min-height: 100vh;
   padding: 2rem 1rem;
+  background: linear-gradient(135deg, #8093F1 0%, #C96DE8 100%);
 }
 
 .queue-header {
@@ -15,12 +16,13 @@
 }
 
 .concert-info {
-  background: white;
+  background: #d4b9f8;
   padding: 2rem;
   border-radius: 12px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   margin-bottom: 2rem;
   text-align: center;
+  width: 800;
 }
 
 .concert-info h2 {

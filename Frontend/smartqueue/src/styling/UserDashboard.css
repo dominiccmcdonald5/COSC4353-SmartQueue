@@ -1,7 +1,7 @@
 /* Dashboard Styles */
 .dashboard-page {
   min-height: 100vh;
-  background: linear-gradient(135deg, #8093F1 0%, #C96DE8 100%);
+  background: linear-gradient(75deg, #ECB8FF, #8093F1);
   padding: 0 0 2rem 0;
 }
 
@@ -946,7 +946,6 @@
   .podium-place.third .podium-step {
     height: 60px;
   }
-}
 
 @media (max-width: 640px) {
   .stats-container {

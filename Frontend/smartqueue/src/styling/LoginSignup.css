@@ -20,7 +20,7 @@
    LOGIN PAGE STYLES
 ========================= */
 .login-page .login-container {
-  background: white;
+  background: #f3e8ff;
   padding: 2rem;
   border-radius: 12px;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
@@ -113,8 +113,7 @@
 .signup-page .signup-left h1 {
   font-size: 2.5rem;
   margin-bottom: 15px;
-  text-shadow: 1px 1px 1px #000000;
-  font-style: italic;
+  
   font-family: 'Tahoma', sans-serif;
 }
 
@@ -126,6 +125,7 @@
 /* Right side */
 .signup-page .signup-right {
   padding: 50px 40px;
+  background: #f3e8ff;
 }
 
 .signup-page .signup-right h1 {
@@ -133,6 +133,7 @@
   color: #C96DE8;
   font-family: 'Tahoma', sans-serif;
   font-size: 2rem;
+  font-style: italic;
   margin-bottom: 1rem;
   text-shadow: 1px .5px .5px #555;
 }
