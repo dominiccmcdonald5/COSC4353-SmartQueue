@@ -73,6 +73,7 @@ const HomePage: React.FC = () => {
           <h1>ticketQ</h1>
           <div className="user-info">
             <Link to="/dashboard" className="dashboard-link">User Dashboard</Link>
+            <Link to="/admin" className="admin-link">Admin Dashboard</Link>
             <Link to="/purchase-pass" className="pass-link">Get Premium Pass</Link>
             <button onClick={handleLogout} className="logout-btn">Logout</button>
           </div>

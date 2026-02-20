@@ -34,7 +34,7 @@
   gap: 1rem;
 }
 
-.dashboard-link, .pass-link {
+.dashboard-link, .admin-link, .pass-link {
   color: #8093F1;
   text-decoration: none;
   padding: 0.5rem 1rem;
@@ -42,7 +42,7 @@
   transition: background-color 0.2s;
 }
 
-.dashboard-link:hover, .pass-link:hover {
+.dashboard-link:hover, .admin-link:hover, .pass-link:hover {
   background-color: #e0e7ff;
 }
 
