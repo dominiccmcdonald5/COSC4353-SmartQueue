@@ -40,7 +40,8 @@ const PaymentPage: React.FC = () => {
     },
   });
   const [processing, setProcessing] = useState(false);
-  const [errors, setErrors] = useState<Partial<PaymentForm>>({});
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [errors, setErrors] = useState<Partial<PaymentForm> & { billingAddress?: Partial<PaymentForm['billingAddress']> }>({});
 
   useEffect(() => {
     // Get selected seats from session storage
@@ -73,7 +74,15 @@ const PaymentPage: React.FC = () => {
     }
     
     // Clear error when user starts typing
-    if (errors[name as keyof PaymentForm]) {
+    if (name.includes('.')) {
+      const [parent, child] = name.split('.');
+      if (parent === 'billingAddress' && errors.billingAddress?.[child as keyof PaymentForm['billingAddress']]) {
+        setErrors(prev => ({
+          ...prev,
+          billingAddress: prev.billingAddress ? { ...prev.billingAddress, [child]: undefined } : undefined,
+        }));
+      }
+    } else if (errors[name as keyof PaymentForm]) {
       setErrors(prev => ({
         ...prev,
         [name]: undefined,
@@ -82,10 +91,11 @@ const PaymentPage: React.FC = () => {
   };
 
   const validateForm = (): boolean => {
-    const newErrors: Partial<PaymentForm> = {};
+    const newErrors: Partial<PaymentForm> & { billingAddress?: Partial<PaymentForm['billingAddress']> } = {};
+    const { billingAddress } = paymentForm;
 
-    if (!paymentForm.cardNumber || paymentForm.cardNumber.length < 16) {
-      newErrors.cardNumber = 'Valid card number is required';
+    if (!paymentForm.cardNumber || paymentForm.cardNumber.replace(/\s/g, '').length < 16) {
+      newErrors.cardNumber = 'Valid card number is required (16 digits)';
     }
     if (!paymentForm.expiryDate || !/^\d{2}\/\d{2}$/.test(paymentForm.expiryDate)) {
       newErrors.expiryDate = 'Valid expiry date is required (MM/YY)';
@@ -93,8 +103,25 @@ const PaymentPage: React.FC = () => {
     if (!paymentForm.cvv || paymentForm.cvv.length < 3) {
       newErrors.cvv = 'Valid CVV is required';
     }
-    if (!paymentForm.cardholderName) {
+    if (!paymentForm.cardholderName?.trim()) {
       newErrors.cardholderName = 'Cardholder name is required';
+    }
+
+    newErrors.billingAddress = {};
+    if (!billingAddress.street?.trim()) {
+      newErrors.billingAddress.street = 'Street address is required';
+    }
+    if (!billingAddress.city?.trim()) {
+      newErrors.billingAddress.city = 'City is required';
+    }
+    if (!billingAddress.state?.trim()) {
+      newErrors.billingAddress.state = 'State is required';
+    }
+    if (!billingAddress.zipCode?.trim()) {
+      newErrors.billingAddress.zipCode = 'ZIP code is required';
+    }
+    if (Object.keys(newErrors.billingAddress).length === 0) {
+      delete newErrors.billingAddress;
     }
 
     setErrors(newErrors);
@@ -116,12 +143,8 @@ const PaymentPage: React.FC = () => {
       // Clear selected seats from storage
       sessionStorage.removeItem('selectedSeats');
       
-      // Navigate to success page or home
-      navigate('/home', { 
-        state: { 
-          message: 'Payment successful! Your tickets have been confirmed.' 
-        }
-      });
+      // Show success modal
+      setShowSuccessModal(true);
     } catch (error) {
       console.error('Payment failed:', error);
       // Handle payment failure
@@ -150,12 +173,13 @@ const PaymentPage: React.FC = () => {
 
   return (
     <div className="payment-page">
-      <header className="payment-header">
-        <Link to={`/seating/${concertId}`} className="back-link">← Back to Seating</Link>
-        <h1>Payment</h1>
-      </header>
+      <div className="payment-inner">
+        <header className="payment-header">
+          <Link to={`/seating/${concertId}`} className="back-link">← Back to Seating</Link>
+          <h1>Payment</h1>
+        </header>
 
-      <main className="payment-main">
+        <main className="payment-main">
         <div className="payment-container">
           <div className="order-summary">
             <h2>Order Summary</h2>
@@ -169,7 +193,7 @@ const PaymentPage: React.FC = () => {
               <h4>Selected Seats ({selectedSeats.length})</h4>
               {selectedSeats.map((seat) => (
                 <div key={seat.id} className="seat-item">
-                  <span>{seat.section} {seat.row}{seat.seatNumber}</span>
+                  <span>Seat {seat.row}{seat.seatNumber}</span>
                   <span>${seat.price.toFixed(2)}</span>
                 </div>
               ))}
@@ -193,6 +217,7 @@ const PaymentPage: React.FC = () => {
                 <span>${getGrandTotal().toFixed(2)}</span>
               </div>
             </div>
+            <p className="refund-note">All ticket sales are final. Not refundable.</p>
           </div>
 
           <div className="payment-form">
@@ -273,6 +298,7 @@ const PaymentPage: React.FC = () => {
                   placeholder="123 Main Street"
                   required
                 />
+                {errors.billingAddress?.street && <span className="error">{errors.billingAddress.street}</span>}
               </div>
 
               <div className="form-row">
@@ -287,6 +313,7 @@ const PaymentPage: React.FC = () => {
                     placeholder="New York"
                     required
                   />
+                  {errors.billingAddress?.city && <span className="error">{errors.billingAddress.city}</span>}
                 </div>
 
                 <div className="form-group">
@@ -301,6 +328,7 @@ const PaymentPage: React.FC = () => {
                     maxLength={2}
                     required
                   />
+                  {errors.billingAddress?.state && <span className="error">{errors.billingAddress.state}</span>}
                 </div>
 
                 <div className="form-group">
@@ -315,6 +343,7 @@ const PaymentPage: React.FC = () => {
                     maxLength={10}
                     required
                   />
+                  {errors.billingAddress?.zipCode && <span className="error">{errors.billingAddress.zipCode}</span>}
                 </div>
               </div>
 
@@ -333,6 +362,33 @@ const PaymentPage: React.FC = () => {
           <p>🔒 Your payment information is secure and encrypted</p>
         </div>
       </main>
+      </div>
+
+      {showSuccessModal && (
+        <div className="payment-success-overlay" onClick={() => setShowSuccessModal(false)}>
+          <div className="payment-success-modal" onClick={e => e.stopPropagation()}>
+            <div className="payment-success-icon">✓</div>
+            <h2>Payment Successful 🎉</h2>
+            <p>Congrats on securing your seats!</p>
+            <div className="payment-success-actions">
+              <button
+                type="button"
+                className="payment-success-btn primary"
+                onClick={() => navigate('/dashboard')}
+              >
+                View in Dashboard
+              </button>
+              <button
+                type="button"
+                className="payment-success-btn secondary"
+                onClick={() => navigate('/home')}
+              >
+                Go to Homepage
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
