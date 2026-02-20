@@ -2,6 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import '../styling/SeatingMapPage.css';
 
+/** Concert details by ID — matches HomePage concert list so seating shows the correct concert */
+function getConcertById(concertId: string | undefined): { name: string; artist: string; date: string; venue: string } | null {
+  if (!concertId) return null;
+  const concerts: Record<string, { name: string; artist: string; date: string; venue: string }> = {
+    '1': { name: 'Summer Music Festival', artist: 'Various Artists', date: '2026-07-15', venue: 'Central Park' },
+    '2': { name: 'Rock Night', artist: 'The Electric Band', date: '2026-06-20', venue: 'Madison Square Garden' },
+    '3': { name: 'Jazz Evening', artist: 'Miles & Friends', date: '2026-05-30', venue: 'Blue Note' },
+  };
+  return concerts[concertId] ?? null;
+}
+
 interface Seat {
   id: string;
   section: string;
@@ -37,14 +48,16 @@ const SeatingMapPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [hoveredSeat, setHoveredSeat] = useState<Seat | null>(null);
   const [popupPos, setPopupPos] = useState<{ x: number; y: number } | null>(null);
-  const [concertInfo] = useState({
-    name: 'Summer Music Festival',
-    artist: 'Various Artists',
-    date: '2026-07-15',
-    venue: 'Central Park',
-  });
+  const [concertInfo, setConcertInfo] = useState<{ name: string; artist: string; date: string; venue: string } | null>(null);
 
   useEffect(() => {
+    const concert = getConcertById(concertId);
+    setConcertInfo(concert ? { name: concert.name, artist: concert.artist, date: concert.date, venue: concert.venue } : null);
+  }, [concertId]);
+  const concertNotFound = concertId && concertInfo === null;
+
+  useEffect(() => {
+    if (!concertId) return;
     // TODO: Replace with actual API call — Main / Side / Rear layout
     setTimeout(() => {
       const rand = (p: number) => (Math.random() > p ? 'taken' : 'available') as 'taken' | 'available';
@@ -57,7 +70,7 @@ const SeatingMapPage: React.FC = () => {
       rows.forEach((row, ri) => {
         for (let s = 1; s <= seatsPerSide * 2; s++) {
           mainSeats.push({
-            id: `main-${row}-${s}`,
+            id: `main-${concertId}-${row}-${s}`,
             section: 'Orchestra',
             row,
             seatNumber: String(s),
@@ -130,6 +143,34 @@ const SeatingMapPage: React.FC = () => {
     );
   }
 
+  if (!concertId) {
+    return (
+      <div className="seating-page">
+        <header className="seating-header">
+          <Link to="/" className="back-link">← Back to Home</Link>
+          <h1>Select Your Seats</h1>
+        </header>
+        <main className="seating-main">
+          <p className="concert-info">No concert selected.</p>
+        </main>
+      </div>
+    );
+  }
+
+  if (concertNotFound) {
+    return (
+      <div className="seating-page">
+        <header className="seating-header">
+          <Link to="/" className="back-link">← Back to Home</Link>
+          <h1>Select Your Seats</h1>
+        </header>
+        <main className="seating-main">
+          <p className="concert-info">Concert not found.</p>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="seating-page">
       <header className="seating-header">
@@ -138,10 +179,12 @@ const SeatingMapPage: React.FC = () => {
       </header>
 
       <main className="seating-main">
-        <div className="concert-info">
-          <h2>{concertInfo.name}</h2>
-          <p>{concertInfo.artist} • {concertInfo.venue} • {new Date(concertInfo.date).toLocaleDateString()}</p>
-        </div>
+        {concertInfo && (
+          <div className="concert-info">
+            <h2>{concertInfo.name}</h2>
+            <p>{concertInfo.artist} • {concertInfo.venue} • {new Date(concertInfo.date).toLocaleDateString()}</p>
+          </div>
+        )}
 
         <div className="seating-layout">
         <div className="seating-container auditorium-view">
@@ -343,7 +386,6 @@ const SeatingMapPage: React.FC = () => {
           <div className="total-price">
             <h3>Total: ${getTotalPrice()}</h3>
           </div>
-          <p className="refund-note">Not refundable.</p>
 
           <div className="seating-actions">
             <button 

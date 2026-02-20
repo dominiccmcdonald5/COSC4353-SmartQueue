@@ -33,6 +33,7 @@
 .seating-main {
   max-width: 1200px;
   margin: 0 auto;
+  overflow-x: hidden;
 }
 
 .concert-info {
@@ -181,6 +182,10 @@
   justify-content: center;
   align-items: stretch;
   width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
 }
 
 .seating-map-spacer {
@@ -211,7 +216,6 @@
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  margin-left: -28px;
 }
 
 .venue-chart .venue-rows .seat-row {
@@ -526,4 +530,79 @@
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
+}
+
+/* Responsive: keep seats on screen when minimizing */
+@media (max-width: 900px) {
+  .seating-layout {
+    flex-direction: column;
+    gap: 1.5rem;
+    align-items: stretch;
+  }
+
+  .selection-summary {
+    width: 100%;
+    max-width: 100%;
+    position: static;
+  }
+
+  .seating-container {
+    padding: 1rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .seating-page {
+    padding: 1rem 0.5rem;
+  }
+
+  .seating-main {
+    padding: 0;
+  }
+
+  .seating-container {
+    padding: 1rem 0.75rem;
+    border-radius: 8px;
+  }
+
+  .seating-map-wrap {
+    margin: 0 -0.25rem;
+    padding: 0 0.25rem;
+  }
+
+  .seating-map.venue-chart {
+    padding: 0.5rem 0.5rem 1.5rem;
+    min-width: min(100%, 640px);
+  }
+
+  .venue-chart .seat-row.row-with-aisle {
+    grid-template-columns: auto 1fr 28px 1fr;
+    gap: 0 4px;
+    max-width: 100%;
+  }
+
+  .venue-chart .aisle {
+    width: 100%;
+    min-width: 28px;
+  }
+
+  .venue-chart .seat {
+    width: 20px;
+    min-width: 20px;
+    height: 16px;
+    min-height: 16px;
+    font-size: 0.55rem;
+  }
+
+  .concert-info {
+    padding: 1.25rem 1rem;
+  }
+
+  .concert-info h2 {
+    font-size: 1.35rem;
+  }
+
+  .selection-summary {
+    padding: 1.25rem;
+  }
 }
