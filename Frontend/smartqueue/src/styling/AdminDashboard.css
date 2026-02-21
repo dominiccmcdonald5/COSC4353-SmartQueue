@@ -267,6 +267,12 @@
   transition: box-shadow 0.2s;
 }
 
+.event-card {
+  justify-content: flex-start;
+  gap: 1rem;
+  position: relative;
+}
+
 .event-card:hover,
 .user-card:hover {
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
@@ -277,10 +283,18 @@
   flex: 1;
 }
 
+.event-info {
+  padding-right: 360px;
+}
+
+.event-top-row {
+  margin-bottom: 0.25rem;
+}
+
 .event-info h4,
 .user-info h4 {
   color: #1f2937;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0;
   font-size: 1.2rem;
 }
 
@@ -359,6 +373,30 @@
   display: flex;
   gap: 0.5rem;
   margin-left: 1rem;
+}
+
+.event-side {
+  position: absolute;
+  top: 1.25rem;
+  right: 1.25rem;
+}
+
+.event-image-preview {
+  position: absolute;
+  top: 56px;
+  right: 220px;
+  width: 160px;
+  height: 160px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  background: #f3f4f6;
+  margin: 0;
+}
+
+.event-side .event-actions {
+  margin-left: 0;
+  align-self: auto;
 }
 
 .edit-btn {
@@ -513,6 +551,30 @@
   .user-actions {
     margin-left: 0;
     align-self: flex-end;
+  }
+
+  .event-side {
+    position: static;
+    width: auto;
+  }
+
+  .event-info {
+    padding-right: 0;
+  }
+
+  .event-image-preview {
+    position: static;
+    width: 140px;
+    height: 84px;
+    margin: 0;
+  }
+
+  .event-side .event-actions {
+    align-self: flex-end;
+  }
+
+  .event-top-row {
+    flex-wrap: wrap;
   }
 
   .charts-container {

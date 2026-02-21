@@ -22,6 +22,7 @@ interface ConcertEvent {
   genre: string;
   date: string;
   venue: string;
+  image: string;
   capacity: number;
   ticketPrice: number;
   status: 'upcoming' | 'active' | 'completed' | 'cancelled';
@@ -48,6 +49,8 @@ interface ReportData {
   passDistribution: Array<{ name: string; value: number; fill: string }>;
 }
 
+const DEFAULT_CONCERT_IMAGE = '/concert1.jpg';
+
 const AdminDashboard: React.FC = () => {
   const { user, logout } = useAuth();
   const [activeSection, setActiveSection] = useState<'events' | 'users' | 'reports'>('events');
@@ -66,6 +69,7 @@ const AdminDashboard: React.FC = () => {
     genre: '',
     date: '',
     venue: '',
+    image: DEFAULT_CONCERT_IMAGE,
     capacity: 0,
     ticketPrice: 0,
     status: 'upcoming'
@@ -90,6 +94,7 @@ const AdminDashboard: React.FC = () => {
         genre: 'Rock',
         date: '2026-07-15',
         venue: 'Central Stadium',
+        image: '/concert1.jpg',
         capacity: 50000,
         ticketPrice: 89.99,
         status: 'upcoming'
@@ -101,6 +106,7 @@ const AdminDashboard: React.FC = () => {
         genre: 'Jazz',
         date: '2026-06-20',
         venue: 'Downtown Theater',
+        image: '/concert2.jpg',
         capacity: 2500,
         ticketPrice: 65.00,
         status: 'active'
@@ -112,6 +118,7 @@ const AdminDashboard: React.FC = () => {
         genre: 'Pop',
         date: '2026-05-10',
         venue: 'Arena Center',
+        image: '/concert3.jpg',
         capacity: 15000,
         ticketPrice: 120.00,
         status: 'completed'
@@ -201,11 +208,24 @@ const AdminDashboard: React.FC = () => {
       genre: '',
       date: '',
       venue: '',
+      image: DEFAULT_CONCERT_IMAGE,
       capacity: 0,
       ticketPrice: 0,
       status: 'upcoming'
     });
     setShowAddEventForm(false);
+  };
+
+  const handleNewEventImageChange = (file: File | null) => {
+    if (!file) return;
+    const imageUrl = URL.createObjectURL(file);
+    setNewEvent({ ...newEvent, image: imageUrl });
+  };
+
+  const handleEditingEventImageChange = (file: File | null) => {
+    if (!file || !editingEvent) return;
+    const imageUrl = URL.createObjectURL(file);
+    setEditingEvent({ ...editingEvent, image: imageUrl });
   };
 
   const handleEditEvent = (event: ConcertEvent) => {
@@ -270,7 +290,6 @@ const AdminDashboard: React.FC = () => {
         <div className="admin-profile">
           <div className="profile-info">
             <h2>Welcome, Admin {user?.name}!</h2>
-            <p>System Administrator</p>
           </div>
         </div>
 
@@ -348,6 +367,11 @@ const AdminDashboard: React.FC = () => {
                     onChange={(e) => setNewEvent({...newEvent, venue: e.target.value})}
                   />
                   <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleNewEventImageChange(e.target.files?.[0] || null)}
+                  />
+                  <input
                     type="number"
                     placeholder="Capacity"
                     value={newEvent.capacity || ''}
@@ -419,6 +443,11 @@ const AdminDashboard: React.FC = () => {
                           onChange={(e) => setEditingEvent({...editingEvent, venue: e.target.value})}
                         />
                         <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handleEditingEventImageChange(e.target.files?.[0] || null)}
+                        />
+                        <input
                           type="number"
                           value={editingEvent.capacity}
                           onChange={(e) => setEditingEvent({...editingEvent, capacity: parseInt(e.target.value)})}
@@ -451,7 +480,17 @@ const AdminDashboard: React.FC = () => {
                   ) : (
                     <>
                       <div className="event-info">
-                        <h4>{event.name}</h4>
+                        <div className="event-top-row">
+                          <h4>{event.name}</h4>
+                          <img
+                            src={event.image || DEFAULT_CONCERT_IMAGE}
+                            alt={`${event.name} concert`}
+                            className="event-image-preview"
+                            onError={(e) => {
+                              e.currentTarget.src = DEFAULT_CONCERT_IMAGE;
+                            }}
+                          />
+                        </div>
                         <p><strong>Artist:</strong> {event.artist}</p>
                         <p><strong>Genre:</strong> {event.genre}</p>
                         <p><strong>Date:</strong> {new Date(event.date).toLocaleDateString()}</p>
@@ -460,13 +499,15 @@ const AdminDashboard: React.FC = () => {
                         <p><strong>Ticket Price:</strong> ${event.ticketPrice.toFixed(2)}</p>
                         <span className={`status-badge ${event.status}`}>{event.status}</span>
                       </div>
-                      <div className="event-actions">
-                        <button className="edit-btn" onClick={() => handleEditEvent(event)}>
-                          <MdEdit />
-                        </button>
-                        <button className="delete-btn" onClick={() => handleDeleteEvent(event.id)}>
-                          <MdDelete />
-                        </button>
+                      <div className="event-side">
+                        <div className="event-actions">
+                          <button className="edit-btn" onClick={() => handleEditEvent(event)}>
+                            <MdEdit />
+                          </button>
+                          <button className="delete-btn" onClick={() => handleDeleteEvent(event.id)}>
+                            <MdDelete />
+                          </button>
+                        </div>
                       </div>
                     </>
                   )}
