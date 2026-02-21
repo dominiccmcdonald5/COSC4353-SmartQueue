@@ -93,7 +93,7 @@
 
 .concerts-grid h3 {
   font-size: 1.5rem;
-  margin-bottom: 2rem;
+  margin-bottom: 1rem;
   color: #1f2937;
   font-family: 'Tahoma', sans-serif; 
 }
@@ -141,9 +141,9 @@
 
 .home-page .status-badge {
   position: absolute;
-  top: 1rem;
+  top: .5rem;
   right: 1rem;
-  padding: 0.4rem 1rem;
+  padding: 0.5rem 1rem;
   border-radius: 999px;
   font-size: 0.8rem;
   font-weight: 600;
