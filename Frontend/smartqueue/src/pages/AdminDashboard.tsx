@@ -12,7 +12,7 @@ import {
   MdCancel,
   MdVisibility
 } from 'react-icons/md';
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Tooltip, Legend } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Tooltip } from 'recharts';
 import '../styling/AdminDashboard.css';
 
 interface ConcertEvent {
@@ -782,7 +782,12 @@ const AdminDashboard: React.FC = () => {
                   <LineChart data={reportData.monthlyRevenue}>
                     <XAxis dataKey="month" />
                     <YAxis />
-                    <Tooltip formatter={(value) => [`$${value.toLocaleString()}`, 'Revenue']} />
+                    <Tooltip
+                      formatter={(value) => {
+                        const numericValue = typeof value === 'number' ? value : Number(value ?? 0);
+                        return [`$${numericValue.toLocaleString()}`, 'Revenue'];
+                      }}
+                    />
                     <Line 
                       type="monotone" 
                       dataKey="revenue" 
@@ -801,7 +806,12 @@ const AdminDashboard: React.FC = () => {
                   <LineChart data={reportData.userGrowth}>
                     <XAxis dataKey="month" />
                     <YAxis />
-                    <Tooltip formatter={(value) => [value.toLocaleString(), 'Users']} />
+                    <Tooltip
+                      formatter={(value) => {
+                        const numericValue = typeof value === 'number' ? value : Number(value ?? 0);
+                        return [numericValue.toLocaleString(), 'Users'];
+                      }}
+                    />
                     <Line 
                       type="monotone" 
                       dataKey="users" 
