@@ -1,7 +1,7 @@
 /* Home Page */
 .home-page {
   min-height: 100vh;
-  background-color: white;
+  background-color: #ECB8FF;
   padding: 0 0 2rem 0;
 }
 
@@ -74,13 +74,13 @@
   padding: 0 1rem;
 }
 
-.hero {
+.home-page .hero {
   text-align: center;
   margin-bottom: 3rem;
   font-family: 'Tahoma', sans-serif; 
 }
 
-.hero h2 {
+.home-page .hero h2 {
   font-size: 2.5rem;
   color: #1f2937;
   margin-bottom: 1rem;
@@ -88,7 +88,7 @@
 
 .hero p {
   font-size: 1.2rem;
-  color: #6b7280;
+  color: #8093F1;
 }
 
 .concerts-grid h3 {
