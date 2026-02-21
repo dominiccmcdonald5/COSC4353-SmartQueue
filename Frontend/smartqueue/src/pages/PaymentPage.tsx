@@ -56,20 +56,29 @@ const PaymentPage: React.FC = () => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    
+    let filteredValue = value;
+
+    if (name === 'cardholderName') {
+      filteredValue = value.replace(/[^a-zA-Z\s]/g, '');
+    } else if (name === 'billingAddress.city' || name === 'billingAddress.state') {
+      filteredValue = value.replace(/[^a-zA-Z\s]/g, '');
+    } else if (name === 'billingAddress.zipCode') {
+      filteredValue = value.replace(/\D/g, '');
+    }
+
     if (name.includes('.')) {
       const [parent, child] = name.split('.');
       setPaymentForm(prev => ({
         ...prev,
         [parent]: {
           ...prev[parent as keyof PaymentForm] as any,
-          [child]: value,
+          [child]: filteredValue,
         },
       }));
     } else {
       setPaymentForm(prev => ({
         ...prev,
-        [name]: value,
+        [name]: filteredValue,
       }));
     }
     
@@ -280,6 +289,8 @@ const PaymentPage: React.FC = () => {
                   value={paymentForm.cardholderName}
                   onChange={handleInputChange}
                   placeholder="John Doe"
+                  pattern="[A-Za-z\s]+"
+                  title="Letters and spaces only"
                   required
                 />
                 {errors.cardholderName && <span className="error">{errors.cardholderName}</span>}
@@ -311,6 +322,8 @@ const PaymentPage: React.FC = () => {
                     value={paymentForm.billingAddress.city}
                     onChange={handleInputChange}
                     placeholder="New York"
+                    pattern="[A-Za-z\s]+"
+                    title="Letters and spaces only"
                     required
                   />
                   {errors.billingAddress?.city && <span className="error">{errors.billingAddress.city}</span>}
@@ -325,7 +338,9 @@ const PaymentPage: React.FC = () => {
                     value={paymentForm.billingAddress.state}
                     onChange={handleInputChange}
                     placeholder="NY"
-                    maxLength={2}
+                    pattern="[A-Za-z\s]+"
+                    title="Letters and spaces only"
+                    maxLength={50}
                     required
                   />
                   {errors.billingAddress?.state && <span className="error">{errors.billingAddress.state}</span>}
@@ -335,11 +350,14 @@ const PaymentPage: React.FC = () => {
                   <label htmlFor="billingAddress.zipCode">ZIP Code</label>
                   <input
                     type="text"
+                    inputMode="numeric"
                     id="billingAddress.zipCode"
                     name="billingAddress.zipCode"
                     value={paymentForm.billingAddress.zipCode}
                     onChange={handleInputChange}
                     placeholder="10001"
+                    pattern="[0-9]+"
+                    title="Numbers only"
                     maxLength={10}
                     required
                   />
