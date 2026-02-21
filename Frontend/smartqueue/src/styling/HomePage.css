@@ -73,6 +73,7 @@
 .hero {
   text-align: center;
   margin-bottom: 3rem;
+  font-family: 'Tahoma', sans-serif; 
 }
 
 .hero h2 {
@@ -87,9 +88,10 @@
 }
 
 .concerts-grid h3 {
-  font-size: 2rem;
+  font-size: 1.5rem;
   margin-bottom: 2rem;
   color: #1f2937;
+  font-family: 'Tahoma', sans-serif; 
 }
 
 .concerts-list {
@@ -175,7 +177,7 @@
 }
 
 .home-page .concert-info .artist {
-  color: #6366f1;
+  color: #8093F1;
   font-weight: 600;
   margin-bottom: .25rem;
 }
