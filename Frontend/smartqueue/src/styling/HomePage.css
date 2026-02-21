@@ -38,9 +38,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  width: fit-content;
+  max-width: 100%;
+  flex: 0 0 auto;
 }
 
-.dashboard-link, .pass-link {
+.dashboard-link, .admin-link, .pass-link {
   color: #8093F1;
   border: none;
   padding: 0.5rem 1rem;
@@ -50,8 +53,8 @@
   transition: 0.2s;
 }
 
-.dashboard-link:hover, .pass-link:hover {
-  background-color: #f3e8ff;
+.dashboard-link:hover, .admin-link:hover, .pass-link:hover {
+  background-color: #e0e7ff;
 }
 
 .logout-btn {

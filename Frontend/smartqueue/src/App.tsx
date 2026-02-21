@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 
@@ -7,6 +7,7 @@ import LoginPage from './pages/LoginPage';
 import SignUpPage from './pages/SignUpPage';
 import HomePage from './pages/HomePage';
 import UserDashboard from './pages/UserDashboard';
+import AdminDashboard from './pages/AdminDashboard';
 import QueuePage from './pages/QueuePage';
 import SeatingMapPage from './pages/SeatingMapPage';
 import PaymentPage from './pages/PaymentPage';
@@ -14,6 +15,12 @@ import PurchasePassPage from './pages/PurchasePassPage';
 import PassPurchasePage from './pages/PassPurchasePage';
 
 import './App.css';
+
+/** Forces seating page to remount when concertId changes so the correct concert is shown */
+function SeatingMapKeyed() {
+  const { concertId } = useParams();
+  return <SeatingMapPage key={concertId} />;
+}
 
 function App() {
   return (
@@ -38,6 +45,12 @@ function App() {
               </ProtectedRoute>
             } />
             
+            <Route path="/admin" element={
+              <ProtectedRoute>
+                <AdminDashboard />
+              </ProtectedRoute>
+            } />
+            
             <Route path="/queue/:concertId" element={
               <ProtectedRoute>
                 <QueuePage />
@@ -46,7 +59,7 @@ function App() {
             
             <Route path="/seating/:concertId" element={
               <ProtectedRoute>
-                <SeatingMapPage />
+                <SeatingMapKeyed />
               </ProtectedRoute>
             } />
             
