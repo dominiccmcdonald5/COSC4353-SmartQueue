@@ -61,6 +61,10 @@ const AdminDashboard: React.FC = () => {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [showAddEventForm, setShowAddEventForm] = useState(false);
   const [showAddUserForm, setShowAddUserForm] = useState(false);
+  const [eventSearchTerm, setEventSearchTerm] = useState('');
+  const [eventStatusFilter, setEventStatusFilter] = useState<'all' | ConcertEvent['status']>('all');
+  const [userSearchTerm, setUserSearchTerm] = useState('');
+  const [userStatusFilter, setUserStatusFilter] = useState<'all' | User['status']>('all');
 
   // Form data for new events
   const [newEvent, setNewEvent] = useState<Omit<ConcertEvent, 'id'>>({
@@ -276,6 +280,24 @@ const AdminDashboard: React.FC = () => {
     setUsers(users.filter(u => u.id !== id));
   };
 
+  const filteredEvents = events.filter((event) => {
+    const searchText = eventSearchTerm.toLowerCase();
+    const matchesSearch =
+      event.name.toLowerCase().includes(searchText) ||
+      event.artist.toLowerCase().includes(searchText);
+    const matchesStatus = eventStatusFilter === 'all' || event.status === eventStatusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
+  const filteredUsers = users.filter((currentUser) => {
+    const searchText = userSearchTerm.toLowerCase();
+    const matchesSearch =
+      currentUser.name.toLowerCase().includes(searchText) ||
+      currentUser.email.toLowerCase().includes(searchText);
+    const matchesStatus = userStatusFilter === 'all' || currentUser.status === userStatusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
   return (
     <div className="admin-dashboard">
       <header className="admin-header">
@@ -325,6 +347,27 @@ const AdminDashboard: React.FC = () => {
               >
                 <MdAdd /> Add New Event
               </button>
+            </div>
+
+            <div className="section-tools">
+              <input
+                type="text"
+                className="search-input"
+                placeholder="Search event or artist..."
+                value={eventSearchTerm}
+                onChange={(e) => setEventSearchTerm(e.target.value)}
+              />
+              <select
+                className="filter-select"
+                value={eventStatusFilter}
+                onChange={(e) => setEventStatusFilter(e.target.value as 'all' | ConcertEvent['status'])}
+              >
+                <option value="all">All Statuses</option>
+                <option value="upcoming">Upcoming</option>
+                <option value="active">Active</option>
+                <option value="completed">Completed</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
             </div>
 
             {showAddEventForm && (
@@ -406,7 +449,7 @@ const AdminDashboard: React.FC = () => {
             )}
 
             <div className="events-list">
-              {events.map((event) => (
+              {filteredEvents.map((event) => (
                 <div key={event.id} className="event-card">
                   {editingEvent?.id === event.id ? (
                     <div className="edit-form">
@@ -513,6 +556,9 @@ const AdminDashboard: React.FC = () => {
                   )}
                 </div>
               ))}
+              {filteredEvents.length === 0 && (
+                <p className="empty-results">No events found for your current search/filter.</p>
+              )}
             </div>
           </section>
         )}
@@ -528,6 +574,26 @@ const AdminDashboard: React.FC = () => {
               >
                 <MdAdd /> Add New User
               </button>
+            </div>
+
+            <div className="section-tools">
+              <input
+                type="text"
+                className="search-input"
+                placeholder="Search user name or email..."
+                value={userSearchTerm}
+                onChange={(e) => setUserSearchTerm(e.target.value)}
+              />
+              <select
+                className="filter-select"
+                value={userStatusFilter}
+                onChange={(e) => setUserStatusFilter(e.target.value as 'all' | User['status'])}
+              >
+                <option value="all">All User Statuses</option>
+                <option value="active">Active</option>
+                <option value="suspended">Suspended</option>
+                <option value="banned">Banned</option>
+              </select>
             </div>
 
             {showAddUserForm && (
@@ -575,7 +641,7 @@ const AdminDashboard: React.FC = () => {
             )}
 
             <div className="users-list">
-              {users.map((user) => (
+              {filteredUsers.map((user) => (
                 <div key={user.id} className="user-card">
                   {editingUser?.id === user.id ? (
                     <div className="edit-form">
@@ -638,6 +704,9 @@ const AdminDashboard: React.FC = () => {
                   )}
                 </div>
               ))}
+              {filteredUsers.length === 0 && (
+                <p className="empty-results">No users found for your current search/filter.</p>
+              )}
             </div>
           </section>
         )}
