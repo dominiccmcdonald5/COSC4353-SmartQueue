@@ -1,5 +1,5 @@
 const actions = require('./simpleActions');
-const login = require('./SignUp/Login/login');
+const login = require('./Login/login');
 const signup = require('./SignUp/signup')
 
 
