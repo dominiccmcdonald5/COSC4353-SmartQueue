@@ -18,10 +18,29 @@ const LoginPage: React.FC = () => {
     setError('');
 
     try {
+      const response = await fetch('http://localhost:5000/api/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Login failed');
+      }
+
       await login(email, password);
       navigate(from, { replace: true });
-    } catch (error) {
-      setError('Invalid email or password');
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        setError(error.message);
+        return;
+      }
+
+      setError('Login failed');
     }
   };
 
