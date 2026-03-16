@@ -1,6 +1,7 @@
 const actions = require('./simpleActions');
 const login = require('./Login/login');
-const signup = require('./SignUp/signup')
+const signup = require('./SignUp/signup');
+const userHistory = require('./UserDashboard/ConcertHistory/userHistory');
 
 
 function routes(req, res) {
@@ -19,6 +20,10 @@ function routes(req, res) {
 
    if (URL === '/api/signup' && method === 'POST') {
        return signup.handleSignup(req, res);
+   }
+
+   if (URL === '/api/user/history' && method === 'POST') {
+       return userHistory.getConcertHistory(req, res);
    }
     
     /*if (URL.startsWith('/signup') && method === 'POST') {

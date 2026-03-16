@@ -27,17 +27,18 @@ interface UserStats {
   totalSpent: number;
 }
 
-type PassStatus = 'none' | 'silver' | 'gold';
+type PassStatus = 'Gold' | 'Silver' | 'None';
 
 const UserDashboard: React.FC = () => {
   const { user, logout } = useAuth();
   const [queueHistory, setQueueHistory] = useState<QueueHistory[]>([]);
   const [userStats, setUserStats] = useState<UserStats | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState('');
   const [activeTab, setActiveTab] = useState<'history' | 'stats'>('history');
   const [showBadgePopup, setShowBadgePopup] = useState(false);
 
-  // Mock user pass status - replace with actual user data
-  const userPassStatus: PassStatus = 'gold' as PassStatus;
+  const userPassStatus: PassStatus = user?.passStatus ?? 'None';
 
   // Mock data for enhanced stats
   const topGenres = [
@@ -54,45 +55,6 @@ const UserDashboard: React.FC = () => {
   ];
 
   useEffect(() => {
-    // TODO: Replace with actual API calls
-    // Mock data for demonstration
-    const mockHistory: QueueHistory[] = [
-      {
-        id: '1',
-        concertName: 'Summer Music Festival',
-        artist: 'Various Artists',
-        genre: 'Rock',
-        date: '2026-07-15',
-        status: 'completed',
-        waitTime: '45 minutes',
-        ticketsPurchased: 2,
-        imageUrl: 'https://via.placeholder.com/80x80/667eea/ffffff?text=🎸',
-        queueStatus: 'secured',
-      },
-      {
-        id: '2',
-        concertName: 'Rock Night',
-        artist: 'The Electric Band',
-        genre: 'Rock',
-        date: '2026-06-20',
-        status: 'in-progress',
-        waitTime: '12 minutes',
-        imageUrl: 'https://via.placeholder.com/80x80/f59e0b/ffffff?text=⚡',
-        queueStatus: 'pending',
-      },
-      {
-        id: '3',
-        concertName: 'Pop Extravaganza',
-        artist: 'PopStar',
-        genre: 'Pop',
-        date: '2026-05-10',
-        status: 'cancelled',
-        waitTime: '23 minutes',
-        imageUrl: 'https://via.placeholder.com/80x80/ec4899/ffffff?text=🎤',
-        queueStatus: 'sold-out',
-      },
-    ];
-
     const mockStats: UserStats = {
       totalQueues: 15,
       successfulPurchases: 12,
@@ -100,20 +62,74 @@ const UserDashboard: React.FC = () => {
       favoriteGenre: 'Rock',
       totalSpent: 850,
     };
-    
-    setQueueHistory(mockHistory);
+
+    const loadUserHistory = async () => {
+      const parsedUserId = Number(user?.id || 0);
+      if (!parsedUserId) {
+        setHistoryError('Unable to determine user ID for history lookup');
+        setQueueHistory([]);
+        return;
+      }
+
+      try {
+        setHistoryLoading(true);
+        setHistoryError('');
+
+        const response = await fetch('http://localhost:5000/api/user/history', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ userID: parsedUserId }),
+        });
+
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+          throw new Error(data.message || 'Failed to load user history');
+        }
+
+        const mappedHistory: QueueHistory[] = (data.concerts || []).map((concert: any) => {
+          const historyStatus = concert.history?.status || 'queued';
+          return {
+            id: String(concert.history?.historyID ?? concert.concertID),
+            concertName: concert.concertName,
+            artist: concert.artistName,
+            genre: concert.genre,
+            date: concert.date,
+            status: historyStatus === 'completed' ? 'completed' : historyStatus === 'cancelled' ? 'cancelled' : 'in-progress',
+            waitTime: `${concert.history?.waitTime ?? 0} seconds`,
+            ticketsPurchased: concert.history?.ticketCount,
+            imageUrl: concert.concertImage,
+            queueStatus: historyStatus === 'completed' ? 'secured' : historyStatus === 'cancelled' ? 'sold-out' : 'pending',
+          };
+        });
+
+        setQueueHistory(mappedHistory);
+      } catch (error: unknown) {
+        if (error instanceof Error) {
+          setHistoryError(error.message);
+        } else {
+          setHistoryError('Failed to load user history');
+        }
+        setQueueHistory([]);
+      } finally {
+        setHistoryLoading(false);
+      }
+    };
+
+    loadUserHistory();
     setUserStats(mockStats);
-  }, []);
+  }, [user?.id]);
 
   const getBadgeInfo = () => {
     switch (userPassStatus) {
-      case 'silver':
+      case 'Silver':
         return {
           label: 'Silver',
           color: '#c0c0c0',
           description: 'Skip the line until 25% venue capacity is filled',
         };
-      case 'gold':
+      case 'Gold':
         return {
           label: 'Gold',
           color: '#ffd700',
@@ -174,7 +190,12 @@ const UserDashboard: React.FC = () => {
         {activeTab === 'history' && (
           <section className="queue-history">
             <h3>Your Queue History</h3>
+            {historyLoading && <p>Loading history...</p>}
+            {historyError && <p className="error-message">{historyError}</p>}
             <div className="history-list">
+              {!historyLoading && !historyError && queueHistory.length === 0 && (
+                <p>No history found for this user.</p>
+              )}
               {queueHistory.map((item) => (
                 <div key={item.id} className="history-item">
                   <div className="concert-image">

@@ -37,7 +37,7 @@ const handleSignup = async (req, res) => {
                 lastName,
                 email: normalizedEmail,
                 password,
-                passStatus: 'inactive',
+                passStatus: 'None',
                 createdAt: new Date().toISOString(),
             };
 
