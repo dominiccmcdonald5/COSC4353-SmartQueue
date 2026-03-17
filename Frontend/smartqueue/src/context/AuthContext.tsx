@@ -13,6 +13,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string, firstName: string, lastName: string) => Promise<void>;
   logout: () => void;
+  updatePassStatus: (passStatus: 'Gold' | 'Silver' | 'None') => void;
   isLoading: boolean;
   isAuthenticated: boolean;
 }
@@ -108,11 +109,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     localStorage.removeItem('smartqueue_user');
   };
 
+  const updatePassStatus = (passStatus: 'Gold' | 'Silver' | 'None') => {
+    if (user) {
+      const updatedUser = { ...user, passStatus };
+      setUser(updatedUser);
+      localStorage.setItem('smartqueue_user', JSON.stringify(updatedUser));
+    }
+  };
+
   const value = {
     user,
     login,
     signup,
     logout,
+    updatePassStatus,
     isLoading,
     isAuthenticated: !!user,
   };

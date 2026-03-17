@@ -4,13 +4,16 @@ import { useAuth } from '../context/AuthContext';
 import '../styling/PassPurchasePage.css';
 
 const PassPurchasePage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, updatePassStatus } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [processing, setProcessing] = useState(false);
 
   // Get plan data from navigation state
   const { selectedPlan } = location.state || {};
+
+  // Check if the selected plan is the same as current pass status
+  const isSamePass = selectedPlan && user?.passStatus === (selectedPlan.id.charAt(0).toUpperCase() + selectedPlan.id.slice(1));
 
   const [formData, setFormData] = useState({
     cardNumber: '',
@@ -32,15 +35,50 @@ const PassPurchasePage: React.FC = () => {
 
   const handlePurchase = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedPlan) return;
+    if (!selectedPlan || !user?.id || isSamePass) return;
 
     setProcessing(true);
+    console.log(selectedPlan);
 
     try {
-      // TODO: Replace with actual payment processing API call
       // Simulate payment processing
       await new Promise(resolve => setTimeout(resolve, 2000));
       
+      // Capitalize the pass status for consistency
+      const capitalizedPassStatus = selectedPlan.id.charAt(0).toUpperCase() + selectedPlan.id.slice(1) as 'Gold' | 'Silver' | 'None';
+      
+      // Call API to update user's pass status
+      const response = await fetch('http://localhost:5000/api/user/pass/update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userID: user.id,
+          passStatus: capitalizedPassStatus
+        })
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || 'Failed to update pass status');
+      }
+
+      // Update the user's pass status in the auth context
+      updatePassStatus(capitalizedPassStatus);
+
+      // Clear form data after successful purchase
+      setFormData({
+        cardNumber: '',
+        expiryDate: '',
+        cvv: '',
+        nameOnCard: '',
+        billingAddress: '',
+        city: '',
+        zipCode: ''
+      });
+
       // Navigate back to home with success message
       navigate('/home', { 
         state: { 
@@ -197,9 +235,10 @@ const PassPurchasePage: React.FC = () => {
               <button
                 type="submit"
                 className="purchase-button"
-                disabled={processing}
+                disabled={processing || isSamePass}
+                title={isSamePass ? 'You already have this pass' : ''}
               >
-                {processing ? 'Processing...' : `Purchase ${selectedPlan.name} - $${selectedPlan.price}`}
+                {processing ? 'Processing...' : isSamePass ? `You already have ${selectedPlan.name}` : `Purchase ${selectedPlan.name} - $${selectedPlan.price}`}
               </button>
 
               <p className="terms">
