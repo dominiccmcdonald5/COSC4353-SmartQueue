@@ -10,7 +10,8 @@ const map_route = {
         '/api/login',
       '/api/signup',
       '/api/user/history',
-      '/api/user/stats'
+      '/api/user/stats',
+      '/api/user/pass/update'
     ],
     'PUT': [],
     'DELETE': [],

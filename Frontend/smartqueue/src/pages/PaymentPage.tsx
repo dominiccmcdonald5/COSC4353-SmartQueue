@@ -99,48 +99,10 @@ const PaymentPage: React.FC = () => {
     }
   };
 
-  const validateForm = (): boolean => {
-    const newErrors: Partial<PaymentForm> & { billingAddress?: Partial<PaymentForm['billingAddress']> } = {};
-    const { billingAddress } = paymentForm;
 
-    if (!paymentForm.cardNumber || paymentForm.cardNumber.replace(/\s/g, '').length < 16) {
-      newErrors.cardNumber = 'Valid card number is required (16 digits)';
-    }
-    if (!paymentForm.expiryDate || !/^\d{2}\/\d{2}$/.test(paymentForm.expiryDate)) {
-      newErrors.expiryDate = 'Valid expiry date is required (MM/YY)';
-    }
-    if (!paymentForm.cvv || paymentForm.cvv.length < 3) {
-      newErrors.cvv = 'Valid CVV is required';
-    }
-    if (!paymentForm.cardholderName?.trim()) {
-      newErrors.cardholderName = 'Cardholder name is required';
-    }
-
-    newErrors.billingAddress = {};
-    if (!billingAddress.street?.trim()) {
-      newErrors.billingAddress.street = 'Street address is required';
-    }
-    if (!billingAddress.city?.trim()) {
-      newErrors.billingAddress.city = 'City is required';
-    }
-    if (!billingAddress.state?.trim()) {
-      newErrors.billingAddress.state = 'State is required';
-    }
-    if (!billingAddress.zipCode?.trim()) {
-      newErrors.billingAddress.zipCode = 'ZIP code is required';
-    }
-    if (Object.keys(newErrors.billingAddress).length === 0) {
-      delete newErrors.billingAddress;
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!validateForm()) return;
 
     setProcessing(true);
 
