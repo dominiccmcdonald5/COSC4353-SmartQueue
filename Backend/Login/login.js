@@ -22,12 +22,17 @@ const handleLogin = async (req, res) => {
             );
 
             if (userCheck) {
+                const passStatus = userCheck.passStatus === 'Gold' || userCheck.passStatus === 'Silver' || userCheck.passStatus === 'None'
+                    ? userCheck.passStatus
+                    : 'None';
+
                 res.writeHead(200, { "Content-Type": "application/json" });
                 res.end(JSON.stringify({
                     success: true,
                     userId: userCheck.userID,
                     userName: `${userCheck.firstName} ${userCheck.lastName}`,
                     email: userCheck.email,
+                    passStatus,
                     accountType: 'user',
                     message: "User Account"
                 }));
@@ -43,6 +48,7 @@ const handleLogin = async (req, res) => {
                 res.end(JSON.stringify({
                     success: true,
                     userName: adminCheck.user,
+                    passStatus: 'None',
                     accountType: 'admin',
                     message: "Admin Account"
                 }));

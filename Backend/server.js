@@ -8,7 +8,9 @@ const map_route = {
     'GET': [],
     'POST': [
         '/api/login',
-        '/api/signup'
+      '/api/signup',
+      '/api/user/history',
+      '/api/user/stats'
     ],
     'PUT': [],
     'DELETE': [],
