@@ -37,7 +37,7 @@ interface UserStats {
 type PassStatus = 'Gold' | 'Silver' | 'None';
 
 const UserDashboard: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, updatePassStatus } = useAuth();
   const [queueHistory, setQueueHistory] = useState<QueueHistory[]>([]);
   const [userStats, setUserStats] = useState<UserStats | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -46,6 +46,7 @@ const UserDashboard: React.FC = () => {
   const [statsError, setStatsError] = useState('');
   const [activeTab, setActiveTab] = useState<'history' | 'stats'>('history');
   const [showBadgePopup, setShowBadgePopup] = useState(false);
+  const [isRemovingPass, setIsRemovingPass] = useState(false);
 
   const userPassStatus: PassStatus = user?.passStatus ?? 'None';
 
@@ -232,6 +233,46 @@ const UserDashboard: React.FC = () => {
     }
   };
 
+  const handleRemovePass = async () => {
+    const parsedUserId = Number(user?.id || 0);
+    if (!parsedUserId || userPassStatus === 'None') {
+      return;
+    }
+
+    const shouldRemove = window.confirm('Remove your current pass and go back to None?');
+    if (!shouldRemove) {
+      return;
+    }
+
+    try {
+      setIsRemovingPass(true);
+
+      const response = await fetch('http://localhost:5000/api/user/pass/update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userID: parsedUserId, passStatus: 'None' }),
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Failed to remove pass');
+      }
+
+      updatePassStatus('None');
+      setShowBadgePopup(false);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        alert(error.message);
+      } else {
+        alert('Failed to remove pass');
+      }
+    } finally {
+      setIsRemovingPass(false);
+    }
+  };
+
   const badgeInfo = getBadgeInfo();
 
   return (
@@ -240,7 +281,19 @@ const UserDashboard: React.FC = () => {
         <div className="dashboard-header-content">
           <Link to="/home" className="back-link">← Back to Home</Link>
           <h1>My Dashboard</h1>
-          <button onClick={logout} className="logout-btn">Logout</button>
+          <div className="header-actions">
+            {badgeInfo && (
+              <button
+                type="button"
+                className="remove-pass-btn"
+                onClick={handleRemovePass}
+                disabled={isRemovingPass}
+              >
+                {isRemovingPass ? 'Removing...' : 'Remove Pass'}
+              </button>
+            )}
+            <button onClick={logout} className="logout-btn">Logout</button>
+          </div>
         </div>
       </header>
 

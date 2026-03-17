@@ -60,6 +60,31 @@
   background-color: #dc2626;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.remove-pass-btn {
+  background-color: #f59e0b;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  margin: 0.5rem;
+}
+
+.remove-pass-btn:hover {
+  background-color: #d97706;
+}
+
+.remove-pass-btn:disabled {
+  background-color: #fcd34d;
+  cursor: not-allowed;
+}
+
 .dashboard-main {
   max-width: 1200px;
   margin: 0 auto;

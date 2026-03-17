@@ -2751,7 +2751,7 @@
       "lastName": "U",
       "email": "p@P",
       "password": "11111!",
-      "passStatus": "Gold",
+      "passStatus": "None",
       "createdAt": "2026-03-17T00:38:44.866Z"
     }
   ],
