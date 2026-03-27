@@ -400,19 +400,22 @@ const HomePage: React.FC = () => {
           </h1>
           <p>Join the queue and secure tickets for your favorite artists</p>
           
+          {/* Show role badge based on account type */}
           {isAdmin && (
             <div className="role-badge admin-badge">
               ⚡ Administrator Access - Full System Control
             </div>
           )}
           
-          {isUser && user?.passStatus !== 'None' && user?.passStatus !== 'inactive' && (
+          {/* Show premium badge for Gold or Silver members */}
+          {isUser && (user?.passStatus === 'Gold' || user?.passStatus === 'Silver') && (
             <div className="role-badge premium-badge">
               ⭐ Premium Member - Priority Queue Access
             </div>
           )}
           
-          {isUser && (user?.passStatus === 'None' || user?.passStatus === 'inactive') && (
+          {/* Show standard badge for users with no premium pass */}
+          {isUser && user?.passStatus === 'None' && (
             <div className="role-badge standard-badge">
               🎫 Standard Member - <Link to="/purchase-pass" className="upgrade-link">Upgrade to Premium for Priority Access</Link>
             </div>
