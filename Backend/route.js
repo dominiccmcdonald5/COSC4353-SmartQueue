@@ -4,6 +4,7 @@ const signup = require('./SignUp/signup');
 const userHistory = require('./UserDashboard/ConcertHistory/userHistory');
 const userStats = require('./UserDashboard/UserStats/userStats');
 const updatePass = require('./PassPurchase/updatePass');
+const concerts = require('./Concerts/concerts');
 
 function routes(req, res) {
     const URL = req.url;
@@ -34,6 +35,15 @@ function routes(req, res) {
    if (URL === '/api/user/pass/update' && method === 'POST') {
        return updatePass.updateUserPassStatus(req, res);
    }
+
+    if (URL === '/api/concerts' && method === 'GET'){
+        return concerts.handleGetConcerts(req, res);
+    }
+
+    if (URL.match(/^\/api\/concerts\/\d+$/) && method === 'GET') {
+        const concertId = URL.split('/').pop();
+        return concerts.handleGetConcertById(req, res, concertId);
+    }
     
     /*if (URL.startsWith('/signup') && method === 'POST') {
         return actions.handleSignup(req, res);

@@ -79,99 +79,13 @@ const HomePage: React.FC = () => {
         setConcerts(data.concerts);
       } else {
         setError('Failed to load concerts');
-        loadMockData();
       }
     } catch (error) {
       console.error('Error fetching concerts:', error);
-      setError('Unable to connect to server. Showing demo data.');
-      loadMockData();
+      setError('Unable to connect to server. Please make sure the backend is running.');
     } finally {
       setLoading(false);
     }
-  };
-
-  const loadMockData = () => {
-    const mockConcerts: Concert[] = [
-      {
-        id: '1',
-        name: 'Summer Music Festival',
-        artist: 'Various Artists',
-        date: '2026-07-15',
-        venue: 'Central Park',
-        image: 'https://picsum.photos/seed/summer-festival/600/400',
-        price: '$85 - $150',
-        status: 'available',
-        availableTickets: 450,
-        totalTickets: 1000,
-        genre: 'Various'
-      },
-      {
-        id: '2',
-        name: 'Rock Night',
-        artist: 'The Electric Band',
-        date: '2026-06-20',
-        venue: 'Madison Square Garden',
-        image: 'https://picsum.photos/seed/rock-night/600/400',
-        price: '$95 - $200',
-        status: 'queue-active',
-        availableTickets: 120,
-        totalTickets: 800,
-        genre: 'Rock'
-      },
-      {
-        id: '3',
-        name: 'Jazz Evening',
-        artist: 'Miles & Friends',
-        date: '2026-05-30',
-        venue: 'Blue Note',
-        image: 'https://picsum.photos/seed/jazz-evening/600/400',
-        price: '$65 - $120',
-        status: 'sold-out',
-        availableTickets: 0,
-        totalTickets: 500,
-        genre: 'Jazz'
-      },
-      {
-        id: '4',
-        name: 'EDM Paradise',
-        artist: 'DJ Neon',
-        date: '2026-08-10',
-        venue: 'Electric Factory',
-        image: 'https://picsum.photos/seed/edm-paradise/600/400',
-        price: '$75 - $180',
-        status: 'available',
-        availableTickets: 650,
-        totalTickets: 1200,
-        genre: 'EDM'
-      },
-      {
-        id: '5',
-        name: 'Country Roads',
-        artist: 'Nashville Stars',
-        date: '2026-07-05',
-        venue: 'Ryman Auditorium',
-        image: 'https://picsum.photos/seed/country-roads/600/400',
-        price: '$55 - $110',
-        status: 'queue-active',
-        availableTickets: 85,
-        totalTickets: 600,
-        genre: 'Country'
-      },
-      {
-        id: '6',
-        name: 'Hip Hop Showcase',
-        artist: 'Urban Legends',
-        date: '2026-09-15',
-        venue: 'Brooklyn Arena',
-        image: 'https://picsum.photos/seed/hip-hop/600/400',
-        price: '$100 - $250',
-        status: 'available',
-        availableTickets: 320,
-        totalTickets: 900,
-        genre: 'Hip-Hop'
-      }
-    ];
-    setConcerts(mockConcerts);
   };
 
   useEffect(() => {
@@ -230,34 +144,8 @@ const HomePage: React.FC = () => {
       return;
     }
     
-    try {
-      const response = await fetch('/api/queue/join', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          concertId: concertId,
-          userId: user.id
-        }),
-      });
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        navigate(`/queue/${concertId}`, { 
-          state: { 
-            position: data.position,
-            message: data.message 
-          } 
-        });
-      } else {
-        alert(data.message || 'Failed to join queue');
-      }
-    } catch (error) {
-      console.error('Error joining queue:', error);
-      alert('Unable to join queue. Please try again.');
-    }
+    // For now, just show an alert since queue functionality will be implemented later
+    alert(`Queue functionality coming soon! You clicked on concert ${concertId}`);
   };
 
   const handleLogout = () => {
@@ -368,24 +256,7 @@ const HomePage: React.FC = () => {
         <div className="header-content">
           <h1>ticketQ</h1>
           <div className="user-info">
-            {isUser && (
-              <Link to="/dashboard" className="dashboard-link">
-                📊 User Dashboard
-              </Link>
-            )}
-            
-            {isAdmin && (
-              <Link to="/admin" className="admin-link">
-                ⚙️ Admin Dashboard
-              </Link>
-            )}
-            
-            {isUser && (
-              <Link to="/purchase-pass" className="pass-link">
-                ⭐ Get Premium Pass
-              </Link>
-            )}
-            
+            {/* We'll add dashboard buttons later */}
             <button onClick={handleLogout} className="logout-btn">
               🚪 Logout
             </button>
@@ -399,27 +270,6 @@ const HomePage: React.FC = () => {
             <span>Welcome, {user?.name || 'Guest'}!</span>
           </h1>
           <p>Join the queue and secure tickets for your favorite artists</p>
-          
-          {/* Show role badge based on account type */}
-          {isAdmin && (
-            <div className="role-badge admin-badge">
-              ⚡ Administrator Access - Full System Control
-            </div>
-          )}
-          
-          {/* Show premium badge for Gold or Silver members */}
-          {isUser && (user?.passStatus === 'Gold' || user?.passStatus === 'Silver') && (
-            <div className="role-badge premium-badge">
-              ⭐ Premium Member - Priority Queue Access
-            </div>
-          )}
-          
-          {/* Show standard badge for users with no premium pass */}
-          {isUser && user?.passStatus === 'None' && (
-            <div className="role-badge standard-badge">
-              🎫 Standard Member - <Link to="/purchase-pass" className="upgrade-link">Upgrade to Premium for Priority Access</Link>
-            </div>
-          )}
         </section>
 
         {error && (
