@@ -5,6 +5,7 @@ interface User {
   id: string;
   email: string;
   name: string;
+  passStatus: 'Gold' | 'Silver' | 'None';
 }
 
 interface AuthContextType {
@@ -12,6 +13,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string, firstName: string, lastName: string) => Promise<void>;
   logout: () => void;
+  updatePassStatus: (passStatus: 'Gold' | 'Silver' | 'None') => void;
   isLoading: boolean;
   isAuthenticated: boolean;
 }
@@ -43,22 +45,36 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setIsLoading(false);
   }, []);
 
-  const login = async (email: string) => {
+  const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      // TODO: Replace with actual API call
-      // Simulating API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+      const response = await fetch('http://localhost:5000/api/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Login failed');
+      }
+
       const userData = {
-        id: '1',
-        email,
-        name: email.split('@')[0],
+        id: String(data.userId ?? `admin:${data.userName ?? email}`),
+        email: data.email ?? email,
+        name: data.userName ?? email.split('@')[0],
+        passStatus: data.passStatus === 'Gold' || data.passStatus === 'Silver' ? data.passStatus : 'None',
       };
       
       setUser(userData);
       localStorage.setItem('smartqueue_user', JSON.stringify(userData));
-    } catch (error) {
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        throw new Error(error.message);
+      }
+
       throw new Error('Login failed');
     } finally {
       setIsLoading(false);
@@ -76,6 +92,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         id: Date.now().toString(),
         email,
         name,
+        passStatus: 'None' as const,
       };
       
       setUser(userData);
@@ -92,11 +109,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     localStorage.removeItem('smartqueue_user');
   };
 
+  const updatePassStatus = (passStatus: 'Gold' | 'Silver' | 'None') => {
+    if (user) {
+      const updatedUser = { ...user, passStatus };
+      setUser(updatedUser);
+      localStorage.setItem('smartqueue_user', JSON.stringify(updatedUser));
+    }
+  };
+
   const value = {
     user,
     login,
     signup,
     logout,
+    updatePassStatus,
     isLoading,
     isAuthenticated: !!user,
   };

@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
 import '../styling/LoginSignup.css';
 
 const SignUpPage: React.FC = () => {
@@ -12,7 +11,7 @@ const SignUpPage: React.FC = () => {
     confirmPassword: '',
   });
   const [error, setError] = useState('');
-  const { signup, isLoading } = useAuth();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -38,10 +37,35 @@ const SignUpPage: React.FC = () => {
     }
 
     try {
-      await signup(formData.email, formData.firstName, formData.lastName, formData.password);
-      navigate('/home');
-    } catch (error) {
-      setError('Failed to create account. Please try again.');
+      setIsSubmitting(true);
+
+      const response = await fetch('http://localhost:5000/api/signup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          email: formData.email,
+          password: formData.password,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Failed to create account. Please try again.');
+      }
+
+      navigate('/login');
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        setError(error.message);
+      } else {
+        setError('Failed to create account. Please try again.');
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -124,8 +148,8 @@ const SignUpPage: React.FC = () => {
 
           {error && <div className="error-message">{error}</div>}
 
-          <button type="submit" disabled={isLoading}>
-            {isLoading ? 'Creating Account...' : 'Sign Up'}
+          <button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? 'Creating Account...' : 'Sign Up'}
           </button>
 
         </form>

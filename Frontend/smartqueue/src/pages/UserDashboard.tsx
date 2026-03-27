@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { GiPoliceBadge } from 'react-icons/gi';
@@ -21,99 +21,208 @@ interface QueueHistory {
 
 interface UserStats {
   totalQueues: number;
-  successfulPurchases: number;
-  averageWaitTime: string;
-  favoriteGenre: string;
-  totalSpent: number;
+  successfulQueues: number;
+  firstPopularGenre: string | null;
+  secondPopularGenre: string | null;
+  thirdPopularGenre: string | null;
+  totalSpending: number;
+  spendingByConcert: {
+    concertID: number;
+    concertName: string;
+    totalSpent: number;
+    queueCount: number;
+  }[];
 }
 
-type PassStatus = 'none' | 'silver' | 'gold';
+type PassStatus = 'Gold' | 'Silver' | 'None';
 
 const UserDashboard: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, updatePassStatus } = useAuth();
   const [queueHistory, setQueueHistory] = useState<QueueHistory[]>([]);
   const [userStats, setUserStats] = useState<UserStats | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState('');
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [statsError, setStatsError] = useState('');
   const [activeTab, setActiveTab] = useState<'history' | 'stats'>('history');
   const [showBadgePopup, setShowBadgePopup] = useState(false);
+  const [isRemovingPass, setIsRemovingPass] = useState(false);
 
-  // Mock user pass status - replace with actual user data
-  const userPassStatus: PassStatus = 'gold' as PassStatus;
+  const userPassStatus: PassStatus = user?.passStatus ?? 'None';
 
-  // Mock data for enhanced stats
-  const topGenres = [
-    { name: 'Pop', count: 2, percentage: 25, fill: '#9ca3af' },     // 2nd place (left)
-    { name: 'Rock', count: 4, percentage: 50, fill: '#f59e0b' },    // 1st place (middle)
-    { name: 'Jazz', count: 2, percentage: 25, fill: '#cd7f32' },    // 3rd place (right)
-  ];
+  const topGenres = useMemo(() => {
+    if (!userStats) {
+      return [] as { name: string; count: number; fill: string }[];
+    }
 
-  const spendingByConcert = [
-    { id: 'Summer Rock Festival', label: 'Summer Rock Festival', value: 150, color: '#667eea' },
-    { id: 'Pop Stars Live', label: 'Pop Stars Live', value: 120, color: '#764ba2' },
-    { id: 'Jazz Night', label: 'Jazz Night', value: 80, color: '#10b981' },
-    { id: 'Indie Showcase', label: 'Indie Showcase', value: 100, color: '#f59e0b' },
-  ];
+    const values = [userStats.firstPopularGenre, userStats.secondPopularGenre, userStats.thirdPopularGenre]
+      .filter((genre): genre is string => Boolean(genre));
+    const fallbackCounts = [3, 2, 1];
+    const fills = ['#f59e0b', '#9ca3af', '#cd7f32'];
+
+    return values.map((genre, index) => ({
+      name: genre,
+      count: fallbackCounts[index] || 1,
+      fill: fills[index] || '#9ca3af',
+    }));
+  }, [userStats]);
+
+  const spendingByConcert = useMemo(() => {
+    if (!userStats) {
+      return [] as { id: number; label: string; value: number; color: string }[];
+    }
+
+    const colors = ['#667eea', '#764ba2', '#10b981', '#f59e0b', '#ef4444', '#14b8a6', '#a855f7', '#06b6d4'];
+    return userStats.spendingByConcert.map((item, index) => ({
+      id: item.concertID,
+      label: item.concertName,
+      value: item.totalSpent,
+      color: colors[index % colors.length],
+    }));
+  }, [userStats]);
+
+  const successPercent = useMemo(() => {
+    if (!userStats || userStats.totalQueues === 0) {
+      return 0;
+    }
+    return Math.round((userStats.successfulQueues / userStats.totalQueues) * 100);
+  }, [userStats]);
+
+  const spendingChartGradient = useMemo(() => {
+    if (!userStats || userStats.totalSpending <= 0 || spendingByConcert.length === 0) {
+      return 'conic-gradient(#e5e7eb 0deg 360deg)';
+    }
+
+    let currentAngle = 0;
+    const segments = spendingByConcert.map((item) => {
+      const angle = (item.value / userStats.totalSpending) * 360;
+      const start = currentAngle;
+      const end = currentAngle + angle;
+      currentAngle = end;
+      return `${item.color} ${start}deg ${end}deg`;
+    });
+
+    if (currentAngle < 360) {
+      segments.push(`#e5e7eb ${currentAngle}deg 360deg`);
+    }
+
+    return `conic-gradient(${segments.join(',')})`;
+  }, [spendingByConcert, userStats]);
 
   useEffect(() => {
-    // TODO: Replace with actual API calls
-    // Mock data for demonstration
-    const mockHistory: QueueHistory[] = [
-      {
-        id: '1',
-        concertName: 'Summer Music Festival',
-        artist: 'Various Artists',
-        genre: 'Rock',
-        date: '2026-07-15',
-        status: 'completed',
-        waitTime: '45 minutes',
-        ticketsPurchased: 2,
-        imageUrl: 'https://via.placeholder.com/80x80/667eea/ffffff?text=🎸',
-        queueStatus: 'secured',
-      },
-      {
-        id: '2',
-        concertName: 'Rock Night',
-        artist: 'The Electric Band',
-        genre: 'Rock',
-        date: '2026-06-20',
-        status: 'in-progress',
-        waitTime: '12 minutes',
-        imageUrl: 'https://via.placeholder.com/80x80/f59e0b/ffffff?text=⚡',
-        queueStatus: 'pending',
-      },
-      {
-        id: '3',
-        concertName: 'Pop Extravaganza',
-        artist: 'PopStar',
-        genre: 'Pop',
-        date: '2026-05-10',
-        status: 'cancelled',
-        waitTime: '23 minutes',
-        imageUrl: 'https://via.placeholder.com/80x80/ec4899/ffffff?text=🎤',
-        queueStatus: 'sold-out',
-      },
-    ];
+    const loadUserHistory = async () => {
+      const parsedUserId = Number(user?.id || 0);
+      if (!parsedUserId) {
+        setHistoryError('Unable to determine user ID for history lookup');
+        setQueueHistory([]);
+        return;
+      }
 
-    const mockStats: UserStats = {
-      totalQueues: 15,
-      successfulPurchases: 12,
-      averageWaitTime: '35 minutes',
-      favoriteGenre: 'Rock',
-      totalSpent: 850,
+      try {
+        setHistoryLoading(true);
+        setHistoryError('');
+
+        const response = await fetch('http://localhost:5000/api/user/history', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ userID: parsedUserId }),
+        });
+
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+          throw new Error(data.message || 'Failed to load user history');
+        }
+
+        const mappedHistory: QueueHistory[] = (data.concerts || []).map((concert: any) => {
+          const historyStatus = concert.history?.status || 'queued';
+          return {
+            id: String(concert.history?.historyID ?? concert.concertID),
+            concertName: concert.concertName,
+            artist: concert.artistName,
+            genre: concert.genre,
+            date: concert.date,
+            status: historyStatus === 'completed' ? 'completed' : historyStatus === 'cancelled' ? 'cancelled' : 'in-progress',
+            waitTime: `${concert.history?.waitTime ?? 0} seconds`,
+            ticketsPurchased: concert.history?.ticketCount,
+            imageUrl: concert.concertImage,
+            queueStatus: historyStatus === 'completed' ? 'secured' : historyStatus === 'cancelled' ? 'sold-out' : 'pending',
+          };
+        });
+
+        setQueueHistory(mappedHistory);
+      } catch (error: unknown) {
+        if (error instanceof Error) {
+          setHistoryError(error.message);
+        } else {
+          setHistoryError('Failed to load user history');
+        }
+        setQueueHistory([]);
+      } finally {
+        setHistoryLoading(false);
+      }
     };
-    
-    setQueueHistory(mockHistory);
-    setUserStats(mockStats);
-  }, []);
+
+    const loadUserStats = async () => {
+      const parsedUserId = Number(user?.id || 0);
+      if (!parsedUserId) {
+        setStatsError('Unable to determine user ID for stats lookup');
+        setUserStats(null);
+        return;
+      }
+
+      try {
+        setStatsLoading(true);
+        setStatsError('');
+
+        const response = await fetch('http://localhost:5000/api/user/stats', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ userID: parsedUserId }),
+        });
+
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+          throw new Error(data.message || 'Failed to load user stats');
+        }
+
+        setUserStats({
+          totalQueues: Number(data.totalQueues ?? 0),
+          successfulQueues: Number(data.successfulQueues ?? 0),
+          firstPopularGenre: data.firstPopularGenre ?? null,
+          secondPopularGenre: data.secondPopularGenre ?? null,
+          thirdPopularGenre: data.thirdPopularGenre ?? null,
+          totalSpending: Number(data.totalSpending ?? 0),
+          spendingByConcert: Array.isArray(data.spendingByConcert) ? data.spendingByConcert : [],
+        });
+      } catch (error: unknown) {
+        if (error instanceof Error) {
+          setStatsError(error.message);
+        } else {
+          setStatsError('Failed to load user stats');
+        }
+        setUserStats(null);
+      } finally {
+        setStatsLoading(false);
+      }
+    };
+
+    loadUserHistory();
+    loadUserStats();
+  }, [user?.id]);
 
   const getBadgeInfo = () => {
     switch (userPassStatus) {
-      case 'silver':
+      case 'Silver':
         return {
           label: 'Silver',
           color: '#c0c0c0',
           description: 'Skip the line until 25% venue capacity is filled',
         };
-      case 'gold':
+      case 'Gold':
         return {
           label: 'Gold',
           color: '#ffd700',
@@ -121,6 +230,46 @@ const UserDashboard: React.FC = () => {
         };
       default:
         return null;
+    }
+  };
+
+  const handleRemovePass = async () => {
+    const parsedUserId = Number(user?.id || 0);
+    if (!parsedUserId || userPassStatus === 'None') {
+      return;
+    }
+
+    const shouldRemove = window.confirm('Remove your current pass and go back to None?');
+    if (!shouldRemove) {
+      return;
+    }
+
+    try {
+      setIsRemovingPass(true);
+
+      const response = await fetch('http://localhost:5000/api/user/pass/update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userID: parsedUserId, passStatus: 'None' }),
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Failed to remove pass');
+      }
+
+      updatePassStatus('None');
+      setShowBadgePopup(false);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        alert(error.message);
+      } else {
+        alert('Failed to remove pass');
+      }
+    } finally {
+      setIsRemovingPass(false);
     }
   };
 
@@ -132,7 +281,19 @@ const UserDashboard: React.FC = () => {
         <div className="dashboard-header-content">
           <Link to="/home" className="back-link">← Back to Home</Link>
           <h1>My Dashboard</h1>
-          <button onClick={logout} className="logout-btn">Logout</button>
+          <div className="header-actions">
+            {badgeInfo && (
+              <button
+                type="button"
+                className="remove-pass-btn"
+                onClick={handleRemovePass}
+                disabled={isRemovingPass}
+              >
+                {isRemovingPass ? 'Removing...' : 'Remove Pass'}
+              </button>
+            )}
+            <button onClick={logout} className="logout-btn">Logout</button>
+          </div>
         </div>
       </header>
 
@@ -174,7 +335,12 @@ const UserDashboard: React.FC = () => {
         {activeTab === 'history' && (
           <section className="queue-history">
             <h3>Your Queue History</h3>
+            {historyLoading && <p>Loading history...</p>}
+            {historyError && <p className="error-message">{historyError}</p>}
             <div className="history-list">
+              {!historyLoading && !historyError && queueHistory.length === 0 && (
+                <p>No history found for this user.</p>
+              )}
               {queueHistory.map((item) => (
                 <div key={item.id} className="history-item">
                   <div className="concert-image">
@@ -225,6 +391,8 @@ const UserDashboard: React.FC = () => {
         {activeTab === 'stats' && userStats && (
           <section className="user-stats">
             <h3>Your Concert Statistics</h3>
+            {statsLoading && <p>Loading stats...</p>}
+            {statsError && <p className="error-message">{statsError}</p>}
             
             {/* Success Rate Container */}
             <div className="stats-container success-container">
@@ -234,14 +402,14 @@ const UserDashboard: React.FC = () => {
                     className="pie-chart-circle"
                     style={{
                       background: `conic-gradient(
-                        #10b981 0deg ${(userStats.successfulPurchases / userStats.totalQueues) * 360}deg,
-                        #e5e7eb ${(userStats.successfulPurchases / userStats.totalQueues) * 360}deg 360deg
+                        #10b981 0deg ${(userStats.totalQueues > 0 ? userStats.successfulQueues / userStats.totalQueues : 0) * 360}deg,
+                        #e5e7eb ${(userStats.totalQueues > 0 ? userStats.successfulQueues / userStats.totalQueues : 0) * 360}deg 360deg
                       )`
                     }}
                   >
                     <div className="pie-chart-center">
                       <span className="success-percentage">
-                        {Math.round((userStats.successfulPurchases / userStats.totalQueues) * 100)}%
+                        {successPercent}%
                       </span>
                       <span className="success-label">Success Rate</span>
                     </div>
@@ -250,9 +418,9 @@ const UserDashboard: React.FC = () => {
                 <div className="success-details">
                   <h4>Performance Level</h4>
                   <p className="performance-level">
-                    {Math.round((userStats.successfulPurchases / userStats.totalQueues) * 100) >= 80 ? 'Expert' :
-                     Math.round((userStats.successfulPurchases / userStats.totalQueues) * 100) >= 60 ? 'Advanced' :
-                     Math.round((userStats.successfulPurchases / userStats.totalQueues) * 100) >= 40 ? 'Intermediate' : 'Beginner'}
+                    {successPercent >= 80 ? 'Expert' :
+                     successPercent >= 60 ? 'Advanced' :
+                     successPercent >= 40 ? 'Intermediate' : 'Beginner'}
                   </p>
                   <div className="queue-stats">
                     <div className="queue-stat">
@@ -260,7 +428,7 @@ const UserDashboard: React.FC = () => {
                       <span className="stat-label">Total Queues</span>
                     </div>
                     <div className="queue-stat">
-                      <span className="stat-value">{userStats.successfulPurchases}</span>
+                      <span className="stat-value">{userStats.successfulQueues}</span>
                       <span className="stat-label">Successful</span>
                     </div>
                   </div>
@@ -303,19 +471,14 @@ const UserDashboard: React.FC = () => {
               <div className="spending-chart-container">
                 <div className="spending-total">
                   <h4>Total Spending</h4>
-                  <p className="total-amount">${userStats.totalSpent}</p>
+                  <p className="total-amount">${userStats.totalSpending.toFixed(2)}</p>
                   <p className="spending-instruction">Hover over the chart to see breakdown</p>
                 </div>
                 <div className="custom-pie-container">
                   <div 
                     className="custom-pie-chart"
                     style={{
-                      background: `conic-gradient(
-                        ${spendingByConcert[0].color} 0deg ${(spendingByConcert[0].value / userStats.totalSpent) * 360}deg,
-                        ${spendingByConcert[1].color} ${(spendingByConcert[0].value / userStats.totalSpent) * 360}deg ${((spendingByConcert[0].value + spendingByConcert[1].value) / userStats.totalSpent) * 360}deg,
-                        ${spendingByConcert[2].color} ${((spendingByConcert[0].value + spendingByConcert[1].value) / userStats.totalSpent) * 360}deg ${((spendingByConcert[0].value + spendingByConcert[1].value + spendingByConcert[2].value) / userStats.totalSpent) * 360}deg,
-                        ${spendingByConcert[3].color} ${((spendingByConcert[0].value + spendingByConcert[1].value + spendingByConcert[2].value) / userStats.totalSpent) * 360}deg 360deg
-                      )`
+                      background: spendingChartGradient
                     }}
                   >
                     <div className="pie-center">
@@ -324,10 +487,10 @@ const UserDashboard: React.FC = () => {
                   </div>
                   <div className="pie-legend">
                     {spendingByConcert.map((item, index) => (
-                      <div key={index} className="legend-item" title={`${item.label}: $${item.value}`}>
+                      <div key={index} className="legend-item" title={`${item.label}: $${item.value.toFixed(2)}`}>
                         <div className="legend-dot" style={{ backgroundColor: item.color }}></div>
                         <span className="legend-label">{item.label}</span>
-                        <span className="legend-value">${item.value}</span>
+                        <span className="legend-value">${item.value.toFixed(2)}</span>
                       </div>
                     ))}
                   </div>

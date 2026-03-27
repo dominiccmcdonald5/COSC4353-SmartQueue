@@ -12,7 +12,7 @@ import {
   MdCancel,
   MdVisibility
 } from 'react-icons/md';
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Tooltip, Legend } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Tooltip } from 'recharts';
 import '../styling/AdminDashboard.css';
 
 interface ConcertEvent {
@@ -22,6 +22,7 @@ interface ConcertEvent {
   genre: string;
   date: string;
   venue: string;
+  image: string;
   capacity: number;
   ticketPrice: number;
   status: 'upcoming' | 'active' | 'completed' | 'cancelled';
@@ -48,6 +49,8 @@ interface ReportData {
   passDistribution: Array<{ name: string; value: number; fill: string }>;
 }
 
+const DEFAULT_CONCERT_IMAGE = '/concert1.jpg';
+
 const AdminDashboard: React.FC = () => {
   const { user, logout } = useAuth();
   const [activeSection, setActiveSection] = useState<'events' | 'users' | 'reports'>('events');
@@ -58,6 +61,10 @@ const AdminDashboard: React.FC = () => {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [showAddEventForm, setShowAddEventForm] = useState(false);
   const [showAddUserForm, setShowAddUserForm] = useState(false);
+  const [eventSearchTerm, setEventSearchTerm] = useState('');
+  const [eventStatusFilter, setEventStatusFilter] = useState<'all' | ConcertEvent['status']>('all');
+  const [userSearchTerm, setUserSearchTerm] = useState('');
+  const [userStatusFilter, setUserStatusFilter] = useState<'all' | User['status']>('all');
 
   // Form data for new events
   const [newEvent, setNewEvent] = useState<Omit<ConcertEvent, 'id'>>({
@@ -66,6 +73,7 @@ const AdminDashboard: React.FC = () => {
     genre: '',
     date: '',
     venue: '',
+    image: DEFAULT_CONCERT_IMAGE,
     capacity: 0,
     ticketPrice: 0,
     status: 'upcoming'
@@ -90,6 +98,7 @@ const AdminDashboard: React.FC = () => {
         genre: 'Rock',
         date: '2026-07-15',
         venue: 'Central Stadium',
+        image: '/concert1.jpg',
         capacity: 50000,
         ticketPrice: 89.99,
         status: 'upcoming'
@@ -101,6 +110,7 @@ const AdminDashboard: React.FC = () => {
         genre: 'Jazz',
         date: '2026-06-20',
         venue: 'Downtown Theater',
+        image: '/concert2.jpg',
         capacity: 2500,
         ticketPrice: 65.00,
         status: 'active'
@@ -112,6 +122,7 @@ const AdminDashboard: React.FC = () => {
         genre: 'Pop',
         date: '2026-05-10',
         venue: 'Arena Center',
+        image: '/concert3.jpg',
         capacity: 15000,
         ticketPrice: 120.00,
         status: 'completed'
@@ -201,11 +212,24 @@ const AdminDashboard: React.FC = () => {
       genre: '',
       date: '',
       venue: '',
+      image: DEFAULT_CONCERT_IMAGE,
       capacity: 0,
       ticketPrice: 0,
       status: 'upcoming'
     });
     setShowAddEventForm(false);
+  };
+
+  const handleNewEventImageChange = (file: File | null) => {
+    if (!file) return;
+    const imageUrl = URL.createObjectURL(file);
+    setNewEvent({ ...newEvent, image: imageUrl });
+  };
+
+  const handleEditingEventImageChange = (file: File | null) => {
+    if (!file || !editingEvent) return;
+    const imageUrl = URL.createObjectURL(file);
+    setEditingEvent({ ...editingEvent, image: imageUrl });
   };
 
   const handleEditEvent = (event: ConcertEvent) => {
@@ -256,6 +280,24 @@ const AdminDashboard: React.FC = () => {
     setUsers(users.filter(u => u.id !== id));
   };
 
+  const filteredEvents = events.filter((event) => {
+    const searchText = eventSearchTerm.toLowerCase();
+    const matchesSearch =
+      event.name.toLowerCase().includes(searchText) ||
+      event.artist.toLowerCase().includes(searchText);
+    const matchesStatus = eventStatusFilter === 'all' || event.status === eventStatusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
+  const filteredUsers = users.filter((currentUser) => {
+    const searchText = userSearchTerm.toLowerCase();
+    const matchesSearch =
+      currentUser.name.toLowerCase().includes(searchText) ||
+      currentUser.email.toLowerCase().includes(searchText);
+    const matchesStatus = userStatusFilter === 'all' || currentUser.status === userStatusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
   return (
     <div className="admin-dashboard">
       <header className="admin-header">
@@ -270,7 +312,6 @@ const AdminDashboard: React.FC = () => {
         <div className="admin-profile">
           <div className="profile-info">
             <h2>Welcome, Admin {user?.name}!</h2>
-            <p>System Administrator</p>
           </div>
         </div>
 
@@ -306,6 +347,27 @@ const AdminDashboard: React.FC = () => {
               >
                 <MdAdd /> Add New Event
               </button>
+            </div>
+
+            <div className="section-tools">
+              <input
+                type="text"
+                className="search-input"
+                placeholder="Search event or artist..."
+                value={eventSearchTerm}
+                onChange={(e) => setEventSearchTerm(e.target.value)}
+              />
+              <select
+                className="filter-select"
+                value={eventStatusFilter}
+                onChange={(e) => setEventStatusFilter(e.target.value as 'all' | ConcertEvent['status'])}
+              >
+                <option value="all">All Statuses</option>
+                <option value="upcoming">Upcoming</option>
+                <option value="active">Active</option>
+                <option value="completed">Completed</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
             </div>
 
             {showAddEventForm && (
@@ -348,6 +410,11 @@ const AdminDashboard: React.FC = () => {
                     onChange={(e) => setNewEvent({...newEvent, venue: e.target.value})}
                   />
                   <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleNewEventImageChange(e.target.files?.[0] || null)}
+                  />
+                  <input
                     type="number"
                     placeholder="Capacity"
                     value={newEvent.capacity || ''}
@@ -382,7 +449,7 @@ const AdminDashboard: React.FC = () => {
             )}
 
             <div className="events-list">
-              {events.map((event) => (
+              {filteredEvents.map((event) => (
                 <div key={event.id} className="event-card">
                   {editingEvent?.id === event.id ? (
                     <div className="edit-form">
@@ -419,6 +486,11 @@ const AdminDashboard: React.FC = () => {
                           onChange={(e) => setEditingEvent({...editingEvent, venue: e.target.value})}
                         />
                         <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handleEditingEventImageChange(e.target.files?.[0] || null)}
+                        />
+                        <input
                           type="number"
                           value={editingEvent.capacity}
                           onChange={(e) => setEditingEvent({...editingEvent, capacity: parseInt(e.target.value)})}
@@ -451,7 +523,17 @@ const AdminDashboard: React.FC = () => {
                   ) : (
                     <>
                       <div className="event-info">
-                        <h4>{event.name}</h4>
+                        <div className="event-top-row">
+                          <h4>{event.name}</h4>
+                          <img
+                            src={event.image || DEFAULT_CONCERT_IMAGE}
+                            alt={`${event.name} concert`}
+                            className="event-image-preview"
+                            onError={(e) => {
+                              e.currentTarget.src = DEFAULT_CONCERT_IMAGE;
+                            }}
+                          />
+                        </div>
                         <p><strong>Artist:</strong> {event.artist}</p>
                         <p><strong>Genre:</strong> {event.genre}</p>
                         <p><strong>Date:</strong> {new Date(event.date).toLocaleDateString()}</p>
@@ -460,18 +542,23 @@ const AdminDashboard: React.FC = () => {
                         <p><strong>Ticket Price:</strong> ${event.ticketPrice.toFixed(2)}</p>
                         <span className={`status-badge ${event.status}`}>{event.status}</span>
                       </div>
-                      <div className="event-actions">
-                        <button className="edit-btn" onClick={() => handleEditEvent(event)}>
-                          <MdEdit />
-                        </button>
-                        <button className="delete-btn" onClick={() => handleDeleteEvent(event.id)}>
-                          <MdDelete />
-                        </button>
+                      <div className="event-side">
+                        <div className="event-actions">
+                          <button className="edit-btn" onClick={() => handleEditEvent(event)}>
+                            <MdEdit />
+                          </button>
+                          <button className="delete-btn" onClick={() => handleDeleteEvent(event.id)}>
+                            <MdDelete />
+                          </button>
+                        </div>
                       </div>
                     </>
                   )}
                 </div>
               ))}
+              {filteredEvents.length === 0 && (
+                <p className="empty-results">No events found for your current search/filter.</p>
+              )}
             </div>
           </section>
         )}
@@ -487,6 +574,26 @@ const AdminDashboard: React.FC = () => {
               >
                 <MdAdd /> Add New User
               </button>
+            </div>
+
+            <div className="section-tools">
+              <input
+                type="text"
+                className="search-input"
+                placeholder="Search user name or email..."
+                value={userSearchTerm}
+                onChange={(e) => setUserSearchTerm(e.target.value)}
+              />
+              <select
+                className="filter-select"
+                value={userStatusFilter}
+                onChange={(e) => setUserStatusFilter(e.target.value as 'all' | User['status'])}
+              >
+                <option value="all">All User Statuses</option>
+                <option value="active">Active</option>
+                <option value="suspended">Suspended</option>
+                <option value="banned">Banned</option>
+              </select>
             </div>
 
             {showAddUserForm && (
@@ -534,7 +641,7 @@ const AdminDashboard: React.FC = () => {
             )}
 
             <div className="users-list">
-              {users.map((user) => (
+              {filteredUsers.map((user) => (
                 <div key={user.id} className="user-card">
                   {editingUser?.id === user.id ? (
                     <div className="edit-form">
@@ -597,6 +704,9 @@ const AdminDashboard: React.FC = () => {
                   )}
                 </div>
               ))}
+              {filteredUsers.length === 0 && (
+                <p className="empty-results">No users found for your current search/filter.</p>
+              )}
             </div>
           </section>
         )}
@@ -672,7 +782,12 @@ const AdminDashboard: React.FC = () => {
                   <LineChart data={reportData.monthlyRevenue}>
                     <XAxis dataKey="month" />
                     <YAxis />
-                    <Tooltip formatter={(value) => [`$${value.toLocaleString()}`, 'Revenue']} />
+                    <Tooltip
+                      formatter={(value) => {
+                        const numericValue = typeof value === 'number' ? value : Number(value ?? 0);
+                        return [`$${numericValue.toLocaleString()}`, 'Revenue'];
+                      }}
+                    />
                     <Line 
                       type="monotone" 
                       dataKey="revenue" 
@@ -691,7 +806,12 @@ const AdminDashboard: React.FC = () => {
                   <LineChart data={reportData.userGrowth}>
                     <XAxis dataKey="month" />
                     <YAxis />
-                    <Tooltip formatter={(value) => [value.toLocaleString(), 'Users']} />
+                    <Tooltip
+                      formatter={(value) => {
+                        const numericValue = typeof value === 'number' ? value : Number(value ?? 0);
+                        return [numericValue.toLocaleString(), 'Users'];
+                      }}
+                    />
                     <Line 
                       type="monotone" 
                       dataKey="users" 

@@ -1,0 +1,74 @@
+const { allMockData } = require('../mockData');
+
+const handleLogin = async (req, res) => {
+    let body = "";
+
+    req.on("data", (chunk) => {
+        body += chunk.toString();
+    });
+
+    req.on('end', async () => {
+        try {
+            const parsedBody = JSON.parse(body);
+            const { email, password } = parsedBody;
+            const userIdentifier = email;
+
+            if (!userIdentifier || !password) {
+                throw new Error('Missing required fields');
+            }
+
+            const userCheck = allMockData.USER.find(
+                (item) => item.email === userIdentifier && item.password === password
+            );
+
+            if (userCheck) {
+                const passStatus = userCheck.passStatus === 'Gold' || userCheck.passStatus === 'Silver' || userCheck.passStatus === 'None'
+                    ? userCheck.passStatus
+                    : 'None';
+
+                res.writeHead(200, { "Content-Type": "application/json" });
+                res.end(JSON.stringify({
+                    success: true,
+                    userId: userCheck.userID,
+                    userName: `${userCheck.firstName} ${userCheck.lastName}`,
+                    email: userCheck.email,
+                    passStatus,
+                    accountType: 'user',
+                    message: "User Account"
+                }));
+                return;
+            }
+
+            const adminCheck = allMockData.ADMIN.find(
+                (item) => item.user === userIdentifier && item.password === password
+            );
+
+            if (adminCheck) {
+                res.writeHead(200, { "Content-Type": "application/json" });
+                res.end(JSON.stringify({
+                    success: true,
+                    userName: adminCheck.user,
+                    passStatus: 'None',
+                    accountType: 'admin',
+                    message: "Admin Account"
+                }));
+                return;
+            }
+
+            res.writeHead(404, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({
+                success: false,
+                message: "User not found"
+            }));
+        }
+        catch (err) {
+            console.error('Error during login:', err);
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: false, message: err.message || 'Login Failed' }));
+        }
+    });
+};
+
+module.exports = {
+    handleLogin,
+};

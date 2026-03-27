@@ -64,7 +64,7 @@
 .admin-main {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 0 1rem;
+  padding: 0 1.25rem;
 }
 
 .admin-profile {
@@ -133,7 +133,7 @@
   background: white;
   border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  padding: 2rem;
+  padding: 2.25rem;
 }
 
 .section-header {
@@ -149,6 +149,46 @@
   color: #1f2937;
   font-size: 1.5rem;
   margin: 0;
+}
+
+.section-tools {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.search-input,
+.filter-select {
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 0.7rem 0.9rem;
+  font-size: 0.95rem;
+  background: white;
+}
+
+.search-input {
+  flex: 1;
+  min-width: 260px;
+}
+
+.filter-select {
+  min-width: 190px;
+}
+
+.search-input:focus,
+.filter-select:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
+}
+
+.empty-results {
+  margin: 0;
+  padding: 1rem;
+  border-radius: 8px;
+  border: 1px dashed #d1d5db;
+  color: #6b7280;
+  background: #f9fafb;
 }
 
 .add-btn {
@@ -173,7 +213,7 @@
 .add-form,
 .edit-form {
   background: #f9fafb;
-  padding: 1.5rem;
+  padding: 1.75rem;
   border-radius: 8px;
   margin-bottom: 2rem;
   border: 1px solid #e5e7eb;
@@ -252,7 +292,7 @@
 .events-list,
 .users-list {
   display: grid;
-  gap: 1.5rem;
+  gap: 1.9rem;
 }
 
 .event-card,
@@ -260,11 +300,17 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  padding: 1.5rem;
+  padding: 1.75rem;
   border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  border-radius: 10px;
   background: #fafafa;
   transition: box-shadow 0.2s;
+}
+
+.event-card {
+  justify-content: flex-start;
+  gap: 1rem;
+  position: relative;
 }
 
 .event-card:hover,
@@ -277,17 +323,49 @@
   flex: 1;
 }
 
+.admin-dashboard .user-info {
+  display: block;
+  padding-right: 1.25rem;
+  padding-top: 0.5rem;
+}
+
+.event-info {
+  padding-right: 360px;
+}
+
+.event-top-row {
+  margin-bottom: 0.25rem;
+}
+
 .event-info h4,
 .user-info h4 {
   color: #1f2937;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0;
   font-size: 1.2rem;
 }
 
 .event-info p,
 .user-info p {
   color: #6b7280;
-  margin: 0.25rem 0;
+  margin: 0.5rem 0;
+  line-height: 1.55;
+}
+
+.admin-dashboard .user-info p {
+  display: block;
+}
+
+.admin-dashboard .user-info h4 {
+  margin-top: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.admin-dashboard .user-card .status-badge {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: left;
+  margin-top: 1rem;
 }
 
 .status-badge {
@@ -357,8 +435,32 @@
 .event-actions,
 .user-actions {
   display: flex;
-  gap: 0.5rem;
-  margin-left: 1rem;
+  gap: 0.6rem;
+  margin-left: 1.25rem;
+}
+
+.event-side {
+  position: absolute;
+  top: 1.25rem;
+  right: 1.25rem;
+}
+
+.event-image-preview {
+  position: absolute;
+  top: 56px;
+  right: 220px;
+  width: 160px;
+  height: 160px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  background: #f3f4f6;
+  margin: 0;
+}
+
+.event-side .event-actions {
+  margin-left: 0;
+  align-self: auto;
 }
 
 .edit-btn {
@@ -503,6 +605,17 @@
     grid-template-columns: 1fr;
   }
 
+  .section-tools {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .search-input,
+  .filter-select {
+    min-width: 0;
+    width: 100%;
+  }
+
   .event-card,
   .user-card {
     flex-direction: column;
@@ -513,6 +626,30 @@
   .user-actions {
     margin-left: 0;
     align-self: flex-end;
+  }
+
+  .event-side {
+    position: static;
+    width: auto;
+  }
+
+  .event-info {
+    padding-right: 0;
+  }
+
+  .event-image-preview {
+    position: static;
+    width: 140px;
+    height: 84px;
+    margin: 0;
+  }
+
+  .event-side .event-actions {
+    align-self: flex-end;
+  }
+
+  .event-top-row {
+    flex-wrap: wrap;
   }
 
   .charts-container {
