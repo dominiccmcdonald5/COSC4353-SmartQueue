@@ -14,18 +14,46 @@ import {
 } from 'react-icons/md';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Tooltip } from 'recharts';
 import '../styling/AdminDashboard.css';
+import { ADMIN_EVENTS_STORAGE_KEY } from '../data/adminEventsStorage';
+import type { ConcertEvent } from '../types/concertEvent';
+import ConcertEventEditForm from '../components/admin/ConcertEventEditForm';
+import EventEditModal from '../components/admin/EventEditModal';
+import {
+  VENUE_MAX_LEN,
+  VENUE_OTHER,
+  VENUE_PRESETS,
+  venueOtherInputValue,
+  venueSelectValue,
+} from '../utils/concertVenue';
 
-interface ConcertEvent {
-  id: string;
-  name: string;
-  artist: string;
-  genre: string;
-  date: string;
-  venue: string;
-  image: string;
-  capacity: number;
-  ticketPrice: number;
-  status: 'upcoming' | 'active' | 'completed' | 'cancelled';
+const DEFAULT_CONCERT_IMAGE = '/concert1.jpg';
+
+function migrateStoredEvents(raw: unknown): ConcertEvent[] | null {
+  if (!Array.isArray(raw) || raw.length === 0) return null;
+  const out: ConcertEvent[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const e = item as Partial<ConcertEvent> & { ticketPrice?: number };
+    if (!e.id || !e.name) continue;
+    const legacy = typeof e.ticketPrice === 'number' ? e.ticketPrice : 0;
+    const min = typeof e.ticketPriceMin === 'number' ? e.ticketPriceMin : legacy;
+    const max = typeof e.ticketPriceMax === 'number' ? e.ticketPriceMax : legacy;
+    out.push({
+      id: e.id,
+      name: e.name,
+      artist: e.artist ?? '',
+      genre: e.genre ?? '',
+      date: e.date ?? '',
+      venue: e.venue ?? '',
+      image: e.image ?? DEFAULT_CONCERT_IMAGE,
+      capacity: e.capacity ?? 0,
+      ticketPriceMin: min,
+      ticketPriceMax: max,
+      status: e.status ?? 'upcoming',
+      published: e.published ?? true,
+    });
+  }
+  return out.length ? out : null;
 }
 
 interface User {
@@ -48,8 +76,6 @@ interface ReportData {
   userGrowth: Array<{ month: string; users: number }>;
   passDistribution: Array<{ name: string; value: number; fill: string }>;
 }
-
-const DEFAULT_CONCERT_IMAGE = '/concert1.jpg';
 
 const AdminDashboard: React.FC = () => {
   const { user, logout } = useAuth();
@@ -75,8 +101,10 @@ const AdminDashboard: React.FC = () => {
     venue: '',
     image: DEFAULT_CONCERT_IMAGE,
     capacity: 0,
-    ticketPrice: 0,
-    status: 'upcoming'
+    ticketPriceMin: 0,
+    ticketPriceMax: 0,
+    status: 'upcoming',
+    published: false,
   });
 
   // Form data for new users
@@ -88,8 +116,6 @@ const AdminDashboard: React.FC = () => {
   });
 
   useEffect(() => {
-    // TODO: Replace with actual API calls
-    // Mock data for demonstration
     const mockEvents: ConcertEvent[] = [
       {
         id: '1',
@@ -100,8 +126,10 @@ const AdminDashboard: React.FC = () => {
         venue: 'Central Stadium',
         image: '/concert1.jpg',
         capacity: 50000,
-        ticketPrice: 89.99,
-        status: 'upcoming'
+        ticketPriceMin: 79.99,
+        ticketPriceMax: 99.99,
+        status: 'upcoming',
+        published: true,
       },
       {
         id: '2',
@@ -112,8 +140,10 @@ const AdminDashboard: React.FC = () => {
         venue: 'Downtown Theater',
         image: '/concert2.jpg',
         capacity: 2500,
-        ticketPrice: 65.00,
-        status: 'active'
+        ticketPriceMin: 55,
+        ticketPriceMax: 75,
+        status: 'active',
+        published: true,
       },
       {
         id: '3',
@@ -124,9 +154,11 @@ const AdminDashboard: React.FC = () => {
         venue: 'Arena Center',
         image: '/concert3.jpg',
         capacity: 15000,
-        ticketPrice: 120.00,
-        status: 'completed'
-      }
+        ticketPriceMin: 100,
+        ticketPriceMax: 140,
+        status: 'completed',
+        published: false,
+      },
     ];
 
     const mockUsers: User[] = [
@@ -194,16 +226,54 @@ const AdminDashboard: React.FC = () => {
       ]
     };
 
-    setEvents(mockEvents);
+    try {
+      const raw = localStorage.getItem(ADMIN_EVENTS_STORAGE_KEY);
+      if (raw) {
+        const migrated = migrateStoredEvents(JSON.parse(raw));
+        if (migrated && migrated.length > 0) {
+          setEvents(migrated);
+        } else {
+          setEvents(mockEvents);
+        }
+      } else {
+        setEvents(mockEvents);
+      }
+    } catch {
+      setEvents(mockEvents);
+    }
+
     setUsers(mockUsers);
     setReportData(mockReportData);
   }, []);
 
-  // Event Management Functions
+  useEffect(() => {
+    if (events.length === 0) return;
+    try {
+      localStorage.setItem(ADMIN_EVENTS_STORAGE_KEY, JSON.stringify(events));
+    } catch {
+      /* ignore */
+    }
+  }, [events]);
+
   const handleAddEvent = () => {
+    const venueTrimmed = newEvent.venue.trim();
+    if (!venueTrimmed || venueTrimmed === VENUE_OTHER) {
+      window.alert('Please select a venue or choose Other and enter a venue name.');
+      return;
+    }
+    let min = newEvent.ticketPriceMin;
+    let max = newEvent.ticketPriceMax;
+    if (min > max) {
+      const t = min;
+      min = max;
+      max = t;
+    }
     const event: ConcertEvent = {
       ...newEvent,
-      id: Date.now().toString()
+      id: Date.now().toString(),
+      venue: venueTrimmed.slice(0, VENUE_MAX_LEN),
+      ticketPriceMin: min,
+      ticketPriceMax: max,
     };
     setEvents([...events, event]);
     setNewEvent({
@@ -214,33 +284,40 @@ const AdminDashboard: React.FC = () => {
       venue: '',
       image: DEFAULT_CONCERT_IMAGE,
       capacity: 0,
-      ticketPrice: 0,
-      status: 'upcoming'
+      ticketPriceMin: 0,
+      ticketPriceMax: 0,
+      status: 'upcoming',
+      published: false,
     });
     setShowAddEventForm(false);
   };
 
-  const handleNewEventImageChange = (file: File | null) => {
-    if (!file) return;
-    const imageUrl = URL.createObjectURL(file);
-    setNewEvent({ ...newEvent, image: imageUrl });
-  };
-
-  const handleEditingEventImageChange = (file: File | null) => {
-    if (!file || !editingEvent) return;
-    const imageUrl = URL.createObjectURL(file);
-    setEditingEvent({ ...editingEvent, image: imageUrl });
-  };
-
   const handleEditEvent = (event: ConcertEvent) => {
-    setEditingEvent({ ...event });
+    setEditingEvent({ ...event, published: event.published ?? false });
   };
 
   const handleSaveEvent = () => {
-    if (editingEvent) {
-      setEvents(events.map(e => e.id === editingEvent.id ? editingEvent : e));
-      setEditingEvent(null);
+    if (!editingEvent) return;
+    const venueTrimmed = editingEvent.venue.trim();
+    if (!venueTrimmed || venueTrimmed === VENUE_OTHER) {
+      window.alert('Please select a venue or choose Other and enter a venue name.');
+      return;
     }
+    let min = editingEvent.ticketPriceMin;
+    let max = editingEvent.ticketPriceMax;
+    if (min > max) {
+      const t = min;
+      min = max;
+      max = t;
+    }
+    const updated: ConcertEvent = {
+      ...editingEvent,
+      venue: venueTrimmed.slice(0, VENUE_MAX_LEN),
+      ticketPriceMin: min,
+      ticketPriceMax: max,
+    };
+    setEvents(events.map((e) => (e.id === updated.id ? updated : e)));
+    setEditingEvent(null);
   };
 
   const handleDeleteEvent = (id: string) => {
@@ -378,17 +455,17 @@ const AdminDashboard: React.FC = () => {
                     type="text"
                     placeholder="Event Name"
                     value={newEvent.name}
-                    onChange={(e) => setNewEvent({...newEvent, name: e.target.value})}
+                    onChange={(e) => setNewEvent({ ...newEvent, name: e.target.value })}
                   />
                   <input
                     type="text"
                     placeholder="Artist"
                     value={newEvent.artist}
-                    onChange={(e) => setNewEvent({...newEvent, artist: e.target.value})}
+                    onChange={(e) => setNewEvent({ ...newEvent, artist: e.target.value })}
                   />
                   <select
                     value={newEvent.genre}
-                    onChange={(e) => setNewEvent({...newEvent, genre: e.target.value})}
+                    onChange={(e) => setNewEvent({ ...newEvent, genre: e.target.value })}
                   >
                     <option value="">Select Genre</option>
                     <option value="Rock">Rock</option>
@@ -401,47 +478,114 @@ const AdminDashboard: React.FC = () => {
                   <input
                     type="date"
                     value={newEvent.date}
-                    onChange={(e) => setNewEvent({...newEvent, date: e.target.value})}
+                    onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })}
                   />
-                  <input
-                    type="text"
-                    placeholder="Venue"
-                    value={newEvent.venue}
-                    onChange={(e) => setNewEvent({...newEvent, venue: e.target.value})}
-                  />
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => handleNewEventImageChange(e.target.files?.[0] || null)}
-                  />
+                  <div className="form-field-venue">
+                    <span className="form-field-label">Venue</span>
+                    <select
+                      className="form-field-control"
+                      value={venueSelectValue(newEvent.venue)}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (v === VENUE_OTHER) {
+                          setNewEvent({ ...newEvent, venue: VENUE_OTHER });
+                        } else {
+                          setNewEvent({ ...newEvent, venue: v });
+                        }
+                      }}
+                    >
+                      <option value="">Select venue</option>
+                      {VENUE_PRESETS.map((opt) => (
+                        <option key={opt} value={opt}>
+                          {opt}
+                        </option>
+                      ))}
+                      <option value={VENUE_OTHER}>Other (type below)</option>
+                    </select>
+                    {venueSelectValue(newEvent.venue) === VENUE_OTHER && (
+                      <input
+                        type="text"
+                        className="venue-other-input"
+                        placeholder="Venue name (max 100 characters)"
+                        maxLength={VENUE_MAX_LEN}
+                        value={venueOtherInputValue(newEvent.venue)}
+                        onChange={(e) =>
+                          setNewEvent({
+                            ...newEvent,
+                            venue: e.target.value.slice(0, VENUE_MAX_LEN),
+                          })
+                        }
+                        aria-label="Custom venue name"
+                      />
+                    )}
+                  </div>
                   <input
                     type="number"
                     placeholder="Capacity"
                     value={newEvent.capacity || ''}
-                    onChange={(e) => setNewEvent({...newEvent, capacity: parseInt(e.target.value) || 0})}
+                    onChange={(e) => setNewEvent({ ...newEvent, capacity: parseInt(e.target.value, 10) || 0 })}
                   />
-                  <input
-                    type="number"
-                    step="0.01"
-                    placeholder="Ticket Price"
-                    value={newEvent.ticketPrice || ''}
-                    onChange={(e) => setNewEvent({...newEvent, ticketPrice: parseFloat(e.target.value) || 0})}
-                  />
+                  <div className="form-field-price-range">
+                    <span className="form-field-label">Ticket price range ($)</span>
+                    <div className="event-price-range-inputs">
+                      <input
+                        type="number"
+                        step="0.01"
+                        min={0}
+                        placeholder="Min"
+                        value={newEvent.ticketPriceMin || ''}
+                        onChange={(e) =>
+                          setNewEvent({
+                            ...newEvent,
+                            ticketPriceMin: parseFloat(e.target.value) || 0,
+                          })
+                        }
+                        aria-label="Minimum ticket price"
+                      />
+                      <span className="price-range-sep" aria-hidden>
+                        to
+                      </span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min={0}
+                        placeholder="Max"
+                        value={newEvent.ticketPriceMax || ''}
+                        onChange={(e) =>
+                          setNewEvent({
+                            ...newEvent,
+                            ticketPriceMax: parseFloat(e.target.value) || 0,
+                          })
+                        }
+                        aria-label="Maximum ticket price"
+                      />
+                    </div>
+                  </div>
                   <select
                     value={newEvent.status}
-                    onChange={(e) => setNewEvent({...newEvent, status: e.target.value as ConcertEvent['status']})}
+                    onChange={(e) =>
+                      setNewEvent({ ...newEvent, status: e.target.value as ConcertEvent['status'] })
+                    }
                   >
                     <option value="upcoming">Upcoming</option>
                     <option value="active">Active</option>
                     <option value="completed">Completed</option>
                     <option value="cancelled">Cancelled</option>
                   </select>
+                  <label className="form-publish-option">
+                    <input
+                      type="checkbox"
+                      checked={newEvent.published}
+                      onChange={(e) => setNewEvent({ ...newEvent, published: e.target.checked })}
+                    />
+                    Publish on home page when saved
+                  </label>
                 </div>
                 <div className="form-actions">
-                  <button className="save-btn" onClick={handleAddEvent}>
+                  <button type="button" className="save-btn" onClick={handleAddEvent}>
                     <MdSave /> Save Event
                   </button>
-                  <button className="cancel-btn" onClick={() => setShowAddEventForm(false)}>
+                  <button type="button" className="cancel-btn" onClick={() => setShowAddEventForm(false)}>
                     <MdCancel /> Cancel
                   </button>
                 </div>
@@ -451,115 +595,92 @@ const AdminDashboard: React.FC = () => {
             <div className="events-list">
               {filteredEvents.map((event) => (
                 <div key={event.id} className="event-card">
-                  {editingEvent?.id === event.id ? (
-                    <div className="edit-form">
-                      <div className="form-grid">
-                        <input
-                          type="text"
-                          value={editingEvent.name}
-                          onChange={(e) => setEditingEvent({...editingEvent, name: e.target.value})}
-                        />
-                        <input
-                          type="text"
-                          value={editingEvent.artist}
-                          onChange={(e) => setEditingEvent({...editingEvent, artist: e.target.value})}
-                        />
-                        <select
-                          value={editingEvent.genre}
-                          onChange={(e) => setEditingEvent({...editingEvent, genre: e.target.value})}
-                        >
-                          <option value="Rock">Rock</option>
-                          <option value="Pop">Pop</option>
-                          <option value="Jazz">Jazz</option>
-                          <option value="Electronic">Electronic</option>
-                          <option value="Classical">Classical</option>
-                          <option value="Hip-Hop">Hip-Hop</option>
-                        </select>
-                        <input
-                          type="date"
-                          value={editingEvent.date}
-                          onChange={(e) => setEditingEvent({...editingEvent, date: e.target.value})}
-                        />
-                        <input
-                          type="text"
-                          value={editingEvent.venue}
-                          onChange={(e) => setEditingEvent({...editingEvent, venue: e.target.value})}
-                        />
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => handleEditingEventImageChange(e.target.files?.[0] || null)}
-                        />
-                        <input
-                          type="number"
-                          value={editingEvent.capacity}
-                          onChange={(e) => setEditingEvent({...editingEvent, capacity: parseInt(e.target.value)})}
-                        />
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={editingEvent.ticketPrice}
-                          onChange={(e) => setEditingEvent({...editingEvent, ticketPrice: parseFloat(e.target.value)})}
-                        />
-                        <select
-                          value={editingEvent.status}
-                          onChange={(e) => setEditingEvent({...editingEvent, status: e.target.value as ConcertEvent['status']})}
-                        >
-                          <option value="upcoming">Upcoming</option>
-                          <option value="active">Active</option>
-                          <option value="completed">Completed</option>
-                          <option value="cancelled">Cancelled</option>
-                        </select>
-                      </div>
-                      <div className="form-actions">
-                        <button className="save-btn" onClick={handleSaveEvent}>
-                          <MdSave /> Save
-                        </button>
-                        <button className="cancel-btn" onClick={() => setEditingEvent(null)}>
-                          <MdCancel /> Cancel
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="event-info">
-                        <div className="event-top-row">
-                          <h4>{event.name}</h4>
-                          <img
-                            src={event.image || DEFAULT_CONCERT_IMAGE}
-                            alt={`${event.name} concert`}
-                            className="event-image-preview"
-                            onError={(e) => {
-                              e.currentTarget.src = DEFAULT_CONCERT_IMAGE;
-                            }}
-                          />
-                        </div>
-                        <p><strong>Artist:</strong> {event.artist}</p>
-                        <p><strong>Genre:</strong> {event.genre}</p>
-                        <p><strong>Date:</strong> {new Date(event.date).toLocaleDateString()}</p>
-                        <p><strong>Venue:</strong> {event.venue}</p>
-                        <p><strong>Capacity:</strong> {event.capacity.toLocaleString()}</p>
-                        <p><strong>Ticket Price:</strong> ${event.ticketPrice.toFixed(2)}</p>
+                  <div className="event-info">
+                    <div className="event-info-header">
+                      <h4 className="event-title">{event.name}</h4>
+                      <div className="event-info-toolbar">
                         <span className={`status-badge ${event.status}`}>{event.status}</span>
-                      </div>
-                      <div className="event-side">
+                        <span
+                          className={`event-publish-badge ${event.published ?? false ? 'is-published' : 'is-draft'}`}
+                        >
+                          {event.published ?? false ? 'Listed' : 'Not listed'}
+                        </span>
                         <div className="event-actions">
-                          <button className="edit-btn" onClick={() => handleEditEvent(event)}>
+                          <button
+                            type="button"
+                            className="edit-btn"
+                            onClick={() => handleEditEvent(event)}
+                            aria-label={`Edit ${event.name}`}
+                            title="Edit event"
+                          >
                             <MdEdit />
                           </button>
-                          <button className="delete-btn" onClick={() => handleDeleteEvent(event.id)}>
+                          <button
+                            type="button"
+                            className="delete-btn"
+                            onClick={() => handleDeleteEvent(event.id)}
+                            aria-label={`Delete ${event.name}`}
+                            title="Delete event"
+                          >
                             <MdDelete />
                           </button>
                         </div>
                       </div>
-                    </>
-                  )}
+                    </div>
+                    <dl className="event-detail-rows">
+                      <div className="event-detail-row">
+                        <dt>Artist</dt>
+                        <dd>{event.artist}</dd>
+                      </div>
+                      <div className="event-detail-row">
+                        <dt>Genre</dt>
+                        <dd>{event.genre}</dd>
+                      </div>
+                      <div className="event-detail-row">
+                        <dt>Date</dt>
+                        <dd>{new Date(event.date).toLocaleDateString(undefined, { dateStyle: 'long' })}</dd>
+                      </div>
+                      <div className="event-detail-row">
+                        <dt>Venue</dt>
+                        <dd>{event.venue}</dd>
+                      </div>
+                      <div className="event-detail-row">
+                        <dt>Capacity</dt>
+                        <dd>{event.capacity.toLocaleString()} seats</dd>
+                      </div>
+                      <div className="event-detail-row">
+                        <dt>Ticket price</dt>
+                        <dd>
+                          ${event.ticketPriceMin.toFixed(2)} – ${event.ticketPriceMax.toFixed(2)}
+                        </dd>
+                      </div>
+                    </dl>
+                  </div>
                 </div>
               ))}
               {filteredEvents.length === 0 && (
-                <p className="empty-results">No events found for your current search/filter.</p>
+                <p className="empty-results">
+                  {events.length === 0
+                    ? 'No concert events yet. Add one with the button above.'
+                    : 'No events match your search or status filter. Try changing the filter to “All Statuses” or clear the search.'}
+                </p>
               )}
             </div>
+
+            {editingEvent && (
+              <EventEditModal
+                open
+                title={`Edit event — ${editingEvent.name}`}
+                onClose={() => setEditingEvent(null)}
+              >
+                <ConcertEventEditForm
+                  value={editingEvent}
+                  onChange={setEditingEvent}
+                  onSave={handleSaveEvent}
+                  onCancel={() => setEditingEvent(null)}
+                />
+              </EventEditModal>
+            )}
           </section>
         )}
 
