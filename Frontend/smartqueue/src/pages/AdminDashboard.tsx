@@ -77,12 +77,25 @@ interface ReportData {
   passDistribution: Array<{ name: string; value: number; fill: string }>;
 }
 
+interface ApiReportData {
+  totalUsers: number;
+  totalEvents: number;
+  totalRevenue: number;
+  averageQueueTime: string;
+  topGenres: Array<{ genre: string; count: number }>;
+  passDistribution: Array<{ passType: string; count: number; percentage: string }>;
+  monthlyRevenueTrend: Array<{ month: string; revenue: number }>;
+  userGrowth: Array<{ month: string; newUsers: number; totalUsers: number }>;
+}
+
 const AdminDashboard: React.FC = () => {
   const { user, logout } = useAuth();
   const [activeSection, setActiveSection] = useState<'events' | 'users' | 'reports'>('events');
   const [events, setEvents] = useState<ConcertEvent[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [reportData, setReportData] = useState<ReportData | null>(null);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
   const [editingEvent, setEditingEvent] = useState<ConcertEvent | null>(null);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [showAddEventForm, setShowAddEventForm] = useState(false);
@@ -191,41 +204,6 @@ const AdminDashboard: React.FC = () => {
       }
     ];
 
-    const mockReportData: ReportData = {
-      totalUsers: 1247,
-      totalEvents: 24,
-      totalRevenue: 284750,
-      averageQueueTime: '23 minutes',
-      topGenres: [
-        { name: 'Rock', count: 8, fill: '#f59e0b' },
-        { name: 'Pop', count: 6, fill: '#10b981' },
-        { name: 'Jazz', count: 4, fill: '#6366f1' },
-        { name: 'Electronic', count: 3, fill: '#ec4899' },
-        { name: 'Classical', count: 3, fill: '#8b5cf6' }
-      ],
-      monthlyRevenue: [
-        { month: 'Jan', revenue: 45000 },
-        { month: 'Feb', revenue: 52000 },
-        { month: 'Mar', revenue: 48000 },
-        { month: 'Apr', revenue: 61000 },
-        { month: 'May', revenue: 67000 },
-        { month: 'Jun', revenue: 59000 }
-      ],
-      userGrowth: [
-        { month: 'Jan', users: 1100 },
-        { month: 'Feb', users: 1150 },
-        { month: 'Mar', users: 1180 },
-        { month: 'Apr', users: 1210 },
-        { month: 'May', users: 1235 },
-        { month: 'Jun', users: 1247 }
-      ],
-      passDistribution: [
-        { name: 'None', value: 68, fill: '#9ca3af' },
-        { name: 'Silver', value: 22, fill: '#c0c0c0' },
-        { name: 'Gold', value: 10, fill: '#ffd700' }
-      ]
-    };
-
     try {
       const raw = localStorage.getItem(ADMIN_EVENTS_STORAGE_KEY);
       if (raw) {
@@ -243,7 +221,6 @@ const AdminDashboard: React.FC = () => {
     }
 
     setUsers(mockUsers);
-    setReportData(mockReportData);
   }, []);
 
   useEffect(() => {
@@ -254,6 +231,68 @@ const AdminDashboard: React.FC = () => {
       /* ignore */
     }
   }, [events]);
+
+  // Fetch admin report data from API
+  useEffect(() => {
+    const fetchReportData = async () => {
+      setReportLoading(true);
+      setReportError(null);
+      try {
+        const response = await fetch('http://localhost:5000/api/admin/data-report');
+        if (!response.ok) {
+          throw new Error('Failed to fetch report data');
+        }
+        const data = await response.json();
+        
+        if (data.success && data.data) {
+          const apiData = data.data as ApiReportData;
+          
+          // Transform API data to match ReportData interface
+          const colors = ['#f59e0b', '#10b981', '#6366f1', '#ec4899', '#8b5cf6'];
+          const transformedReport: ReportData = {
+            totalUsers: apiData.totalUsers,
+            totalEvents: apiData.totalEvents,
+            totalRevenue: apiData.totalRevenue,
+            averageQueueTime: apiData.averageQueueTime,
+            topGenres: apiData.topGenres.map((g, idx) => ({
+              name: g.genre,
+              count: g.count,
+              fill: colors[idx % colors.length]
+            })),
+            monthlyRevenue: apiData.monthlyRevenueTrend.map(m => ({
+              month: m.month,
+              revenue: m.revenue
+            })),
+            userGrowth: apiData.userGrowth.map(u => ({
+              month: u.month,
+              users: u.totalUsers
+            })),
+            passDistribution: apiData.passDistribution.map(p => {
+              const passMap: Record<string, string> = {
+                'None': '#9ca3af',
+                'Gold': '#ffd700',
+                'Silver': '#c0c0c0'
+              };
+              return {
+                name: p.passType,
+                value: parseInt(p.percentage),
+                fill: passMap[p.passType] || '#9ca3af'
+              };
+            })
+          };
+          
+          setReportData(transformedReport);
+        }
+      } catch (error) {
+        console.error('Error fetching report data:', error);
+        setReportError(error instanceof Error ? error.message : 'Failed to load report data');
+      } finally {
+        setReportLoading(false);
+      }
+    };
+
+    fetchReportData();
+  }, []);
 
   const handleAddEvent = () => {
     const venueTrimmed = newEvent.venue.trim();
@@ -833,139 +872,155 @@ const AdminDashboard: React.FC = () => {
         )}
 
         {/* Data Reports Section */}
-        {activeSection === 'reports' && reportData && (
+        {activeSection === 'reports' && (
           <section className="reports-section">
             <h3>Data Reports & Analytics</h3>
             
-            {/* Key Metrics */}
-            <div className="metrics-grid">
-              <div className="metric-card">
-                <div className="metric-icon">
-                  <MdPeople />
-                </div>
-                <div className="metric-info">
-                  <h4>{reportData.totalUsers.toLocaleString()}</h4>
-                  <p>Total Users</p>
-                </div>
+            {reportLoading && (
+              <div className="loading-state">
+                <p>Loading report data...</p>
               </div>
-              <div className="metric-card">
-                <div className="metric-icon">
-                  <MdEvent />
-                </div>
-                <div className="metric-info">
-                  <h4>{reportData.totalEvents}</h4>
-                  <p>Total Events</p>
-                </div>
+            )}
+            
+            {reportError && (
+              <div className="error-state">
+                <p>Error: {reportError}</p>
               </div>
-              <div className="metric-card">
-                <div className="metric-icon">
-                  <MdAnalytics />
+            )}
+            
+            {reportData && (
+              <>
+                {/* Key Metrics */}
+                <div className="metrics-grid">
+                  <div className="metric-card">
+                    <div className="metric-icon">
+                      <MdPeople />
+                    </div>
+                    <div className="metric-info">
+                      <h4>{reportData.totalUsers.toLocaleString()}</h4>
+                      <p>Total Users</p>
+                    </div>
+                  </div>
+                  <div className="metric-card">
+                    <div className="metric-icon">
+                      <MdEvent />
+                    </div>
+                    <div className="metric-info">
+                      <h4>{reportData.totalEvents}</h4>
+                      <p>Total Events</p>
+                    </div>
+                  </div>
+                  <div className="metric-card">
+                    <div className="metric-icon">
+                      <MdAnalytics />
+                    </div>
+                    <div className="metric-info">
+                      <h4>${reportData.totalRevenue.toLocaleString()}</h4>
+                      <p>Total Revenue</p>
+                    </div>
+                  </div>
+                  <div className="metric-card">
+                    <div className="metric-icon">
+                      <MdVisibility />
+                    </div>
+                    <div className="metric-info">
+                      <h4>{reportData.averageQueueTime}</h4>
+                      <p>Avg Queue Time</p>
+                    </div>
+                  </div>
                 </div>
-                <div className="metric-info">
-                  <h4>${reportData.totalRevenue.toLocaleString()}</h4>
-                  <p>Total Revenue</p>
-                </div>
-              </div>
-              <div className="metric-card">
-                <div className="metric-icon">
-                  <MdVisibility />
-                </div>
-                <div className="metric-info">
-                  <h4>{reportData.averageQueueTime}</h4>
-                  <p>Avg Queue Time</p>
-                </div>
-              </div>
-            </div>
 
-            {/* Charts Container */}
-            <div className="charts-container">
-              {/* Genre Distribution */}
-              <div className="chart-card">
-                <h4>Popular Genres</h4>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={reportData.topGenres}>
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="count" radius={[4, 4, 0, 0]}>
-                      {reportData.topGenres.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.fill} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+                {/* Charts Container */}
+                <div className="charts-container">
+                  {/* Genre Distribution */}
+                  <div className="chart-card">
+                    <h4>Popular Genres</h4>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={reportData.topGenres}>
+                        <XAxis dataKey="name" />
+                        <YAxis />
+                        <Tooltip />
+                        <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                          {reportData.topGenres.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.fill} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
 
-              {/* Monthly Revenue */}
-              <div className="chart-card">
-                <h4>Monthly Revenue Trend</h4>
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={reportData.monthlyRevenue}>
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip
-                      formatter={(value) => {
-                        const numericValue = typeof value === 'number' ? value : Number(value ?? 0);
-                        return [`$${numericValue.toLocaleString()}`, 'Revenue'];
-                      }}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="revenue" 
-                      stroke="#6366f1" 
-                      strokeWidth={3}
-                      dot={{ r: 5 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
+                  {/* Monthly Revenue */}
+                  <div className="chart-card">
+                    <h4>Monthly Revenue Trend</h4>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <LineChart data={reportData.monthlyRevenue}>
+                        <XAxis dataKey="month" />
+                        <YAxis />
+                        <Tooltip
+                          formatter={(value) => {
+                            const numericValue = typeof value === 'number' ? value : Number(value ?? 0);
+                            return [`$${numericValue.toLocaleString()}`, 'Revenue'];
+                          }}
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="revenue" 
+                          stroke="#6366f1" 
+                          strokeWidth={3}
+                          dot={{ r: 5 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
 
-              {/* User Growth */}
-              <div className="chart-card">
-                <h4>User Growth</h4>
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={reportData.userGrowth}>
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip
-                      formatter={(value) => {
-                        const numericValue = typeof value === 'number' ? value : Number(value ?? 0);
-                        return [numericValue.toLocaleString(), 'Users'];
-                      }}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="users" 
-                      stroke="#10b981" 
-                      strokeWidth={3}
-                      dot={{ r: 5 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
+                  {/* User Growth */}
+                  <div className="chart-card">
+                    <h4>User Growth</h4>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <LineChart data={reportData.userGrowth}>
+                        <XAxis dataKey="month" />
+                        <YAxis />
+                        <Tooltip
+                          formatter={(value) => {
+                            const numericValue = typeof value === 'number' ? value : Number(value ?? 0);
+                            return [numericValue.toLocaleString(), 'Users'];
+                          }}
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="users" 
+                          stroke="#10b981" 
+                          strokeWidth={3}
+                          dot={{ r: 5 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
 
-              {/* Pass Distribution */}
-              <div className="chart-card">
-                <h4>Pass Type Distribution</h4>
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={reportData.passDistribution}
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={80}
-                      dataKey="value"
-                      label={({ name, value }) => `${name}: ${value}%`}
-                    >
-                      {reportData.passDistribution.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.fill} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
+                  {/* Pass Distribution */}
+                  <div className="chart-card">
+                    <h4>Pass Type Distribution</h4>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <PieChart>
+                        <Pie
+                          data={reportData.passDistribution}
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={80}
+                          dataKey="value"
+                          label={({ name, value }) => `${name}: ${value}%`}
+                        >
+                          {reportData.passDistribution.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.fill} />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </>
+            )}
           </section>
         )}
       </main>
