@@ -4,6 +4,7 @@ const signup = require('./SignUp/signup');
 const userHistory = require('./UserDashboard/ConcertHistory/userHistory');
 const userStats = require('./UserDashboard/UserStats/userStats');
 const updatePass = require('./PassPurchase/updatePass');
+const dataReportStats = require('./AdminDataReport/dataReportStats');
 
 function routes(req, res) {
     const URL = req.url;
@@ -33,6 +34,10 @@ function routes(req, res) {
 
    if (URL === '/api/user/pass/update' && method === 'POST') {
        return updatePass.updateUserPassStatus(req, res);
+   }
+
+   if (URL === '/api/admin/data-report' && method === 'GET') {
+       return dataReportStats.getDataReportStats(req, res);
    }
     
     /*if (URL.startsWith('/signup') && method === 'POST') {

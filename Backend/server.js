@@ -5,7 +5,9 @@ const Routes = require('./route');
 
 
 const map_route = {
-    'GET': [],
+    'GET': [
+      '/api/admin/data-report'
+    ],
     'POST': [
         '/api/login',
       '/api/signup',
