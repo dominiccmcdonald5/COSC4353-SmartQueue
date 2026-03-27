@@ -190,6 +190,89 @@
   text-decoration: underline;
 }
 
+/* Filter Section */
+.filters-section {
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  background: #f9fafb;
+  border-radius: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.search-bar {
+  position: relative;
+  margin-bottom: 1rem;
+}
+
+.search-input {
+  width: 100%;
+  padding: 0.75rem 1rem 0.75rem 2.5rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  transition: all 0.2s;
+  background: white;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #8093F1;
+  box-shadow: 0 0 0 3px rgba(128, 147, 241, 0.1);
+}
+
+.search-icon {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9ca3af;
+  font-size: 1rem;
+}
+
+.filter-controls {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.filter-select {
+  padding: 0.5rem 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  background: white;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s;
+}
+
+.filter-select:hover {
+  border-color: #8093F1;
+}
+
+.clear-filters-btn {
+  padding: 0.5rem 1rem;
+  background: #ef4444;
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s;
+}
+
+.clear-filters-btn:hover {
+  background: #dc2626;
+  transform: translateY(-1px);
+}
+
+.results-count {
+  color: #6b7280;
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+  font-weight: 500;
+}
+
 .concerts-grid h3 {
   font-size: 1.5rem;
   margin-bottom: 1rem;
@@ -212,6 +295,7 @@
   display: flex;
   flex-direction: column;
   transition: transform 0.3s ease, box-shadow 0.3s ease;
+  position: relative;
 }
 
 .home-page .concert-card:hover {
@@ -242,7 +326,7 @@
 /* Status Badges */
 .home-page .status-badge {
   position: absolute;
-  top: .5rem;
+  top: 0.5rem;
   right: 1rem;
   padding: 0.5rem 1rem;
   border-radius: 999px;
@@ -251,6 +335,7 @@
   box-shadow: 0 4px 10px rgba(0,0,0,0.15);
   backdrop-filter: blur(4px);
   letter-spacing: 0.5px;
+  z-index: 2;
 }
 
 .home-page .status-badge.available {
@@ -281,6 +366,65 @@
   color: white;
 }
 
+/* Coming Soon Badge */
+.coming-soon-badge {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  z-index: 2;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Genre Badge */
+.genre-badge {
+  position: absolute;
+  bottom: 0.5rem;
+  left: 0.5rem;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  z-index: 2;
+}
+
+/* Favorite Button */
+.favorite-btn {
+  position: absolute;
+  bottom: 0.5rem;
+  right: 0.5rem;
+  background: white;
+  border: none;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  font-size: 1.2rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+
+.favorite-btn:hover {
+  transform: scale(1.1);
+}
+
+.favorite-btn.active {
+  background: #fee2e2;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+}
+
 .home-page .concert-info {
   width: 100%;
   height: 100%;
@@ -299,7 +443,7 @@
 .home-page .concert-info .artist {
   color: #8093F1;
   font-weight: 600;
-  margin-bottom: .25rem;
+  margin-bottom: 0.25rem;
 }
 
 .home-page .concert-info .venue,
@@ -308,6 +452,41 @@
   color: #6b7280;
   margin-bottom: 0.25rem;
   font-size: 0.9rem;
+}
+
+/* Ticket Progress Bar */
+.ticket-progress {
+  margin: 1rem 0;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 6px;
+  background: #e5e7eb;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+  border-radius: 3px;
+}
+
+.ticket-stats {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin-top: 0.5rem;
+}
+
+.low-ticket-warning {
+  color: #f59e0b;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-top: 0.5rem;
+  text-align: center;
 }
 
 .home-page .concert-actions {
@@ -374,6 +553,51 @@
   cursor: not-allowed;
 }
 
+/* Skeleton Loading */
+.skeleton .skeleton-image {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: loading 1.5s infinite;
+  height: 220px;
+}
+
+.skeleton .skeleton-title {
+  height: 24px;
+  width: 80%;
+  background: #e5e7eb;
+  border-radius: 4px;
+  margin-bottom: 12px;
+}
+
+.skeleton .skeleton-text {
+  height: 16px;
+  width: 60%;
+  background: #e5e7eb;
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+
+.skeleton .skeleton-text.short {
+  width: 40%;
+}
+
+.skeleton .skeleton-button {
+  height: 40px;
+  width: 100%;
+  background: #e5e7eb;
+  border-radius: 8px;
+  margin-top: 16px;
+}
+
+@keyframes loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
 /* Loading State */
 .concerts-loading {
   text-align: center;
@@ -408,6 +632,12 @@
   background: #f9fafb;
   border-radius: 1rem;
   grid-column: 1 / -1;
+}
+
+/* Error Message */
+.error-message {
+  margin-bottom: 1rem;
+  animation: fadeInUp 0.3s ease-out;
 }
 
 /* Tooltip for Premium Features */
@@ -471,6 +701,18 @@
   .home-page .hero {
     padding: 1.5rem;
   }
+  
+  .filter-controls {
+    flex-direction: column;
+  }
+  
+  .filter-select, .clear-filters-btn {
+    width: 100%;
+  }
+  
+  .filters-section {
+    padding: 1rem;
+  }
 }
 
 @media (max-width: 480px) {
@@ -480,5 +722,15 @@
   
   .home-page .concert-info h4 {
     font-size: 1.1rem;
+  }
+  
+  .search-input {
+    font-size: 0.9rem;
+  }
+  
+  .favorite-btn {
+    width: 28px;
+    height: 28px;
+    font-size: 1rem;
   }
 }
