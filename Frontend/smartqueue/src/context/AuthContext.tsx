@@ -6,6 +6,7 @@ interface User {
   email: string;
   name: string;
   passStatus: 'Gold' | 'Silver' | 'None';
+  accountType: 'user' | 'admin';
 }
 
 interface AuthContextType {
@@ -16,6 +17,8 @@ interface AuthContextType {
   updatePassStatus: (passStatus: 'Gold' | 'Silver' | 'None') => void;
   isLoading: boolean;
   isAuthenticated: boolean;
+  isAdmin: boolean;
+  isUser: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -66,6 +69,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         email: data.email ?? email,
         name: data.userName ?? email.split('@')[0],
         passStatus: data.passStatus === 'Gold' || data.passStatus === 'Silver' ? data.passStatus : 'None',
+        accountType: data.accountType || (data.userId ? 'user' : 'admin'),
       };
       
       setUser(userData);
@@ -81,23 +85,35 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const signup = async (email: string, name: string) => {
+  const signup = async (email: string, password: string, firstName: string, lastName: string) => {
     setIsLoading(true);
     try {
-      // TODO: Replace with actual API call
-      // Simulating API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+      // Replace with your actual signup API call
+      const response = await fetch('http://localhost:5000/api/signup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password, firstName, lastName }),
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Signup failed');
+      }
+
       const userData = {
-        id: Date.now().toString(),
-        email,
-        name,
+        id: String(data.userId),
+        email: data.email,
+        name: `${firstName} ${lastName}`,
         passStatus: 'None' as const,
+        accountType: 'user' as const,
       };
       
       setUser(userData);
       localStorage.setItem('smartqueue_user', JSON.stringify(userData));
     } catch (error) {
+      console.error('Signup error:', error);
       throw new Error('Signup failed');
     } finally {
       setIsLoading(false);
@@ -117,6 +133,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const isAdmin = user?.accountType === 'admin';
+  const isUser = user?.accountType === 'user';
+
   const value = {
     user,
     login,
@@ -125,6 +144,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     updatePassStatus,
     isLoading,
     isAuthenticated: !!user,
+    isAdmin,
+    isUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

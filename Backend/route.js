@@ -8,6 +8,8 @@ const updatePass = require('./PassPurchase/updatePass');
 const services = require('./ServiceManagement/services');
 const adminQueue = require('./AdminQueue/queue');
 const concerts = require('./ConcertManagement/concerts');
+const concerts = require('./Concerts/concerts');
+const dataReportStats = require('./AdminDataReport/dataReportStats');
 
 function routes(req, res) {
   const parsed = url.parse(req.url || '', true);
@@ -39,6 +41,29 @@ function routes(req, res) {
   if (pathname === '/api/user/pass/update' && method === 'POST') {
     return updatePass.updateUserPassStatus(req, res);
   }
+   if (URL === '/api/user/pass/update' && method === 'POST') {
+       return updatePass.updateUserPassStatus(req, res);
+   }
+
+    // Concert routes
+    if (URL === '/api/concerts' && method === 'GET'){
+        return concerts.handleGetConcerts(req, res);
+    }
+
+    if (URL.match(/^\/api\/concerts\/\d+$/) && method === 'GET') {
+        const concertId = URL.split('/').pop();
+        return concerts.handleGetConcertById(req, res, concertId);
+    }
+
+    // Admin data report route
+    if (URL === '/api/admin/data-report' && method === 'GET') {
+        return dataReportStats.getDataReportStats(req, res);
+    }
+    
+    /*if (URL.startsWith('/signup') && method === 'POST') {
+        return actions.handleSignup(req, res);
+    } */
+    
 
   /* —— Service management (admin) —— */
   if (pathname === '/api/services' && method === 'GET') {
