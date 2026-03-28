@@ -94,6 +94,11 @@ function routes(req, res) {
     return adminQueue.getQueue(req, res);
   }
 
+  if (method === 'GET' && /^\/api\/queue\/\d+$/.test(pathname)) {
+    const concertID = pathname.split('/').pop();
+    return adminQueue.getQueueStatusByConcert(req, res, concertID, parsed.query?.userId);
+  }
+
   if (pathname === '/api/admin/queue/serve-next' && method === 'POST') {
     return adminQueue.serveNext(req, res);
   }
@@ -101,6 +106,10 @@ function routes(req, res) {
   /** Optional: POST { label?, priorityLevel? } — for manual / Postman tests */
   if (pathname === '/api/queue/join' && method === 'POST') {
     return adminQueue.joinQueue(req, res);
+  }
+
+  if (pathname === '/api/queue/leave' && method === 'POST') {
+    return adminQueue.leaveQueue(req, res);
   }
 
   res.writeHead(404, { 'Content-Type': 'application/json' });

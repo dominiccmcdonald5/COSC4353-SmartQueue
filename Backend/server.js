@@ -3,7 +3,7 @@ const url = require('url');
 const Routes = require('./route'); 
 
 const map_route = {
-  GET: ['/api/ping', '/api/services', '/api/admin/queue', '/api/concerts', '/api/admin/data-report', '/api/admin/concerts'],
+  GET: ['/api/ping', '/api/services', '/api/admin/queue', '/api/concerts', '/api/admin/data-report', '/api/admin/concerts', '/api/queue/'],
   POST: [
     '/api/login',
     '/api/signup',
@@ -13,6 +13,7 @@ const map_route = {
     '/api/services',
     '/api/admin/queue/serve-next',
     '/api/queue/join',
+    '/api/queue/leave',
     '/api/admin/concerts',
   ],
   PUT: ['/api/services/', '/api/admin/concerts/'],
