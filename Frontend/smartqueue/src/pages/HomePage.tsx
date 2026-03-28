@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom'; // Add Link back
 import { useAuth } from '../context/AuthContext';
 import '../styling/HomePage.css';
 
@@ -32,7 +32,7 @@ const ConcertSkeleton: React.FC = () => (
 );
 
 const HomePage: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, isAdmin, isUser } = useAuth(); // Add isAdmin and isUser back
   const navigate = useNavigate();
   const [concerts, setConcerts] = useState<Concert[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -231,6 +231,27 @@ const HomePage: React.FC = () => {
         <div className="header-content">
           <h1>ticketQ</h1>
           <div className="user-info">
+            {/* Show User Dashboard button for regular users */}
+            {isUser && (
+              <Link to="/dashboard" className="dashboard-link">
+                📊 User Dashboard
+              </Link>
+            )}
+            
+            {/* Show Admin Dashboard button for admin users */}
+            {isAdmin && (
+              <Link to="/admin" className="admin-link">
+                ⚙️ Admin Dashboard
+              </Link>
+            )}
+            
+            {/* Show Premium Pass link for regular users */}
+            {isUser && (
+              <Link to="/purchase-pass" className="pass-link">
+                ⭐ Get Premium Pass
+              </Link>
+            )}
+            
             <button onClick={handleLogout} className="logout-btn">
               🚪 Logout
             </button>
@@ -244,6 +265,25 @@ const HomePage: React.FC = () => {
             <span>Welcome, {user?.name || 'Guest'}!</span>
           </h1>
           <p>Join the queue and secure tickets for your favorite artists</p>
+          
+          {/* Show role badge based on account type */}
+          {isAdmin && (
+            <div className="role-badge admin-badge">
+              ⚡ Administrator Access - Full System Control
+            </div>
+          )}
+          
+          {isUser && user?.passStatus !== 'None' && (
+            <div className="role-badge premium-badge">
+              ⭐ Premium Member - Priority Queue Access
+            </div>
+          )}
+          
+          {isUser && user?.passStatus === 'None' && (
+            <div className="role-badge standard-badge">
+              🎫 Standard Member - <Link to="/purchase-pass" className="upgrade-link">Upgrade to Premium for Priority Access</Link>
+            </div>
+          )}
         </section>
 
         {error && (

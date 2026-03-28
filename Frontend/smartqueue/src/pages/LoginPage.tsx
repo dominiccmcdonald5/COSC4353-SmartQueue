@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import '../styling/LoginSignup.css';
 
 const LoginPage: React.FC = () => {
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState(''); // Changed from email to identifier
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const { login, isLoading } = useAuth();
@@ -18,7 +18,8 @@ const LoginPage: React.FC = () => {
     setError('');
 
     try {
-      await login(email, password);
+      // Pass the identifier (can be email or username) to login
+      await login(identifier, password);
       navigate(from, { replace: true });
     } catch (error: unknown) {
       if (error instanceof Error) {
@@ -38,12 +39,13 @@ const LoginPage: React.FC = () => {
         
         <form onSubmit={handleSubmit} className="login-form">
           <div className="form-group">
-            <label htmlFor="email">Email</label>
+            <label htmlFor="identifier">Email or Username</label>
             <input
-              type="email"
-              id="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              type="text"
+              id="identifier"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
+              placeholder="Enter your email or username"
               required
             />
           </div>
