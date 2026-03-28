@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom'; // Add Link back
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import '../styling/HomePage.css';
 
@@ -32,7 +32,7 @@ const ConcertSkeleton: React.FC = () => (
 );
 
 const HomePage: React.FC = () => {
-  const { user, logout, isAdmin, isUser } = useAuth(); // Add isAdmin and isUser back
+  const { user, logout, isAdmin, isUser } = useAuth();
   const navigate = useNavigate();
   const [concerts, setConcerts] = useState<Concert[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -164,6 +164,17 @@ const HomePage: React.FC = () => {
   };
 
   const getButtonConfig = (concert: Concert) => {
+    // If user is admin, don't show any join button
+    if (isAdmin) {
+      return {
+        text: 'Admin View Only',
+        className: 'admin-view-btn',
+        disabled: true,
+        action: undefined
+      };
+    }
+    
+    // For regular users, show appropriate button based on concert status
     switch (concert.status) {
       case 'available':
         return {
