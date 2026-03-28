@@ -7,7 +7,10 @@
       "email": "alex.smith0001@smartqueue.test",
       "password": "mockUserPass0001",
       "passStatus": "None",
-      "createdAt": "2025-01-01T14:00:00.000Z"
+      "createdAt": "2025-01-01T14:00:00.000Z",
+      "passType": "none",
+      "accountStatus": "active",
+      "totalSpent": 380
     },
     {
       "userID": 2,
@@ -2719,40 +2722,28 @@
       "createdAt": "2026-03-16T22:08:00.823Z"
     },
     {
-      "userID": 303,
-      "firstName": "hi",
-      "lastName": "hi",
-      "email": "HHello@gmail.com",
-      "password": "123456@",
-      "passStatus": "Silver",
-      "createdAt": "2026-03-16T22:08:32.541Z"
-    },
-    {
       "userID": 304,
       "firstName": "Dom",
       "lastName": "Dom",
       "email": "Dom@gmail.com",
       "password": "domdom123@",
       "passStatus": "Gold",
-      "createdAt": "2026-03-17T00:28:49.672Z"
-    },
-    {
-      "userID": 305,
-      "firstName": "Bella",
-      "lastName": "Daisy",
-      "email": "puppy@gmail.com",
-      "password": "123412@",
-      "passStatus": "Gold",
-      "createdAt": "2026-03-17T00:35:27.927Z"
+      "createdAt": "2026-03-17T00:28:49.672Z",
+      "passType": "gold",
+      "accountStatus": "active",
+      "totalSpent": 0
     },
     {
       "userID": 306,
       "firstName": "P",
       "lastName": "U",
-      "email": "p@P",
+      "email": "p@P.com",
       "password": "11111!",
-      "passStatus": "None",
-      "createdAt": "2026-03-17T00:38:44.866Z"
+      "passStatus": "Silver",
+      "createdAt": "2026-03-17T00:38:44.866Z",
+      "passType": "silver",
+      "accountStatus": "active",
+      "totalSpent": 0
     },
     {
       "userID": 307,
