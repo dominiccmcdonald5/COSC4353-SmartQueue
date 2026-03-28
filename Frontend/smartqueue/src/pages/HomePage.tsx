@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import '../styling/HomePage.css';
 
@@ -32,7 +32,7 @@ const ConcertSkeleton: React.FC = () => (
 );
 
 const HomePage: React.FC = () => {
-  const { user, logout, isAdmin, isUser } = useAuth();
+  const { user, logout } = useAuth(); // Removed isAdmin and isUser for now
   const navigate = useNavigate();
   const [concerts, setConcerts] = useState<Concert[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -256,7 +256,6 @@ const HomePage: React.FC = () => {
         <div className="header-content">
           <h1>ticketQ</h1>
           <div className="user-info">
-            {/* We'll add dashboard buttons later */}
             <button onClick={handleLogout} className="logout-btn">
               🚪 Logout
             </button>
