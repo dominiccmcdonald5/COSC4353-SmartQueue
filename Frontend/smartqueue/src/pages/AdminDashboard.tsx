@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { 
@@ -18,6 +18,7 @@ import { ADMIN_EVENTS_STORAGE_KEY } from '../data/adminEventsStorage';
 import type { ConcertEvent } from '../types/concertEvent';
 import ConcertEventEditForm from '../components/admin/ConcertEventEditForm';
 import EventEditModal from '../components/admin/EventEditModal';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
 import {
   VENUE_MAX_LEN,
   VENUE_OTHER,
@@ -28,6 +29,11 @@ import {
 
 const DEFAULT_CONCERT_IMAGE = '/concert1.jpg';
 const API_BASE = 'http://localhost:5000';
+
+type PendingDelete =
+  | { kind: 'concert'; id: string; title: string }
+  | { kind: 'user'; id: string; title: string }
+  | null;
 
 // Maps a raw concert record from the backend to a ConcertEvent used by the UI
 function mapApiConcert(c: {
@@ -158,6 +164,56 @@ interface User {
   status: 'active' | 'suspended' | 'banned';
 }
 
+const DEMO_ADMIN_USERS: User[] = [
+  {
+    id: '1',
+    name: 'John Doe',
+    email: 'john.doe@email.com',
+    joinDate: '2025-12-01',
+    passType: 'gold',
+    totalSpent: 850.0,
+    status: 'active',
+  },
+  {
+    id: '2',
+    name: 'Jane Smith',
+    email: 'jane.smith@email.com',
+    joinDate: '2026-01-15',
+    passType: 'silver',
+    totalSpent: 450.0,
+    status: 'active',
+  },
+  {
+    id: '3',
+    name: 'Mike Johnson',
+    email: 'mike.j@email.com',
+    joinDate: '2026-01-20',
+    passType: 'none',
+    totalSpent: 120.0,
+    status: 'suspended',
+  },
+];
+
+function mapApiUserRow(u: {
+  id: string;
+  name: string;
+  email: string;
+  joinDate: string;
+  passType: string;
+  totalSpent: number;
+  status: string;
+}): User {
+  return {
+    id: String(u.id),
+    name: u.name,
+    email: u.email,
+    joinDate: u.joinDate,
+    passType: (['none', 'silver', 'gold'].includes(u.passType) ? u.passType : 'none') as User['passType'],
+    totalSpent: Number(u.totalSpent) || 0,
+    status: (['active', 'suspended', 'banned'].includes(u.status) ? u.status : 'active') as User['status'],
+  };
+}
+
 interface ReportData {
   totalUsers: number;
   totalEvents: number;
@@ -196,6 +252,7 @@ const AdminDashboard: React.FC = () => {
   const [eventStatusFilter, setEventStatusFilter] = useState<'all' | ConcertEvent['status']>('all');
   const [userSearchTerm, setUserSearchTerm] = useState('');
   const [userStatusFilter, setUserStatusFilter] = useState<'all' | User['status']>('all');
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete>(null);
 
   // Form data for new events
   const [newEvent, setNewEvent] = useState<Omit<ConcertEvent, 'id'>>({
@@ -221,37 +278,16 @@ const AdminDashboard: React.FC = () => {
   });
 
   useEffect(() => {
-    const mockUsers: User[] = [
-      {
-        id: '1',
-        name: 'John Doe',
-        email: 'john.doe@email.com',
-        joinDate: '2025-12-01',
-        passType: 'gold',
-        totalSpent: 850.00,
-        status: 'active'
-      },
-      {
-        id: '2',
-        name: 'Jane Smith',
-        email: 'jane.smith@email.com',
-        joinDate: '2026-01-15',
-        passType: 'silver',
-        totalSpent: 450.00,
-        status: 'active'
-      },
-      {
-        id: '3',
-        name: 'Mike Johnson',
-        email: 'mike.j@email.com',
-        joinDate: '2026-01-20',
-        passType: 'none',
-        totalSpent: 120.00,
-        status: 'suspended'
-      }
-    ];
-
-    setUsers(mockUsers);
+    fetch(`${API_BASE}/api/admin/users`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.success && Array.isArray(data.users) && data.users.length > 0) {
+          setUsers(data.users.map(mapApiUserRow));
+        } else {
+          setUsers(DEMO_ADMIN_USERS);
+        }
+      })
+      .catch(() => setUsers(DEMO_ADMIN_USERS));
 
     // Fetch concerts from API, fall back to local/demo data on failure
     fetch(`${API_BASE}/api/admin/concerts`)
@@ -425,8 +461,16 @@ const AdminDashboard: React.FC = () => {
     setEditingEvent(null);
   };
 
-  const handleDeleteEvent = async (id: string) => {
-    if (!window.confirm('Delete this concert? This cannot be undone.')) return;
+  const requestDeleteEvent = (id: string) => {
+    const ev = events.find((e) => e.id === id);
+    setPendingDelete({
+      kind: 'concert',
+      id,
+      title: ev?.name?.trim() ? ev.name : `Event #${id}`,
+    });
+  };
+
+  const executeDeleteEvent = async (id: string) => {
     try {
       const res = await fetch(`${API_BASE}/api/admin/concerts/${id}`, { method: 'DELETE' });
       const data = await res.json();
@@ -441,19 +485,40 @@ const AdminDashboard: React.FC = () => {
   };
 
   // User Management Functions
-  const handleAddUser = () => {
-    const user: User = {
-      ...newUser,
-      id: Date.now().toString(),
-      joinDate: new Date().toISOString().split('T')[0],
-      totalSpent: 0
-    };
-    setUsers([...users, user]);
+  const handleAddUser = async () => {
+    const nameTrim = newUser.name.trim();
+    const emailTrim = newUser.email.trim();
+    if (!nameTrim || !emailTrim) {
+      window.alert('Name and email are required.');
+      return;
+    }
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/users`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: nameTrim,
+          email: emailTrim,
+          passType: newUser.passType,
+          status: newUser.status,
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.user) {
+        setUsers((prev) => [...prev, mapApiUserRow(data.user)]);
+      } else {
+        window.alert(`Failed to add user: ${data.errors?.join(', ') || data.message || 'Unknown error'}`);
+        return;
+      }
+    } catch {
+      window.alert('Failed to connect to server. User not created.');
+      return;
+    }
     setNewUser({
       name: '',
       email: '',
       passType: 'none',
-      status: 'active'
+      status: 'active',
     });
     setShowAddUserForm(false);
   };
@@ -462,15 +527,67 @@ const AdminDashboard: React.FC = () => {
     setEditingUser({ ...user });
   };
 
-  const handleSaveUser = () => {
-    if (editingUser) {
-      setUsers(users.map(u => u.id === editingUser.id ? editingUser : u));
-      setEditingUser(null);
+  const handleSaveUser = async () => {
+    if (!editingUser) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/users/${editingUser.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: editingUser.name.trim(),
+          email: editingUser.email.trim(),
+          passType: editingUser.passType,
+          status: editingUser.status,
+          totalSpent: editingUser.totalSpent,
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.user) {
+        const updated = mapApiUserRow(data.user);
+        setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
+      } else {
+        window.alert(`Failed to save user: ${data.errors?.join(', ') || data.message || 'Unknown error'}`);
+        return;
+      }
+    } catch {
+      window.alert('Failed to connect to server. Changes not saved.');
+      return;
+    }
+    setEditingUser(null);
+  };
+
+  const requestDeleteUser = (id: string) => {
+    const u = users.find((x) => x.id === id);
+    setPendingDelete({
+      kind: 'user',
+      id,
+      title: u?.name?.trim() ? u.name : `User #${id}`,
+    });
+  };
+
+  const executeDeleteUser = async (id: string) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/users/${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        setUsers((prev) => prev.filter((x) => x.id !== id));
+      } else {
+        window.alert(`Failed to delete user: ${data.message || 'Unknown error'}`);
+      }
+    } catch {
+      window.alert('Failed to connect to server. User not deleted.');
     }
   };
 
-  const handleDeleteUser = (id: string) => {
-    setUsers(users.filter(u => u.id !== id));
+  const handleConfirmDelete = () => {
+    if (!pendingDelete) return;
+    const { kind, id } = pendingDelete;
+    setPendingDelete(null);
+    if (kind === 'concert') {
+      void executeDeleteEvent(id);
+    } else {
+      void executeDeleteUser(id);
+    }
   };
 
   const filteredEvents = events.filter((event) => {
@@ -741,7 +858,7 @@ const AdminDashboard: React.FC = () => {
                           <button
                             type="button"
                             className="delete-btn"
-                            onClick={() => handleDeleteEvent(event.id)}
+                            onClick={() => requestDeleteEvent(event.id)}
                             aria-label={`Delete ${event.name}`}
                             title="Delete event"
                           >
@@ -884,72 +1001,128 @@ const AdminDashboard: React.FC = () => {
               </div>
             )}
 
-            <div className="users-list">
-              {filteredUsers.map((user) => (
-                <div key={user.id} className="user-card">
-                  {editingUser?.id === user.id ? (
-                    <div className="edit-form">
-                      <div className="form-grid">
-                        <input
-                          type="text"
-                          value={editingUser.name}
-                          onChange={(e) => setEditingUser({...editingUser, name: e.target.value})}
-                        />
-                        <input
-                          type="email"
-                          value={editingUser.email}
-                          onChange={(e) => setEditingUser({...editingUser, email: e.target.value})}
-                        />
-                        <select
-                          value={editingUser.passType}
-                          onChange={(e) => setEditingUser({...editingUser, passType: e.target.value as User['passType']})}
-                        >
-                          <option value="none">No Pass</option>
-                          <option value="silver">Silver Pass</option>
-                          <option value="gold">Gold Pass</option>
-                        </select>
-                        <select
-                          value={editingUser.status}
-                          onChange={(e) => setEditingUser({...editingUser, status: e.target.value as User['status']})}
-                        >
-                          <option value="active">Active</option>
-                          <option value="suspended">Suspended</option>
-                          <option value="banned">Banned</option>
-                        </select>
-                      </div>
-                      <div className="form-actions">
-                        <button className="save-btn" onClick={handleSaveUser}>
-                          <MdSave /> Save
-                        </button>
-                        <button className="cancel-btn" onClick={() => setEditingUser(null)}>
-                          <MdCancel /> Cancel
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="user-info">
-                        <h4>{user.name}</h4>
-                        <p><strong>Email:</strong> {user.email}</p>
-                        <p><strong>Member Since:</strong> {new Date(user.joinDate).toLocaleDateString()}</p>
-                        <p><strong>Pass Type:</strong> <span className={`pass-type ${user.passType}`}>{user.passType}</span></p>
-                        <p><strong>Total Spent:</strong> ${user.totalSpent.toFixed(2)}</p>
-                        <span className={`status-badge ${user.status}`}>{user.status}</span>
-                      </div>
-                      <div className="user-actions">
-                        <button className="edit-btn" onClick={() => handleEditUser(user)}>
-                          <MdEdit />
-                        </button>
-                        <button className="delete-btn" onClick={() => handleDeleteUser(user.id)}>
-                          <MdDelete />
-                        </button>
-                      </div>
-                    </>
+            <div className="users-table-wrap">
+              <table className="admin-users-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Name</th>
+                    <th scope="col">Email</th>
+                    <th scope="col">Joined</th>
+                    <th scope="col">Pass</th>
+                    <th scope="col">Spent</th>
+                    <th scope="col">Status</th>
+                    <th scope="col" className="admin-users-table-actions">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredUsers.map((user) =>
+                    editingUser?.id === user.id ? (
+                      <tr key={user.id} className="admin-users-table-row is-editing">
+                        <td>
+                          <input
+                            type="text"
+                            aria-label="Name"
+                            value={editingUser.name}
+                            onChange={(e) => setEditingUser({ ...editingUser, name: e.target.value })}
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="email"
+                            aria-label="Email"
+                            value={editingUser.email}
+                            onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
+                          />
+                        </td>
+                        <td className="admin-users-table-muted">
+                          {new Date(editingUser.joinDate).toLocaleDateString()}
+                        </td>
+                        <td>
+                          <select
+                            aria-label="Pass type"
+                            value={editingUser.passType}
+                            onChange={(e) =>
+                              setEditingUser({
+                                ...editingUser,
+                                passType: e.target.value as User['passType'],
+                              })
+                            }
+                          >
+                            <option value="none">None</option>
+                            <option value="silver">Silver</option>
+                            <option value="gold">Gold</option>
+                          </select>
+                        </td>
+                        <td>
+                          <input
+                            type="number"
+                            min={0}
+                            step={0.01}
+                            aria-label="Total spent"
+                            className="admin-users-spent-input"
+                            value={editingUser.totalSpent}
+                            onChange={(e) =>
+                              setEditingUser({
+                                ...editingUser,
+                                totalSpent: parseFloat(e.target.value) || 0,
+                              })
+                            }
+                          />
+                        </td>
+                        <td>
+                          <select
+                            aria-label="Account status"
+                            value={editingUser.status}
+                            onChange={(e) =>
+                              setEditingUser({
+                                ...editingUser,
+                                status: e.target.value as User['status'],
+                              })
+                            }
+                          >
+                            <option value="active">Active</option>
+                            <option value="suspended">Suspended</option>
+                            <option value="banned">Banned</option>
+                          </select>
+                        </td>
+                        <td className="admin-users-table-actions">
+                          <button type="button" className="save-btn save-btn--compact" onClick={() => void handleSaveUser()}>
+                            <MdSave /> Save
+                          </button>
+                          <button type="button" className="cancel-btn cancel-btn--compact" onClick={() => setEditingUser(null)}>
+                            <MdCancel /> Cancel
+                          </button>
+                        </td>
+                      </tr>
+                    ) : (
+                      <tr key={user.id} className="admin-users-table-row">
+                        <td className="admin-users-table-strong">{user.name}</td>
+                        <td>{user.email}</td>
+                        <td className="admin-users-table-muted">{new Date(user.joinDate).toLocaleDateString()}</td>
+                        <td>
+                          <span className={`pass-type pass-type--pill ${user.passType}`}>{user.passType}</span>
+                        </td>
+                        <td>${user.totalSpent.toFixed(2)}</td>
+                        <td>
+                          <span className={`status-badge status-badge--table ${user.status}`}>{user.status}</span>
+                        </td>
+                        <td className="admin-users-table-actions">
+                          <button type="button" className="edit-btn" onClick={() => handleEditUser(user)} aria-label={`Edit ${user.name}`} title="Edit">
+                            <MdEdit />
+                          </button>
+                          <button type="button" className="delete-btn" onClick={() => requestDeleteUser(user.id)} aria-label={`Delete ${user.name}`} title="Delete">
+                            <MdDelete />
+                          </button>
+                        </td>
+                      </tr>
+                    ),
                   )}
-                </div>
-              ))}
+                </tbody>
+              </table>
               {filteredUsers.length === 0 && (
-                <p className="empty-results">No users found for your current search/filter.</p>
+                <p className="empty-results empty-results--users-table">No users found for your current search/filter.</p>
               )}
             </div>
           </section>
@@ -1108,6 +1281,33 @@ const AdminDashboard: React.FC = () => {
           </section>
         )}
       </main>
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title={
+          pendingDelete?.kind === 'concert'
+            ? 'Delete concert?'
+            : pendingDelete?.kind === 'user'
+              ? 'Delete user?'
+              : ''
+        }
+        message={
+          pendingDelete?.kind === 'concert' ? (
+            <p>
+              Remove <strong>{pendingDelete.title}</strong> from the catalog? This cannot be undone.
+            </p>
+          ) : pendingDelete?.kind === 'user' ? (
+            <p>
+              Remove <strong>{pendingDelete.title}</strong>? Their queue history will be removed as well.
+            </p>
+          ) : null
+        }
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        confirmVariant="danger"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setPendingDelete(null)}
+      />
     </div>
   );
 };

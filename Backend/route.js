@@ -10,6 +10,7 @@ const adminQueue = require('./AdminQueue/queue');
 const concerts = require('./ConcertManagement/concerts');
 const concertsLegacy = require('./Concerts/concerts');
 const dataReportStats = require('./AdminDataReport/dataReportStats');
+const adminUsers = require('./UserManagement/adminUsers');
 
 function routes(req, res) {
   const parsed = url.parse(req.url || '', true);
@@ -87,6 +88,25 @@ function routes(req, res) {
   if (method === 'DELETE' && /^\/api\/admin\/concerts\/\d+$/.test(pathname)) {
     const concertID = pathname.split('/').pop();
     return concerts.deleteConcert(req, res, concertID);
+  }
+
+  /* —— User management (admin) —— */
+  if (pathname === '/api/admin/users' && method === 'GET') {
+    return adminUsers.getAllUsers(req, res);
+  }
+
+  if (pathname === '/api/admin/users' && method === 'POST') {
+    return adminUsers.createUser(req, res);
+  }
+
+  if (method === 'PUT' && /^\/api\/admin\/users\/\d+$/.test(pathname)) {
+    const userID = pathname.split('/').pop();
+    return adminUsers.editUser(req, res, userID);
+  }
+
+  if (method === 'DELETE' && /^\/api\/admin\/users\/\d+$/.test(pathname)) {
+    const userID = pathname.split('/').pop();
+    return adminUsers.deleteUser(req, res, userID);
   }
 
   /* —— Admin queue —— */

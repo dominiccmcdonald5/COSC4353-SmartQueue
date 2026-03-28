@@ -297,10 +297,126 @@
 }
 
 /* Card Styles */
-.events-list,
-.users-list {
+.events-list {
   display: grid;
   gap: 1.9rem;
+}
+
+/* User management — dense table */
+.users-table-wrap {
+  overflow-x: auto;
+  margin-top: 0.5rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.admin-users-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.admin-users-table th,
+.admin-users-table td {
+  padding: 0.45rem 0.65rem;
+  text-align: left;
+  border-bottom: 1px solid #f3f4f6;
+  vertical-align: middle;
+}
+
+.admin-users-table thead th {
+  background: #f9fafb;
+  color: #374151;
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.admin-users-table tbody tr:hover {
+  background: #fafafa;
+}
+
+.admin-users-table-row.is-editing {
+  background: #f5f3ff;
+}
+
+.admin-users-table-row.is-editing:hover {
+  background: #ede9fe;
+}
+
+.admin-users-table td input,
+.admin-users-table td select {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  font-size: 0.85rem;
+  padding: 0.35rem 0.45rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+}
+
+.admin-users-spent-input {
+  max-width: 7rem;
+}
+
+.admin-users-table-strong {
+  font-weight: 600;
+  color: #111827;
+}
+
+.admin-users-table-muted {
+  color: #6b7280;
+  white-space: nowrap;
+}
+
+.admin-users-table-actions {
+  white-space: nowrap;
+  text-align: right;
+  width: 1%;
+}
+
+.admin-users-table-actions .edit-btn,
+.admin-users-table-actions .delete-btn {
+  display: inline-flex;
+  margin-left: 0.25rem;
+}
+
+.pass-type--pill {
+  font-size: 0.75rem;
+  text-transform: capitalize;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: #f3f4f6;
+}
+
+.status-badge--table {
+  font-size: 0.7rem;
+  margin: 0;
+}
+
+.save-btn--compact,
+.cancel-btn--compact {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.4rem 0.65rem;
+  font-size: 0.8rem;
+  margin-left: 0.35rem;
+}
+
+.save-btn--compact:first-child,
+.cancel-btn--compact:first-child {
+  margin-left: 0;
+}
+
+.empty-results--users-table {
+  margin: 0;
+  padding: 1rem 1.25rem;
+  border-top: 1px dashed #e5e7eb;
 }
 
 .event-card,
@@ -433,13 +549,17 @@
 }
 
 .pass-type.silver {
-  background: #f1f5f9;
-  color: #64748b;
+  background: linear-gradient(145deg, #f1f5f9 0%, #d8dee6 40%, #b8c4ce 100%);
+  color: #334155;
+  border: 1px solid #94a3b8;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
 }
 
 .pass-type.gold {
-  background: #fef3c7;
-  color: #d97706;
+  background: linear-gradient(145deg, #fffbeb 0%, #fde68a 35%, #fbbf24 70%, #d97706 100%);
+  color: #78350f;
+  border: 1px solid #b45309;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
 }
 
 .event-actions,
