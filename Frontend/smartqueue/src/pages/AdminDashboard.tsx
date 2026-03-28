@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { 
@@ -27,6 +27,38 @@ import {
 } from '../utils/concertVenue';
 
 const DEFAULT_CONCERT_IMAGE = '/concert1.jpg';
+const API_BASE = 'http://localhost:5000';
+
+// Maps a raw concert record from the backend to a ConcertEvent used by the UI
+function mapApiConcert(c: {
+  concertID: number;
+  concertName: string;
+  artistName: string;
+  genre: string;
+  date: string;
+  venue: string;
+  capacity: number;
+  ticketPrice: number;
+  concertImage: string;
+  concertStatus: string;
+}): ConcertEvent {
+  const soldOut = String(c.concertStatus).toLowerCase() === 'sold_out';
+  const price = Number(c.ticketPrice);
+  return {
+    id: String(c.concertID),
+    name: c.concertName || `Event ${c.concertID}`,
+    artist: c.artistName || '',
+    genre: c.genre || '',
+    date: typeof c.date === 'string' && c.date.length >= 10 ? c.date.slice(0, 10) : c.date,
+    venue: c.venue || '',
+    image: c.concertImage || DEFAULT_CONCERT_IMAGE,
+    capacity: Number(c.capacity) || 0,
+    ticketPriceMin: Number.isFinite(price) ? price : 0,
+    ticketPriceMax: Number.isFinite(price) ? price : 0,
+    status: soldOut ? 'completed' : 'upcoming',
+    published: !soldOut,
+  };
+}
 
 function migrateStoredEvents(raw: unknown): ConcertEvent[] | null {
   if (!Array.isArray(raw) || raw.length === 0) return null;
@@ -54,80 +86,6 @@ function migrateStoredEvents(raw: unknown): ConcertEvent[] | null {
     });
   }
   return out.length ? out : null;
-}
-
-/** Empty `VITE_API_URL` would make fetch(`/api/concerts`) hit Vite (5173) and fail — coerce to real backend URL. */
-function resolveBackendBase(): string {
-  const v = import.meta.env.VITE_API_URL;
-  if (v != null && String(v).trim() !== '') {
-    return String(v).trim().replace(/\/$/, '');
-  }
-  return 'http://localhost:5000';
-}
-
-interface ApiConcertRow {
-  concertID: number;
-  concertName: string;
-  artistName: string;
-  genre: string;
-  date: string;
-  venue: string;
-  capacity: number;
-  ticketPrice: number;
-  concertImage: string;
-  concertStatus: string;
-}
-
-function mapApiRowToConcertEvent(c: ApiConcertRow): ConcertEvent {
-  const soldOut = String(c.concertStatus).toLowerCase() === 'sold_out';
-  const iso = typeof c.date === 'string' ? c.date : '';
-  const dateForInput = iso.length >= 10 ? iso.slice(0, 10) : iso;
-  const price = Number(c.ticketPrice);
-  const id = c.concertID;
-  return {
-    id: String(id),
-    name: (typeof c.concertName === 'string' && c.concertName.trim()) ? c.concertName.trim() : `Event ${id}`,
-    artist: typeof c.artistName === 'string' ? c.artistName : '',
-    genre: typeof c.genre === 'string' ? c.genre : '',
-    date: dateForInput || iso,
-    venue: typeof c.venue === 'string' ? c.venue : '',
-    image: typeof c.concertImage === 'string' && c.concertImage.trim() ? c.concertImage.trim() : DEFAULT_CONCERT_IMAGE,
-    capacity: Number(c.capacity) || 0,
-    ticketPriceMin: Number.isFinite(price) ? price : 0,
-    ticketPriceMax: Number.isFinite(price) ? price : 0,
-    /* Backend uses open/sold_out; map open → upcoming so “Upcoming” filter matches most catalog rows. */
-    status: soldOut ? 'completed' : 'upcoming',
-    published: !soldOut,
-  };
-}
-
-async function fetchConcertsFromBackend(base: string): Promise<ConcertEvent[] | null> {
-  const url = `${base}/api/concerts`;
-  try {
-    const res = await fetch(url, { headers: { Accept: 'application/json' } });
-    const text = await res.text();
-    let data: { concerts?: unknown } = {};
-    try {
-      data = text ? JSON.parse(text) : {};
-    } catch {
-      return null;
-    }
-    const list = data.concerts;
-    if (!res.ok || !Array.isArray(list) || list.length === 0) {
-      return null;
-    }
-    const mapped = list
-      .filter(
-        (row): row is ApiConcertRow =>
-          row != null &&
-          typeof row === 'object' &&
-          typeof (row as ApiConcertRow).concertID === 'number',
-      )
-      .map((row) => mapApiRowToConcertEvent(row));
-    return mapped.length > 0 ? mapped : null;
-  } catch {
-    return null;
-  }
 }
 
 const DEMO_ADMIN_EVENTS: ConcertEvent[] = [
@@ -263,8 +221,6 @@ const AdminDashboard: React.FC = () => {
   });
 
   useEffect(() => {
-    let cancelled = false;
-
     const mockUsers: User[] = [
       {
         id: '1',
@@ -295,34 +251,20 @@ const AdminDashboard: React.FC = () => {
       }
     ];
 
-    try {
-      const raw = localStorage.getItem(ADMIN_EVENTS_STORAGE_KEY);
-      if (raw) {
-        const migrated = migrateStoredEvents(JSON.parse(raw));
-        if (migrated && migrated.length > 0) {
-          setEvents(migrated);
-        } else {
-          setEvents(mockEvents);
-        }
-      } else {
-        setEvents(mockEvents);
-      }
-      setEvents(getFallbackConcertEvents());
-      setUsers(mockUsers);
-      setReportData(mockReportData);
-    }
-
     setUsers(mockUsers);
-  }, []);
 
-  useEffect(() => {
-    if (events.length === 0) return;
-    try {
-      localStorage.setItem(ADMIN_EVENTS_STORAGE_KEY, JSON.stringify(events));
-    } catch {
-      /* ignore */
-    }
-  }, [events]);
+    // Fetch concerts from API, fall back to local/demo data on failure
+    fetch(`${API_BASE}/api/admin/concerts`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.success && Array.isArray(data.concerts) && data.concerts.length > 0) {
+          setEvents(data.concerts.map(mapApiConcert));
+        } else {
+          setEvents(getFallbackConcertEvents());
+        }
+      })
+      .catch(() => setEvents(getFallbackConcertEvents()));
+  }, []);
 
   // Fetch admin report data from API
   useEffect(() => {
@@ -386,7 +328,7 @@ const AdminDashboard: React.FC = () => {
     fetchReportData();
   }, []);
 
-  const handleAddEvent = () => {
+  const handleAddEvent = async () => {
     const venueTrimmed = newEvent.venue.trim();
     if (!venueTrimmed || venueTrimmed === VENUE_OTHER) {
       window.alert('Please select a venue or choose Other and enter a venue name.');
@@ -394,31 +336,41 @@ const AdminDashboard: React.FC = () => {
     }
     let min = newEvent.ticketPriceMin;
     let max = newEvent.ticketPriceMax;
-    if (min > max) {
-      const t = min;
-      min = max;
-      max = t;
-    }
-    const event: ConcertEvent = {
-      ...newEvent,
-      id: Date.now().toString(),
+    if (min > max) { const t = min; min = max; max = t; }
+
+    const body = {
+      concertName: newEvent.name.trim(),
+      artistName: newEvent.artist.trim(),
+      genre: newEvent.genre.trim(),
+      date: newEvent.date,
       venue: venueTrimmed.slice(0, VENUE_MAX_LEN),
-      ticketPriceMin: min,
-      ticketPriceMax: max,
+      capacity: newEvent.capacity,
+      ticketPrice: (min + max) / 2,
+      concertImage: newEvent.image || DEFAULT_CONCERT_IMAGE,
     };
-    setEvents([...events, event]);
+
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/concerts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.success && data.concert) {
+        setEvents((prev) => [...prev, mapApiConcert(data.concert)]);
+      } else {
+        window.alert(`Failed to add concert: ${data.errors?.join(', ') || data.message || 'Unknown error'}`);
+        return;
+      }
+    } catch {
+      window.alert('Failed to connect to server. Concert not saved.');
+      return;
+    }
+
     setNewEvent({
-      name: '',
-      artist: '',
-      genre: '',
-      date: '',
-      venue: '',
-      image: DEFAULT_CONCERT_IMAGE,
-      capacity: 0,
-      ticketPriceMin: 0,
-      ticketPriceMax: 0,
-      status: 'upcoming',
-      published: false,
+      name: '', artist: '', genre: '', date: '', venue: '',
+      image: DEFAULT_CONCERT_IMAGE, capacity: 0,
+      ticketPriceMin: 0, ticketPriceMax: 0, status: 'upcoming', published: false,
     });
     setShowAddEventForm(false);
   };
@@ -427,7 +379,7 @@ const AdminDashboard: React.FC = () => {
     setEditingEvent({ ...event, published: event.published ?? false });
   };
 
-  const handleSaveEvent = () => {
+  const handleSaveEvent = async () => {
     if (!editingEvent) return;
     const venueTrimmed = editingEvent.venue.trim();
     if (!venueTrimmed || venueTrimmed === VENUE_OTHER) {
@@ -436,23 +388,56 @@ const AdminDashboard: React.FC = () => {
     }
     let min = editingEvent.ticketPriceMin;
     let max = editingEvent.ticketPriceMax;
-    if (min > max) {
-      const t = min;
-      min = max;
-      max = t;
-    }
-    const updated: ConcertEvent = {
-      ...editingEvent,
+    if (min > max) { const t = min; min = max; max = t; }
+
+    const body = {
+      concertName: editingEvent.name.trim(),
+      artistName: editingEvent.artist.trim(),
+      genre: editingEvent.genre.trim(),
+      date: editingEvent.date,
       venue: venueTrimmed.slice(0, VENUE_MAX_LEN),
-      ticketPriceMin: min,
-      ticketPriceMax: max,
+      capacity: editingEvent.capacity,
+      ticketPrice: (min + max) / 2,
+      concertImage: editingEvent.image || DEFAULT_CONCERT_IMAGE,
+      concertStatus: editingEvent.status === 'completed' || editingEvent.status === 'cancelled'
+        ? 'sold_out' : 'open',
     };
-    setEvents(events.map((e) => (e.id === updated.id ? updated : e)));
+
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/concerts/${editingEvent.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.success && data.concert) {
+        const updated = mapApiConcert(data.concert);
+        setEvents((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
+      } else {
+        window.alert(`Failed to save concert: ${data.errors?.join(', ') || data.message || 'Unknown error'}`);
+        return;
+      }
+    } catch {
+      window.alert('Failed to connect to server. Changes not saved.');
+      return;
+    }
+
     setEditingEvent(null);
   };
 
-  const handleDeleteEvent = (id: string) => {
-    setEvents(events.filter(e => e.id !== id));
+  const handleDeleteEvent = async (id: string) => {
+    if (!window.confirm('Delete this concert? This cannot be undone.')) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/concerts/${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        setEvents((prev) => prev.filter((e) => e.id !== id));
+      } else {
+        window.alert(`Failed to delete concert: ${data.message || 'Unknown error'}`);
+      }
+    } catch {
+      window.alert('Failed to connect to server. Concert not deleted.');
+    }
   };
 
   // User Management Functions
