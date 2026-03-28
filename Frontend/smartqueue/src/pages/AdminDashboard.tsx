@@ -56,6 +56,140 @@ function migrateStoredEvents(raw: unknown): ConcertEvent[] | null {
   return out.length ? out : null;
 }
 
+/** Empty `VITE_API_URL` would make fetch(`/api/concerts`) hit Vite (5173) and fail — coerce to real backend URL. */
+function resolveBackendBase(): string {
+  const v = import.meta.env.VITE_API_URL;
+  if (v != null && String(v).trim() !== '') {
+    return String(v).trim().replace(/\/$/, '');
+  }
+  return 'http://localhost:5000';
+}
+
+interface ApiConcertRow {
+  concertID: number;
+  concertName: string;
+  artistName: string;
+  genre: string;
+  date: string;
+  venue: string;
+  capacity: number;
+  ticketPrice: number;
+  concertImage: string;
+  concertStatus: string;
+}
+
+function mapApiRowToConcertEvent(c: ApiConcertRow): ConcertEvent {
+  const soldOut = String(c.concertStatus).toLowerCase() === 'sold_out';
+  const iso = typeof c.date === 'string' ? c.date : '';
+  const dateForInput = iso.length >= 10 ? iso.slice(0, 10) : iso;
+  const price = Number(c.ticketPrice);
+  const id = c.concertID;
+  return {
+    id: String(id),
+    name: (typeof c.concertName === 'string' && c.concertName.trim()) ? c.concertName.trim() : `Event ${id}`,
+    artist: typeof c.artistName === 'string' ? c.artistName : '',
+    genre: typeof c.genre === 'string' ? c.genre : '',
+    date: dateForInput || iso,
+    venue: typeof c.venue === 'string' ? c.venue : '',
+    image: typeof c.concertImage === 'string' && c.concertImage.trim() ? c.concertImage.trim() : DEFAULT_CONCERT_IMAGE,
+    capacity: Number(c.capacity) || 0,
+    ticketPriceMin: Number.isFinite(price) ? price : 0,
+    ticketPriceMax: Number.isFinite(price) ? price : 0,
+    /* Backend uses open/sold_out; map open → upcoming so “Upcoming” filter matches most catalog rows. */
+    status: soldOut ? 'completed' : 'upcoming',
+    published: !soldOut,
+  };
+}
+
+async function fetchConcertsFromBackend(base: string): Promise<ConcertEvent[] | null> {
+  const url = `${base}/api/concerts`;
+  try {
+    const res = await fetch(url, { headers: { Accept: 'application/json' } });
+    const text = await res.text();
+    let data: { concerts?: unknown } = {};
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch {
+      return null;
+    }
+    const list = data.concerts;
+    if (!res.ok || !Array.isArray(list) || list.length === 0) {
+      return null;
+    }
+    const mapped = list
+      .filter(
+        (row): row is ApiConcertRow =>
+          row != null &&
+          typeof row === 'object' &&
+          typeof (row as ApiConcertRow).concertID === 'number',
+      )
+      .map((row) => mapApiRowToConcertEvent(row));
+    return mapped.length > 0 ? mapped : null;
+  } catch {
+    return null;
+  }
+}
+
+const DEMO_ADMIN_EVENTS: ConcertEvent[] = [
+  {
+    id: '1',
+    name: 'Summer Rock Festival',
+    artist: 'Various Artists',
+    genre: 'Rock',
+    date: '2026-07-15',
+    venue: 'Central Stadium',
+    image: '/concert1.jpg',
+    capacity: 50000,
+    ticketPriceMin: 79.99,
+    ticketPriceMax: 99.99,
+    status: 'upcoming',
+    published: true,
+  },
+  {
+    id: '2',
+    name: 'Jazz Night Live',
+    artist: 'The Jazz Collective',
+    genre: 'Jazz',
+    date: '2026-06-20',
+    venue: 'Downtown Theater',
+    image: '/concert2.jpg',
+    capacity: 2500,
+    ticketPriceMin: 55,
+    ticketPriceMax: 75,
+    status: 'active',
+    published: true,
+  },
+  {
+    id: '3',
+    name: 'Pop Extravaganza',
+    artist: 'PopStar',
+    genre: 'Pop',
+    date: '2026-05-10',
+    venue: 'Arena Center',
+    image: '/concert3.jpg',
+    capacity: 15000,
+    ticketPriceMin: 100,
+    ticketPriceMax: 140,
+    status: 'completed',
+    published: false,
+  },
+];
+
+function getFallbackConcertEvents(): ConcertEvent[] {
+  try {
+    const raw = localStorage.getItem(ADMIN_EVENTS_STORAGE_KEY);
+    if (raw) {
+      const migrated = migrateStoredEvents(JSON.parse(raw));
+      if (migrated && migrated.length > 0) {
+        return migrated;
+      }
+    }
+  } catch {
+    /* use demo */
+  }
+  return DEMO_ADMIN_EVENTS;
+}
+
 interface User {
   id: string;
   name: string;
@@ -129,50 +263,7 @@ const AdminDashboard: React.FC = () => {
   });
 
   useEffect(() => {
-    const mockEvents: ConcertEvent[] = [
-      {
-        id: '1',
-        name: 'Summer Rock Festival',
-        artist: 'Various Artists',
-        genre: 'Rock',
-        date: '2026-07-15',
-        venue: 'Central Stadium',
-        image: '/concert1.jpg',
-        capacity: 50000,
-        ticketPriceMin: 79.99,
-        ticketPriceMax: 99.99,
-        status: 'upcoming',
-        published: true,
-      },
-      {
-        id: '2',
-        name: 'Jazz Night Live',
-        artist: 'The Jazz Collective',
-        genre: 'Jazz',
-        date: '2026-06-20',
-        venue: 'Downtown Theater',
-        image: '/concert2.jpg',
-        capacity: 2500,
-        ticketPriceMin: 55,
-        ticketPriceMax: 75,
-        status: 'active',
-        published: true,
-      },
-      {
-        id: '3',
-        name: 'Pop Extravaganza',
-        artist: 'PopStar',
-        genre: 'Pop',
-        date: '2026-05-10',
-        venue: 'Arena Center',
-        image: '/concert3.jpg',
-        capacity: 15000,
-        ticketPriceMin: 100,
-        ticketPriceMax: 140,
-        status: 'completed',
-        published: false,
-      },
-    ];
+    let cancelled = false;
 
     const mockUsers: User[] = [
       {
@@ -216,8 +307,9 @@ const AdminDashboard: React.FC = () => {
       } else {
         setEvents(mockEvents);
       }
-    } catch {
-      setEvents(mockEvents);
+      setEvents(getFallbackConcertEvents());
+      setUsers(mockUsers);
+      setReportData(mockReportData);
     }
 
     setUsers(mockUsers);
@@ -485,6 +577,13 @@ const AdminDashboard: React.FC = () => {
                 <option value="cancelled">Cancelled</option>
               </select>
             </div>
+
+            <p className="admin-concert-count-line" aria-live="polite">
+              Showing {filteredEvents.length} of {events.length} events
+              {eventStatusFilter !== 'all' || eventSearchTerm.trim()
+                ? ' (filters applied)'
+                : ''}
+            </p>
 
             {showAddEventForm && (
               <div className="add-form">
