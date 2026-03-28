@@ -5196,6 +5196,7 @@
   ],
   "HISTORY": [
     {
+<<<<<<< HEAD
       "historyID": 1,
       "userID": 1,
       "concertID": 1,
@@ -5215,6 +5216,8 @@
       "queuedAt": "2026-01-01T15:00:00.000Z"
     },
     {
+=======
+>>>>>>> 8c672bcd58dd7568ed5ddf1afbc64202c876ec15
       "historyID": 2,
       "userID": 2,
       "concertID": 2,
@@ -20857,17 +20860,6 @@
       "queuedAt": "2026-12-27T00:59:00.000Z"
     },
     {
-      "historyID": 1261,
-      "userID": 61,
-      "concertID": 1,
-      "ticketCount": 1,
-      "totalCost": 47.5,
-      "waitTime": 3467,
-      "status": "queued",
-      "inLineStatus": "in_line",
-      "queuedAt": "2026-01-01T15:00:00.000Z"
-    },
-    {
       "historyID": 1262,
       "userID": 62,
       "concertID": 2,
@@ -34850,106 +34842,113 @@
       "queuedAt": "2026-03-28T01:04:52.128Z"
     },
     {
-      "historyID": 2404,
-      "userID": 147,
+      "historyID": 2435,
+      "userID": 50,
       "concertID": 1,
 >>>>>>> b385d693ca69b81d388bc6fb022144a9c572217a
       "ticketCount": 1,
       "totalCost": 0,
       "waitTime": 0,
+<<<<<<< HEAD
       "status": "queued",
       "inLineStatus": "in_line",
 <<<<<<< HEAD
       "queuedAt": "2026-03-28T01:04:52.128Z"
 =======
       "queuedAt": "2026-03-28T02:25:34.785Z"
+=======
+      "status": "cancelled",
+      "inLineStatus": "left",
+      "queuedAt": "2026-03-28T03:11:51.478Z"
+>>>>>>> 8c672bcd58dd7568ed5ddf1afbc64202c876ec15
     },
     {
-      "historyID": 2405,
-      "userID": 308,
+      "historyID": 2436,
+      "userID": 50,
+      "concertID": 85,
+      "ticketCount": 1,
+      "totalCost": 0,
+      "waitTime": 0,
+      "status": "cancelled",
+      "inLineStatus": "left",
+      "queuedAt": "2026-03-28T03:11:59.434Z"
+    },
+    {
+      "historyID": 2437,
+      "userID": 1,
+      "concertID": 1,
+      "ticketCount": 1,
+      "totalCost": 47.5,
+      "waitTime": 0,
+      "status": "queued",
+      "inLineStatus": "in_line",
+      "queuedAt": "2026-03-27T10:00:00.000Z"
+    },
+    {
+      "historyID": 2438,
+      "userID": 2,
+      "concertID": 1,
+      "ticketCount": 1,
+      "totalCost": 47.5,
+      "waitTime": 0,
+      "status": "queued",
+      "inLineStatus": "in_line",
+      "queuedAt": "2026-03-27T10:01:00.000Z"
+    },
+    {
+      "historyID": 2439,
+      "userID": 3,
+      "concertID": 1,
+      "ticketCount": 1,
+      "totalCost": 47.5,
+      "waitTime": 0,
+      "status": "queued",
+      "inLineStatus": "in_line",
+      "queuedAt": "2026-03-27T10:02:00.000Z"
+    },
+    {
+      "historyID": 2440,
+      "userID": 4,
+      "concertID": 1,
+      "ticketCount": 1,
+      "totalCost": 47.5,
+      "waitTime": 0,
+      "status": "queued",
+      "inLineStatus": "in_line",
+      "queuedAt": "2026-03-27T10:03:00.000Z"
+    },
+    {
+      "historyID": 2441,
+      "userID": 5,
+      "concertID": 1,
+      "ticketCount": 1,
+      "totalCost": 47.5,
+      "waitTime": 0,
+      "status": "queued",
+      "inLineStatus": "in_line",
+      "queuedAt": "2026-03-27T10:04:00.000Z"
+    },
+    {
+      "historyID": 2442,
+      "userID": 50,
+      "concertID": 1,
+      "ticketCount": 1,
+      "totalCost": 86.59,
+      "waitTime": 61843,
+      "status": "completed",
+      "inLineStatus": "entered",
+      "queuedAt": "2026-03-27T10:05:00.000Z"
+    },
+    {
+      "historyID": 2443,
+      "userID": 50,
       "concertID": 1,
       "ticketCount": 1,
       "totalCost": 0,
       "waitTime": 0,
       "status": "queued",
       "inLineStatus": "in_line",
-      "queuedAt": "2026-03-28T02:26:02.594Z"
-    },
-    {
-      "historyID": 2406,
-      "userID": 309,
-      "concertID": 1,
-      "ticketCount": 1,
-      "totalCost": 0,
-      "waitTime": 0,
-      "status": "queued",
-      "inLineStatus": "in_line",
-      "queuedAt": "2026-03-28T02:35:15.409Z"
-    },
-    {
-      "historyID": 2407,
-      "userID": 310,
-      "concertID": 1,
-      "ticketCount": 1,
-      "totalCost": 0,
-      "waitTime": 0,
-      "status": "queued",
-      "inLineStatus": "in_line",
-      "queuedAt": "2026-03-28T02:35:35.570Z"
-    },
-    {
-      "historyID": 2408,
-      "userID": 311,
-      "concertID": 1,
-      "ticketCount": 1,
-      "totalCost": 0,
-      "waitTime": 0,
-      "status": "queued",
-      "inLineStatus": "in_line",
-      "queuedAt": "2026-03-28T02:36:04.632Z"
-    },
-    {
-      "historyID": 2409,
-      "userID": 312,
-      "concertID": 1,
-      "ticketCount": 1,
-      "totalCost": 0,
-      "waitTime": 0,
-      "status": "queued",
-      "inLineStatus": "in_line",
-      "queuedAt": "2026-03-28T02:36:30.146Z"
-    },
-    {
-      "historyID": 2410,
-      "userID": 313,
-      "concertID": 1,
-      "ticketCount": 1,
-      "totalCost": 0,
-      "waitTime": 0,
-      "status": "queued",
-      "inLineStatus": "in_line",
-      "queuedAt": "2026-03-28T02:38:41.578Z"
-    },
-    {
-      "historyID": 2411,
-      "userID": 314,
-      "concertID": 1,
-      "ticketCount": 1,
-      "totalCost": 0,
-      "waitTime": 0,
-      "status": "queued",
-      "inLineStatus": "in_line",
-      "queuedAt": "2026-03-28T02:38:52.808Z"
-    },
-    {
-      "historyID": 2412,
-      "userID": 315,
-      "concertID": 1,
-      "ticketCount": 1,
-      "totalCost": 0,
-      "waitTime": 0,
-      "status": "queued",
-      "inLineStatus": "in_line",
+<<<<<<< HEAD
       "queuedAt": "2026-03-28T02:41:23.763Z"
     },
     {
@@ -35194,6 +35193,9 @@
       "inLineStatus": "in_line",
       "queuedAt": "2026-03-28T02:57:45.659Z"
 >>>>>>> b385d693ca69b81d388bc6fb022144a9c572217a
+=======
+      "queuedAt": "2026-03-28T03:15:48.354Z"
+>>>>>>> 8c672bcd58dd7568ed5ddf1afbc64202c876ec15
     }
   ],
   "ADMIN": [
