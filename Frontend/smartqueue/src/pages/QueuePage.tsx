@@ -3,17 +3,6 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import '../styling/QueuePage.css';
 
-/** Concert by ID — same IDs as HomePage (1=Summer, 2=Rock Night, 3=Jazz) */
-function getConcertById(concertId: string | undefined): { name: string; artist: string; date: string; venue: string } | null {
-  if (!concertId) return null;
-  const concerts: Record<string, { name: string; artist: string; date: string; venue: string }> = {
-    '1': { name: 'Summer Music Festival', artist: 'Various Artists', date: '2026-07-15', venue: 'Central Park' },
-    '2': { name: 'Rock Night', artist: 'The Electric Band', date: '2026-06-20', venue: 'Madison Square Garden' },
-    '3': { name: 'Jazz Evening', artist: 'Miles & Friends', date: '2026-05-30', venue: 'Blue Note' },
-  };
-  return concerts[concertId] ?? null;
-}
-
 interface QueueStatus {
   position: number;
   totalInQueue: number;
@@ -24,6 +13,21 @@ interface QueueStatus {
   venue: string;
 }
 
+interface QueueStatusResponse {
+  success: boolean;
+  data?: {
+    position: number;
+    totalInQueue: number;
+    estimatedWaitTime: string;
+    concertName: string;
+    artist: string;
+    date: string;
+    venue: string;
+    isInQueue: boolean;
+  };
+  message?: string;
+}
+
 const QueuePage: React.FC = () => {
   const { concertId } = useParams<{ concertId: string }>();
   const { user } = useAuth();
@@ -31,56 +35,113 @@ const QueuePage: React.FC = () => {
   const [queueStatus, setQueueStatus] = useState<QueueStatus | null>(null);
   const [isInQueue, setIsInQueue] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!concertId) return;
-
-    // TODO: Replace with actual API call
-    const concert = getConcertById(concertId);
-    if (!concert) {
+    if (!concertId) {
       setLoading(false);
+      setError('Missing concert id.');
       return;
     }
-    setTimeout(() => {
-      const mockQueueStatus: QueueStatus = {
-        position: Math.floor(Math.random() * 1000) + 1,
-        totalInQueue: 2500,
-        estimatedWaitTime: `${Math.floor(Math.random() * 60) + 10} minutes`,
-        concertName: concert.name,
-        artist: concert.artist,
-        date: concert.date,
-        venue: concert.venue,
-      };
-      setQueueStatus(mockQueueStatus);
-      setIsInQueue(true);
-      setLoading(false);
-    }, 1000);
 
-    // Simulate queue position updates
-    const interval = setInterval(() => {
-      setQueueStatus(prev => {
-        if (!prev) return prev;
-        const newPosition = Math.max(1, prev.position - Math.floor(Math.random() * 5));
-        return {
-          ...prev,
-          position: newPosition,
-          estimatedWaitTime: `${Math.max(1, parseInt(prev.estimatedWaitTime) - 1)} minutes`,
-        };
+    let mounted = true;
+
+    const fetchQueueStatus = async () => {
+      try {
+        const userIdParam = user?.id ? `?userId=${encodeURIComponent(user.id)}` : '';
+        const response = await fetch(`http://localhost:5000/api/queue/${concertId}${userIdParam}`);
+        const payload = (await response.json()) as QueueStatusResponse;
+
+        if (!mounted) return;
+
+        if (!response.ok || !payload.success || !payload.data) {
+          setError(payload.message || 'Unable to load queue status.');
+          setLoading(false);
+          return;
+        }
+
+        setQueueStatus({
+          position: payload.data.position,
+          totalInQueue: payload.data.totalInQueue,
+          estimatedWaitTime: payload.data.estimatedWaitTime,
+          concertName: payload.data.concertName,
+          artist: payload.data.artist,
+          date: payload.data.date,
+          venue: payload.data.venue,
+        });
+        setIsInQueue(payload.data.isInQueue);
+        setError(null);
+        setLoading(false);
+      } catch {
+        if (!mounted) return;
+        setError('Unable to connect to server.');
+        setLoading(false);
+      }
+    };
+
+    fetchQueueStatus();
+    const interval = setInterval(fetchQueueStatus, 5000);
+
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, [concertId, user?.id]);
+
+  const handleJoinQueue = async () => {
+    if (!concertId || !user?.id) {
+      return;
+    }
+    try {
+      const res = await fetch('http://localhost:5000/api/queue/join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ concertId, userId: user.id }),
       });
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, [concertId]);
-
-  const handleJoinQueue = () => {
-    setIsInQueue(true);
-    // TODO: API call to join queue
+      const payload = (await res.json()) as { success: boolean; message?: string; activeConcertId?: number };
+      if (!res.ok || !payload.success) {
+        if (payload.activeConcertId) {
+          const goToActive = window.confirm('You are already in another active queue. Go to that queue now?');
+          if (goToActive) {
+            navigate(`/queue/${payload.activeConcertId}`);
+          }
+          return;
+        }
+        window.alert(payload.message || 'Unable to join queue.');
+        return;
+      }
+      setIsInQueue(true);
+      // Queue status is re-polled every 5 seconds by useEffect.
+    } catch {
+      window.alert('Unable to connect to server.');
+    }
   };
 
-  const handleLeaveQueue = () => {
-    setIsInQueue(false);
-    navigate('/home');
-    // TODO: API call to leave queue
+  const handleLeaveQueue = async () => {
+    if (!concertId || !user?.id) {
+      setIsInQueue(false);
+      navigate('/home');
+      return;
+    }
+
+    try {
+      const res = await fetch('http://localhost:5000/api/queue/leave', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ concertId, userId: user.id }),
+      });
+      const payload = (await res.json()) as { success: boolean; message?: string };
+
+      if (!res.ok || !payload.success) {
+        window.alert(payload.message || 'Unable to leave queue right now.');
+        return;
+      }
+
+      setIsInQueue(false);
+      navigate('/home');
+    } catch {
+      window.alert('Unable to connect to server.');
+    }
   };
 
   const handleProceedToSeating = () => {
@@ -99,6 +160,7 @@ const QueuePage: React.FC = () => {
     return (
       <div className="queue-page error">
         <h2>Queue not found</h2>
+        {error && <p>{error}</p>}
         <Link to="/home">Return to Home</Link>
       </div>
     );

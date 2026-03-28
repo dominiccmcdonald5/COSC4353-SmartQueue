@@ -8,6 +8,7 @@ import '../styling/UserDashboard.css';
 
 interface QueueHistory {
   id: string;
+  concertID: number;
   concertName: string;
   artist: string;
   genre: string;
@@ -139,6 +140,7 @@ const UserDashboard: React.FC = () => {
           const historyStatus = concert.history?.status || 'queued';
           return {
             id: String(concert.history?.historyID ?? concert.concertID),
+            concertID: Number(concert.concertID),
             concertName: concert.concertName,
             artist: concert.artistName,
             genre: concert.genre,
@@ -380,6 +382,11 @@ const UserDashboard: React.FC = () => {
                         <span className="status-dot"></span>
                         <span className="status-text">Sold Out</span>
                       </>
+                    )}
+                    {item.queueStatus === 'pending' && (
+                      <Link className="resume-queue-link" to={`/queue/${item.concertID}`}>
+                        Open Queue
+                      </Link>
                     )}
                   </div>
                 </div>

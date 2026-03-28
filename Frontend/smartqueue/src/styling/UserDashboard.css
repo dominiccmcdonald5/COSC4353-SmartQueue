@@ -1088,6 +1088,24 @@
   line-height: 1.2;
 }
 
+.resume-queue-link {
+  margin-top: 0.75rem;
+  padding: 0.4rem 0.7rem;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+  text-decoration: none;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+}
+
+.resume-queue-link:hover {
+  background: rgba(255, 255, 255, 0.32);
+}
+
 /* Concert Image */
 .concert-image {
   flex-shrink: 0;
