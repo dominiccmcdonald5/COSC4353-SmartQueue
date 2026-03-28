@@ -133,6 +133,69 @@ function validateEditPayload(payload) {
   return errors;
 }
 
+/** POST — create a new concert; persists to mockDataStore.json. */
+async function createConcert(req, res) {
+  try {
+    const payload = await readJsonBody(req);
+    const errors = [];
+
+    if (!payload.concertName || typeof payload.concertName !== 'string' || !payload.concertName.trim()) {
+      errors.push('concertName is required');
+    }
+    if (!payload.artistName || typeof payload.artistName !== 'string' || !payload.artistName.trim()) {
+      errors.push('artistName is required');
+    }
+    if (!payload.genre || typeof payload.genre !== 'string' || !payload.genre.trim()) {
+      errors.push('genre is required');
+    }
+    if (!payload.venue || typeof payload.venue !== 'string' || !payload.venue.trim()) {
+      errors.push('venue is required');
+    }
+    if (!payload.date || Number.isNaN(new Date(payload.date).getTime())) {
+      errors.push('date must be a valid date');
+    }
+    if (!Number.isInteger(Number(payload.capacity)) || Number(payload.capacity) < 1) {
+      errors.push('capacity must be a positive integer');
+    }
+    const price = Number(payload.ticketPrice);
+    if (!Number.isFinite(price) || price < 0) {
+      errors.push('ticketPrice must be a non-negative number');
+    }
+
+    if (errors.length > 0) {
+      sendJson(res, 400, { success: false, errors });
+      return;
+    }
+
+    const maxID = allMockData.CONCERT.reduce((max, c) => Math.max(max, c.concertID), 0);
+    const newConcert = {
+      concertID: maxID + 1,
+      concertName: payload.concertName.trim(),
+      artistName: payload.artistName.trim(),
+      genre: payload.genre.trim(),
+      date: new Date(payload.date).toISOString(),
+      venue: payload.venue.trim(),
+      capacity: Number(payload.capacity),
+      ticketPrice: Number(price.toFixed(2)),
+      concertImage: (typeof payload.concertImage === 'string' && payload.concertImage.trim())
+        ? payload.concertImage.trim()
+        : `https://picsum.photos/seed/smartqueue-concert-${maxID + 1}/600/400`,
+      concertStatus: 'open',
+    };
+
+    allMockData.CONCERT.push(newConcert);
+    persistMockData(allMockData);
+
+    sendJson(res, 201, {
+      success: true,
+      message: 'Concert created successfully',
+      concert: newConcert,
+    });
+  } catch (error) {
+    sendJson(res, 400, { success: false, message: error.message || 'Unable to create concert' });
+  }
+}
+
 /** PUT — partial update by concertID; persists to mockDataStore.json. */
 async function editConcert(req, res, rawId) {
   const concertID = Number(rawId);
@@ -232,6 +295,7 @@ function deleteConcert(req, res, rawId) {
 
 module.exports = {
   getAllConcerts,
+  createConcert,
   editConcert,
   deleteConcert,
 };

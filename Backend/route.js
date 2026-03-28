@@ -8,7 +8,7 @@ const updatePass = require('./PassPurchase/updatePass');
 const services = require('./ServiceManagement/services');
 const adminQueue = require('./AdminQueue/queue');
 const concerts = require('./ConcertManagement/concerts');
-const concerts = require('./Concerts/concerts');
+const concertsLegacy = require('./Concerts/concerts');
 const dataReportStats = require('./AdminDataReport/dataReportStats');
 
 function routes(req, res) {
@@ -41,29 +41,20 @@ function routes(req, res) {
   if (pathname === '/api/user/pass/update' && method === 'POST') {
     return updatePass.updateUserPassStatus(req, res);
   }
-   if (URL === '/api/user/pass/update' && method === 'POST') {
-       return updatePass.updateUserPassStatus(req, res);
-   }
 
-    // Concert routes
-    if (URL === '/api/concerts' && method === 'GET'){
-        return concerts.handleGetConcerts(req, res);
-    }
+  if (pathname === '/api/admin/data-report' && method === 'GET') {
+    return dataReportStats.getDataReportStats(req, res);
+  }
 
-    if (URL.match(/^\/api\/concerts\/\d+$/) && method === 'GET') {
-        const concertId = URL.split('/').pop();
-        return concerts.handleGetConcertById(req, res, concertId);
-    }
+  /* —— Concert lookup (legacy) —— */
+  if (pathname === '/api/concerts' && method === 'GET' ) {
+    return concertsLegacy.handleGetConcerts(req, res);
+  }
 
-    // Admin data report route
-    if (URL === '/api/admin/data-report' && method === 'GET') {
-        return dataReportStats.getDataReportStats(req, res);
-    }
-    
-    /*if (URL.startsWith('/signup') && method === 'POST') {
-        return actions.handleSignup(req, res);
-    } */
-    
+  if (/^\/api\/concerts\/\d+$/.test(pathname) && method === 'GET') {
+    const concertId = pathname.split('/').pop();
+    return concertsLegacy.handleGetConcertById(req, res, concertId);
+  }
 
   /* —— Service management (admin) —— */
   if (pathname === '/api/services' && method === 'GET') {
@@ -79,17 +70,21 @@ function routes(req, res) {
     return services.updateService(req, res, serviceID);
   }
 
-  /* —— Concert events (admin) — same shape as mockData CONCERT —— */
-  if (pathname === '/api/concerts' && method === 'GET') {
+  /* —— Concert events admin CRUD —— */
+  if (pathname === '/api/admin/concerts' && method === 'GET') {
     return concerts.getAllConcerts(req, res);
   }
 
-  if (method === 'PUT' && /^\/api\/concerts\/\d+$/.test(pathname)) {
+  if (pathname === '/api/admin/concerts' && method === 'POST') {
+    return concerts.createConcert(req, res);
+  }
+
+  if (method === 'PUT' && /^\/api\/admin\/concerts\/\d+$/.test(pathname)) {
     const concertID = pathname.split('/').pop();
     return concerts.editConcert(req, res, concertID);
   }
 
-  if (method === 'DELETE' && /^\/api\/concerts\/\d+$/.test(pathname)) {
+  if (method === 'DELETE' && /^\/api\/admin\/concerts\/\d+$/.test(pathname)) {
     const concertID = pathname.split('/').pop();
     return concerts.deleteConcert(req, res, concertID);
   }

@@ -3,7 +3,7 @@ const url = require('url');
 const Routes = require('./route'); 
 
 const map_route = {
-  GET: ['/api/ping', '/api/services', '/api/admin/queue', '/api/concerts'],
+  GET: ['/api/ping', '/api/services', '/api/admin/queue', '/api/concerts', '/api/admin/data-report', '/api/admin/concerts'],
   POST: [
     '/api/login',
     '/api/signup',
@@ -13,23 +13,10 @@ const map_route = {
     '/api/services',
     '/api/admin/queue/serve-next',
     '/api/queue/join',
+    '/api/admin/concerts',
   ],
-  PUT: ['/api/services/', '/api/concerts/'],
-  DELETE: ['/api/concerts/'],
-    'GET': [
-        '/api/concerts',  
-        '/api/ping',
-        '/api/admin/data-report'  // Added the admin route
-    ],
-    'POST': [
-        '/api/login',
-        '/api/signup',
-        '/api/user/history',
-        '/api/user/stats',
-        '/api/user/pass/update'
-    ],
-    'PUT': [],
-    'DELETE': [],
+  PUT: ['/api/services/', '/api/admin/concerts/'],
+  DELETE: ['/api/admin/concerts/'],
 };
 
 const server = http.createServer((req, res) => {
