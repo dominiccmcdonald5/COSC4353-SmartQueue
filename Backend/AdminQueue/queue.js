@@ -133,6 +133,7 @@ function getQueueStatusByConcert(req, res, rawConcertId, userIdQuery) {
       position,
       estimatedWaitTime: `${estimatedWaitMinutes} minutes`,
       isInQueue: userRowIndex >= 0,
+      isNextInLine: position === 6,
     },
   });
 }
