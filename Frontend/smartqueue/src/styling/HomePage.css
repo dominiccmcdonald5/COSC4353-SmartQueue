@@ -720,14 +720,13 @@
     justify-content: center;
     flex-wrap: wrap;
     border-radius: 30px;
-    display: flex; 
+    display: flex;
   }
   
   .dashboard-link, .admin-link, .pass-link, .logout-btn {
     font-size: 0.8rem;
     padding: 0.5rem 1rem;
   }
-}
   
   .home-page .hero h1 {
     font-size: 2rem;
@@ -770,6 +769,7 @@
   .concerts-grid h3 {
     font-size: 1.5rem;
   }
+} /* <-- THIS CLOSING BRACE WAS MISSING! */
 
 @media (max-width: 480px) {
   .home-page .concert-info {
