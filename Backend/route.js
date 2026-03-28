@@ -132,6 +132,10 @@ function routes(req, res) {
     return adminQueue.leaveQueue(req, res);
   }
 
+  if (pathname === '/api/payment/complete' && method === 'POST') {
+    return adminQueue.completePayment(req, res);
+  }
+
   res.writeHead(404, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify({ error: 'Route Not Found' }));
 }

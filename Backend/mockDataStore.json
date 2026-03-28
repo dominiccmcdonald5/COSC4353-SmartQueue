@@ -31333,11 +31333,11 @@
       "historyID": 2402,
       "userID": 147,
       "concertID": 85,
-      "ticketCount": 1,
-      "totalCost": 0,
-      "waitTime": 0,
-      "status": "queued",
-      "inLineStatus": "in_line",
+      "ticketCount": 2,
+      "totalCost": 156.99,
+      "waitTime": 3336,
+      "status": "completed",
+      "inLineStatus": "entered",
       "queuedAt": "2026-03-28T00:57:59.872Z"
     },
     {
