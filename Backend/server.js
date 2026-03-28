@@ -8,6 +8,7 @@ const map_route = {
     '/api/services',
     '/api/admin/queue',
     '/api/concerts',
+    '/api/queue/',
     '/api/admin/data-report',
     '/api/admin/concerts',
     '/api/admin/users',
