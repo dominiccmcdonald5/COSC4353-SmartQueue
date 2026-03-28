@@ -32,7 +32,7 @@ const ConcertSkeleton: React.FC = () => (
 );
 
 const HomePage: React.FC = () => {
-  const { user, logout } = useAuth(); // Removed isAdmin and isUser for now
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [concerts, setConcerts] = useState<Concert[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -44,22 +44,6 @@ const HomePage: React.FC = () => {
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'date' | 'name' | 'price'>('date');
   const [genres, setGenres] = useState<string[]>([]);
-  
-  // Favorites state
-  const [favorites, setFavorites] = useState<string[]>([]);
-
-  // Load favorites from localStorage
-  useEffect(() => {
-    const savedFavorites = localStorage.getItem('favorite_concerts');
-    if (savedFavorites) {
-      setFavorites(JSON.parse(savedFavorites));
-    }
-  }, []);
-
-  // Save favorites to localStorage when updated
-  useEffect(() => {
-    localStorage.setItem('favorite_concerts', JSON.stringify(favorites));
-  }, [favorites]);
 
   // Extract unique genres from concerts
   useEffect(() => {
@@ -98,15 +82,6 @@ const HomePage: React.FC = () => {
     const now = new Date();
     const daysUntil = Math.ceil((concertDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
     return daysUntil > 30 && daysUntil <= 60;
-  };
-
-  // Toggle favorite
-  const toggleFavorite = (concertId: string) => {
-    setFavorites(prev => 
-      prev.includes(concertId) 
-        ? prev.filter(id => id !== concertId)
-        : [...prev, concertId]
-    );
   };
 
   // Filter and sort concerts
@@ -372,13 +347,6 @@ const HomePage: React.FC = () => {
                           {concert.genre}
                         </div>
                       )}
-                      
-                      <button 
-                        onClick={() => toggleFavorite(concert.id)}
-                        className={`favorite-btn ${favorites.includes(concert.id) ? 'active' : ''}`}
-                      >
-                        {favorites.includes(concert.id) ? '❤️' : '🤍'}
-                      </button>
                     </div>
                     
                     <div className="concert-info">
