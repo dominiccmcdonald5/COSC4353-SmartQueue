@@ -239,6 +239,12 @@
   margin-bottom: 1.5rem;
 }
 
+.form-field-stacked {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
 .form-grid input,
 .form-grid select {
   padding: 0.75rem;
@@ -248,11 +254,23 @@
   transition: border-color 0.2s;
 }
 
+.form-grid input.is-invalid,
+.form-grid select.is-invalid {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.12);
+}
+
 .form-grid input:focus,
 .form-grid select:focus {
   outline: none;
   border-color: #6366f1;
   box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
+}
+
+.form-grid input.is-invalid:focus,
+.form-grid select.is-invalid:focus {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.2);
 }
 
 .form-actions {
@@ -361,6 +379,28 @@
 
 .admin-users-spent-input {
   max-width: 7rem;
+}
+
+.admin-users-cell-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.admin-users-cell-stack .field-inline-error {
+  font-size: 0.7rem;
+  line-height: 1.2;
+}
+
+.admin-users-table td input.is-invalid {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.12);
+}
+
+.admin-users-table td input.is-invalid:focus {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.2);
 }
 
 .admin-users-table-strong {
@@ -833,6 +873,12 @@
   box-sizing: border-box;
 }
 
+.form-field-venue .form-field-control.is-invalid,
+.form-field-venue .venue-other-input.is-invalid {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.12);
+}
+
 .form-field-venue .venue-other-input {
   width: 100%;
   margin-top: 0.5rem;
@@ -927,6 +973,16 @@
   box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
 }
 
+.event-title-input.is-invalid {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.12);
+}
+
+.event-title-input.is-invalid:focus {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.2);
+}
+
 .event-status-field {
   display: flex;
   flex-direction: column;
@@ -971,6 +1027,24 @@
   outline: none;
   border-color: #6366f1;
   box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.12);
+}
+
+.event-field-input.is-invalid {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.12);
+}
+
+.event-field-input.is-invalid:focus {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.2);
+}
+
+.field-inline-error {
+  display: block;
+  margin-top: 0.28rem;
+  font-size: 0.72rem;
+  color: #b91c1c;
+  font-weight: 500;
 }
 
 .event-venue-edit-dd {
