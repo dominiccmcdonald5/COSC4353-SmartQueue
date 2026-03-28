@@ -113,14 +113,13 @@ const HomePage: React.FC = () => {
 
   const filteredConcerts = getFilteredAndSortedConcerts();
 
-  const handleJoinQueue = async (concertId: string) => {
+  const handleJoinQueue = (concertId: string) => {
     if (!user) {
       navigate('/login');
       return;
     }
-    
-    // For now, just show an alert since queue functionality will be implemented later
-    alert(`Queue functionality coming soon! You clicked on concert ${concertId}`);
+
+    navigate(`/queue/${concertId}`);
   };
 
   const handleLogout = () => {
