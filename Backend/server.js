@@ -23,6 +23,7 @@ const map_route = {
     '/api/admin/queue/serve-next',
     '/api/queue/join',
     '/api/queue/leave',
+    '/api/payment/complete',
     '/api/admin/concerts',
     '/api/admin/users',
   ],

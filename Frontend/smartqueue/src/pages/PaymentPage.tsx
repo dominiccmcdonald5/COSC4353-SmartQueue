@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import '../styling/PaymentPage.css';
 
 interface SelectedSeat {
@@ -25,6 +26,7 @@ interface PaymentForm {
 
 const PaymentPage: React.FC = () => {
   const { concertId } = useParams<{ concertId: string }>();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [selectedSeats, setSelectedSeats] = useState<SelectedSeat[]>([]);
   const [paymentForm, setPaymentForm] = useState<PaymentForm>({
@@ -107,9 +109,32 @@ const PaymentPage: React.FC = () => {
     setProcessing(true);
 
     try {
-      // TODO: Replace with actual payment processing API call
       // Simulate payment processing
       await new Promise(resolve => setTimeout(resolve, 3000));
+
+      const userID = Number(user?.id);
+      const concertID = Number(concertId);
+      if (!Number.isInteger(userID) || userID <= 0 || !Number.isInteger(concertID) || concertID <= 0) {
+        throw new Error('Missing user or concert information for payment confirmation');
+      }
+
+      const paymentResponse = await fetch('http://localhost:5000/api/payment/complete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: userID,
+          concertId: concertID,
+          ticketCount: selectedSeats.length,
+          totalCost: getGrandTotal(),
+        }),
+      });
+
+      const paymentPayload = await paymentResponse.json();
+      if (!paymentResponse.ok || !paymentPayload.success) {
+        throw new Error(paymentPayload.message || 'Failed to finalize payment status');
+      }
       
       // Clear selected seats from storage
       sessionStorage.removeItem('selectedSeats');
@@ -118,7 +143,7 @@ const PaymentPage: React.FC = () => {
       setShowSuccessModal(true);
     } catch (error) {
       console.error('Payment failed:', error);
-      // Handle payment failure
+      window.alert(error instanceof Error ? error.message : 'Payment failed. Please try again.');
     } finally {
       setProcessing(false);
     }
