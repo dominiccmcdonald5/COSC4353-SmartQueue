@@ -2,17 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import '../styling/SeatingMapPage.css';
 
-/** Concert details by ID — matches HomePage concert list so seating shows the correct concert */
-function getConcertById(concertId: string | undefined): { name: string; artist: string; date: string; venue: string } | null {
-  if (!concertId) return null;
-  const concerts: Record<string, { name: string; artist: string; date: string; venue: string }> = {
-    '1': { name: 'Summer Music Festival', artist: 'Various Artists', date: '2026-07-15', venue: 'Central Park' },
-    '2': { name: 'Rock Night', artist: 'The Electric Band', date: '2026-06-20', venue: 'Madison Square Garden' },
-    '3': { name: 'Jazz Evening', artist: 'Miles & Friends', date: '2026-05-30', venue: 'Blue Note' },
-  };
-  return concerts[concertId] ?? null;
-}
-
 interface Seat {
   id: string;
   section: string;
@@ -28,6 +17,51 @@ interface SeatingSection {
   color: string;
   /** For Main/Side/Rear: 'left' | 'center' | 'right' | 'behind'. Omit for single-block sections. */
   subsection?: 'left' | 'center' | 'right' | 'behind';
+}
+
+interface ConcertInfo {
+  name: string;
+  artist: string;
+  date: string;
+  venue: string;
+  availableTickets: number | null;
+  totalTickets: number | null;
+}
+
+interface ApiConcertResponse {
+  success: boolean;
+  concert?: {
+    name?: string;
+    artist?: string;
+    date?: string;
+    venue?: string;
+    availableTickets?: number;
+    totalTickets?: number;
+  };
+  message?: string;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+// Deterministic shuffle so the same concert id keeps the same seat pattern.
+function buildAvailabilityMask(totalSeats: number, availableSeats: number, seedInput: string): Set<number> {
+  const seats = Array.from({ length: totalSeats }, (_, i) => i);
+  let seed = 0;
+  for (let i = 0; i < seedInput.length; i += 1) {
+    seed = (seed * 31 + seedInput.charCodeAt(i)) >>> 0;
+  }
+
+  for (let i = seats.length - 1; i > 0; i -= 1) {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    const j = seed % (i + 1);
+    const t = seats[i];
+    seats[i] = seats[j];
+    seats[j] = t;
+  }
+
+  return new Set(seats.slice(0, clamp(availableSeats, 0, totalSeats)));
 }
 
 function groupSeatsByRow(seats: Seat[]): Record<string, Seat[]> {
@@ -46,45 +80,106 @@ const SeatingMapPage: React.FC = () => {
   const [sections, setSections] = useState<SeatingSection[]>([]);
   const [selectedSeats, setSelectedSeats] = useState<Seat[]>([]);
   const [loading, setLoading] = useState(true);
+  const [concertLoading, setConcertLoading] = useState(true);
   const [hoveredSeat, setHoveredSeat] = useState<Seat | null>(null);
   const [popupPos, setPopupPos] = useState<{ x: number; y: number } | null>(null);
-  const [concertInfo, setConcertInfo] = useState<{ name: string; artist: string; date: string; venue: string } | null>(null);
+  const [concertInfo, setConcertInfo] = useState<ConcertInfo | null>(null);
 
   useEffect(() => {
-    const concert = getConcertById(concertId);
-    setConcertInfo(concert ? { name: concert.name, artist: concert.artist, date: concert.date, venue: concert.venue } : null);
+    if (!concertId) {
+      setConcertInfo(null);
+      setConcertLoading(false);
+      return;
+    }
+
+    let mounted = true;
+    const fetchConcertInfo = async () => {
+      setConcertLoading(true);
+      try {
+        const response = await fetch(`/api/concerts/${concertId}`);
+        const payload = (await response.json()) as ApiConcertResponse;
+
+        if (!mounted) return;
+
+        if (!response.ok || !payload.success || !payload.concert) {
+          setConcertInfo(null);
+          return;
+        }
+
+        setConcertInfo({
+          name: payload.concert.name || `Concert ${concertId}`,
+          artist: payload.concert.artist || '',
+          date: payload.concert.date || '',
+          venue: payload.concert.venue || '',
+          availableTickets: Number.isFinite(Number(payload.concert.availableTickets))
+            ? Number(payload.concert.availableTickets)
+            : null,
+          totalTickets: Number.isFinite(Number(payload.concert.totalTickets))
+            ? Number(payload.concert.totalTickets)
+            : null,
+        });
+      } catch {
+        if (!mounted) return;
+        setConcertInfo(null);
+      } finally {
+        if (mounted) setConcertLoading(false);
+      }
+    };
+
+    fetchConcertInfo();
+    return () => {
+      mounted = false;
+    };
   }, [concertId]);
   const concertNotFound = concertId && concertInfo === null;
 
   useEffect(() => {
     if (!concertId) return;
-    // TODO: Replace with actual API call — Main / Side / Rear layout
-    setTimeout(() => {
-      const rand = (p: number) => (Math.random() > p ? 'taken' : 'available') as 'taken' | 'available';
-      const mockSections: SeatingSection[] = [];
 
-      // Single block — 11 rows (A–K), 12 seats per side (24 per row), center walkway
-      const rows = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'];
-      const seatsPerSide = 12;
-      const mainSeats: Seat[] = [];
-      rows.forEach((row, ri) => {
-        for (let s = 1; s <= seatsPerSide * 2; s++) {
-          mainSeats.push({
-            id: `main-${concertId}-${row}-${s}`,
-            section: 'Orchestra',
-            row,
-            seatNumber: String(s),
-            price: 100 - ri * 6,
-            status: rand(0.5),
-          });
-        }
-      });
-      mockSections.push({ name: 'Orchestra', seats: mainSeats, color: '#64748b', subsection: 'center' });
+    setLoading(true);
+    // Single block — 11 rows (A–K), 12 seats per side (24 per row), center walkway
+    const rows = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'];
+    const seatsPerSide = 12;
+    const totalRenderedSeats = rows.length * seatsPerSide * 2;
 
-      setSections(mockSections);
-      setLoading(false);
-    }, 800);
-  }, [concertId]);
+    let targetAvailable = Math.round(totalRenderedSeats * 0.5);
+    if (
+      concertInfo &&
+      Number.isFinite(concertInfo.availableTickets) &&
+      Number.isFinite(concertInfo.totalTickets) &&
+      (concertInfo.totalTickets as number) > 0
+    ) {
+      const ratio = (concertInfo.availableTickets as number) / (concertInfo.totalTickets as number);
+      targetAvailable = Math.round(totalRenderedSeats * clamp(ratio, 0, 1));
+    }
+
+    const availableMask = buildAvailabilityMask(totalRenderedSeats, targetAvailable, String(concertId));
+    let seatIndex = 0;
+    const mainSeats: Seat[] = [];
+
+    rows.forEach((row, ri) => {
+      for (let s = 1; s <= seatsPerSide * 2; s++) {
+        mainSeats.push({
+          id: `main-${concertId}-${row}-${s}`,
+          section: 'Orchestra',
+          row,
+          seatNumber: String(s),
+          price: 100 - ri * 6,
+          status: availableMask.has(seatIndex) ? 'available' : 'taken',
+        });
+        seatIndex += 1;
+      }
+    });
+
+    setSections([{ name: 'Orchestra', seats: mainSeats, color: '#64748b', subsection: 'center' }]);
+    setLoading(false);
+  }, [concertId, concertInfo?.availableTickets, concertInfo?.totalTickets]);
+
+  const renderedTotalSeats = sections.reduce((sum, section) => sum + section.seats.length, 0);
+  const renderedAvailableSeats = sections.reduce(
+    (sum, section) => sum + section.seats.filter((seat) => seat.status === 'available' || seat.status === 'selected').length,
+    0,
+  );
 
   const handleSeatClick = (seat: Seat) => {
     if (seat.status === 'taken' || seat.status === 'reserved') return;
@@ -135,7 +230,7 @@ const SeatingMapPage: React.FC = () => {
     navigate(`/payment/${concertId}`);
   };
 
-  if (loading) {
+  if (loading || concertLoading) {
     return (
       <div className="seating-page loading">
         <p>Loading seating map...</p>
@@ -183,6 +278,12 @@ const SeatingMapPage: React.FC = () => {
           <div className="concert-info">
             <h2>{concertInfo.name}</h2>
             <p>{concertInfo.artist} • {concertInfo.venue} • {new Date(concertInfo.date).toLocaleDateString()}</p>
+            <p>
+              Seats Available:{' '}
+              {concertInfo.availableTickets != null && concertInfo.totalTickets != null
+                ? `${concertInfo.availableTickets.toLocaleString()} of ${concertInfo.totalTickets.toLocaleString()}`
+                : `${renderedAvailableSeats.toLocaleString()} of ${renderedTotalSeats.toLocaleString()}`}
+            </p>
           </div>
         )}
 
