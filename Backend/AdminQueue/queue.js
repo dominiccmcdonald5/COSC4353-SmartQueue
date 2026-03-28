@@ -330,10 +330,97 @@ async function leaveQueue(req, res) {
   }
 }
 
+async function completePayment(req, res) {
+  try {
+    const payload = await readJsonBody(req);
+    const concertID = Number(payload.concertId);
+    const userID = Number(payload.userId);
+    const ticketCount = Number(payload.ticketCount);
+    const totalCost = Number(payload.totalCost);
+
+    if (!Number.isInteger(concertID) || concertID <= 0 || !Number.isInteger(userID) || userID <= 0) {
+      sendJson(res, 400, { success: false, message: 'Valid concertId and userId are required' });
+      return;
+    }
+
+    if (!Number.isInteger(ticketCount) || ticketCount <= 0) {
+      sendJson(res, 400, { success: false, message: 'ticketCount must be a positive integer' });
+      return;
+    }
+
+    if (!Number.isFinite(totalCost) || totalCost < 0) {
+      sendJson(res, 400, { success: false, message: 'totalCost must be a non-negative number' });
+      return;
+    }
+
+    const activeRows = allMockData.HISTORY
+      .filter(
+        (h) =>
+          h.concertID === concertID &&
+          h.userID === userID &&
+          String(h.status).toLowerCase() === 'queued' &&
+          String(h.inLineStatus || '').toLowerCase() === 'in_line',
+      )
+      .sort((a, b) => {
+        const timeDiff = new Date(a.queuedAt).getTime() - new Date(b.queuedAt).getTime();
+        if (timeDiff !== 0) return timeDiff;
+        return Number(a.historyID) - Number(b.historyID);
+      });
+
+    let row;
+    if (activeRows.length > 0) {
+      row = activeRows[0];
+      const queuedAtMs = new Date(row.queuedAt).getTime();
+      const waitSeconds = Number.isFinite(queuedAtMs)
+        ? Math.max(0, Math.round((Date.now() - queuedAtMs) / 1000))
+        : Number(row.waitTime) || 0;
+
+      row.status = 'completed';
+      row.inLineStatus = 'entered';
+      row.ticketCount = ticketCount;
+      row.totalCost = Number(totalCost.toFixed(2));
+      row.waitTime = waitSeconds;
+    } else {
+      const nextHistoryID = allMockData.HISTORY.reduce((max, r) => Math.max(max, Number(r.historyID) || 0), 0) + 1;
+      row = {
+        historyID: nextHistoryID,
+        userID,
+        concertID,
+        ticketCount,
+        totalCost: Number(totalCost.toFixed(2)),
+        waitTime: 0,
+        status: 'completed',
+        inLineStatus: 'entered',
+        queuedAt: new Date().toISOString(),
+      };
+      allMockData.HISTORY.push(row);
+    }
+
+    persistMockData(allMockData);
+
+    sendJson(res, 200, {
+      success: true,
+      message: 'Payment completed and ticket status updated',
+      history: {
+        historyID: row.historyID,
+        userID: row.userID,
+        concertID: row.concertID,
+        status: row.status,
+        inLineStatus: row.inLineStatus,
+        ticketCount: row.ticketCount,
+        totalCost: row.totalCost,
+      },
+    });
+  } catch (e) {
+    sendJson(res, 400, { success: false, message: e.message || 'Bad request' });
+  }
+}
+
 module.exports = {
   getQueue,
   getQueueStatusByConcert,
   serveNext,
   joinQueue,
   leaveQueue,
+  completePayment,
 };
