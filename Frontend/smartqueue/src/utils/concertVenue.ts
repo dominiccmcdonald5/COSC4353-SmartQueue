@@ -20,6 +20,14 @@ export function venueOtherInputValue(venue: string): string {
   return venue === VENUE_OTHER ? '' : venue;
 }
 
+/** True if no venue is chosen or "Other" is selected without a custom name. */
+export function isVenueIncomplete(venue: string): boolean {
+  const sel = venueSelectValue(venue);
+  if (sel === '') return true;
+  if (sel === VENUE_OTHER) return !venueOtherInputValue(venue).trim();
+  return false;
+}
+
 export function isVenuePreset(venue: string): boolean {
   return VENUE_PRESETS.includes(venue as (typeof VENUE_PRESETS)[number]);
 }
