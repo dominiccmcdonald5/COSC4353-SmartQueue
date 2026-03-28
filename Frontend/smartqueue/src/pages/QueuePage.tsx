@@ -223,15 +223,15 @@ const QueuePage: React.FC = () => {
                 </button>
               )}
               
-              {/* Development/Demo button to skip queue */}
-              <button 
+              {/* Development/Demo button to skip queue              <button 
                 onClick={handleProceedToSeating}
                 className="skip-queue-btn"
                 style={{ backgroundColor: '#10b981', color: 'white' }}
               >
                 Skip Queue (Demo)
               </button>
-              
+              */}
+
               <button 
                 onClick={handleLeaveQueue}
                 className="leave-queue-btn"
@@ -251,12 +251,7 @@ const QueuePage: React.FC = () => {
           </div>
         )}
 
-        <div className="user-info">
-          <p>Logged in as: {user?.name}</p>
-          <Link to="/purchase-pass" className="premium-link">
-            Get Premium Pass for Priority Access
-          </Link>
-        </div>
+
       </main>
     </div>
   );
