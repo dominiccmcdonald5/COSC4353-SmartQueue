@@ -20,7 +20,7 @@
   margin: 0 auto;
   padding: 0 2rem;
   display: flex;
-  justify-content: space-between; /* Change from flex-end to space-between */
+  justify-content: space-between; 
   align-items: center;
   flex-wrap: wrap;
   gap: 1rem;
@@ -720,7 +720,7 @@
     justify-content: center;
     flex-wrap: wrap;
     border-radius: 30px;
-    display: flex; /* Change to flex on mobile for wrapping */
+    display: flex; 
   }
   
   .dashboard-link, .admin-link, .pass-link, .logout-btn {
