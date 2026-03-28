@@ -1,0 +1,17 @@
+{
+  "all": true,
+  "include": [
+    "../Backend/**/*.js"
+  ],
+  "exclude": [
+    "../Backend/node_modules/**",
+    "test/**",
+    ".nyc_output/**"
+  ],
+  "reporter": [
+    "text",
+    "html"
+  ],
+  "report-dir": "./coverage",
+  "temp-dir": "./.c8_output"
+}
