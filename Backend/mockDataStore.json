@@ -8522,8 +8522,8 @@
       "ticketCount": 4,
       "totalCost": 365,
       "waitTime": 2006,
-      "status": "queued",
-      "inLineStatus": "in_line",
+      "status": "cancelled",
+      "inLineStatus": "left",
       "queuedAt": "2026-04-02T21:27:00.000Z"
     },
     {
