@@ -4,6 +4,7 @@ const signup = require('./SignUp/signup');
 const userHistory = require('./UserDashboard/ConcertHistory/userHistory');
 const userStats = require('./UserDashboard/UserStats/userStats');
 const updatePass = require('./PassPurchase/updatePass');
+const concerts = require('./Concerts/concerts');
 const dataReportStats = require('./AdminDataReport/dataReportStats');
 
 function routes(req, res) {
@@ -36,9 +37,20 @@ function routes(req, res) {
        return updatePass.updateUserPassStatus(req, res);
    }
 
-   if (URL === '/api/admin/data-report' && method === 'GET') {
-       return dataReportStats.getDataReportStats(req, res);
-   }
+    // Concert routes
+    if (URL === '/api/concerts' && method === 'GET'){
+        return concerts.handleGetConcerts(req, res);
+    }
+
+    if (URL.match(/^\/api\/concerts\/\d+$/) && method === 'GET') {
+        const concertId = URL.split('/').pop();
+        return concerts.handleGetConcertById(req, res, concertId);
+    }
+
+    // Admin data report route
+    if (URL === '/api/admin/data-report' && method === 'GET') {
+        return dataReportStats.getDataReportStats(req, res);
+    }
     
     /*if (URL.startsWith('/signup') && method === 'POST') {
         return actions.handleSignup(req, res);

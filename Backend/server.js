@@ -2,26 +2,25 @@ const http = require('http');
 const url = require('url');
 const Routes = require('./route'); 
 
-
-
 const map_route = {
     'GET': [
-      '/api/admin/data-report'
+        '/api/concerts',  
+        '/api/ping',
+        '/api/admin/data-report'  // Added the admin route
     ],
     'POST': [
         '/api/login',
-      '/api/signup',
-      '/api/user/history',
-      '/api/user/stats',
-      '/api/user/pass/update'
+        '/api/signup',
+        '/api/user/history',
+        '/api/user/stats',
+        '/api/user/pass/update'
     ],
     'PUT': [],
     'DELETE': [],
 };
 
-
 const server = http.createServer((req, res) => {
-  res.setHeader("Access-Control-Allow-Origin", "*"); // Or specify your frontend URL
+  res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
@@ -46,6 +45,8 @@ const server = http.createServer((req, res) => {
     pathname.startsWith(route)
   );
 
+  console.log(`Route match: ${isMatch}`);
+
   if (isMatch) {
     return Routes(req, res);
   }
@@ -60,4 +61,12 @@ const PORT = process.env.PORT || 5000;
 // Start Server
 server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
+    console.log(`Available endpoints:`);
+    console.log(`  GET  /api/concerts`);
+    console.log(`  GET  /api/admin/data-report`);
+    console.log(`  POST /api/login`);
+    console.log(`  POST /api/signup`);
+    console.log(`  POST /api/user/history`);
+    console.log(`  POST /api/user/stats`);
+    console.log(`  POST /api/user/pass/update`);
 });
