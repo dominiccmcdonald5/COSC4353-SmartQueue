@@ -314,7 +314,7 @@ const HomePage: React.FC = () => {
           <div className="search-bar">
             <input
               type="text"
-              placeholder="Search by concert or artist..."
+              placeholder="        Search by concert or artist..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="search-input"
