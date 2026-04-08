@@ -312,14 +312,14 @@ const HomePage: React.FC = () => {
         {/* Search and Filter Section */}
         <div className="filters-section">
           <div className="search-bar">
+            <span className="search-icon">🔍</span>
             <input
               type="text"
-              placeholder="        Search by concert or artist..."
+              placeholder="Search by concert or artist..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="search-input"
             />
-            <span className="search-icon">🔍</span>
           </div>
           
           <div className="filter-controls">

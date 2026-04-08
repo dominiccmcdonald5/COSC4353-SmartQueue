@@ -8,6 +8,10 @@
 .queue-header {
   max-width: 800px;
   margin: 0 auto 2rem;
+  font-family: 'Tahoma', sans-serif;
+  text-shadow: 1px .5px .5px black;
+  font-style: italic;
+  color: white;
 }
 
 .queue-main {
@@ -86,19 +90,19 @@
 
 .progress {
   height: 100%;
-  background-color: #6366f1;
+  background: linear-gradient(135deg, #8093F1 0%, #C96DE8 100%);
   transition: width 0.3s ease;
 }
 
 .queue-actions {
   display: flex;
-  gap: 1rem;
+  gap: 2rem;
   justify-content: center;
-  margin: 2rem 0;
+  margin: 3rem 0;
   flex-wrap: wrap;
 }
 
-.skip-queue-btn {
+/*.skip-queue-btn {
   background-color: #10b981;
   color: white;
   padding: 0.75rem 1.5rem;
@@ -112,7 +116,7 @@
 .skip-queue-btn:hover {
   background-color: #059669;
   transform: translateY(-2px);
-}
+}*/
 
 .queue-tips {
   background: #f8fafc;
@@ -133,6 +137,7 @@
 
 .queue-tips li {
   margin-bottom: 0.5rem;
+  
 }
 
 .join-queue-section {
@@ -176,4 +181,31 @@
 .premium-link:hover {
   background-color: #6366f1;
   color: white;
+}
+
+.queue-conflict-dialog-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.queue-conflict-dialog-actions .confirm-dialog-btn {
+  width: 100%;
+  text-align: center;
+}
+
+.queue-conflict-btn-outline {
+  background: #fff;
+  color: #4f46e5;
+  border-color: #c7d2fe;
+}
+
+.queue-conflict-btn-outline:hover:not(:disabled) {
+  background: #eef2ff;
+  border-color: #a5b4fc;
+}
+
+.queue-conflict-dialog-actions .confirm-dialog-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
 }

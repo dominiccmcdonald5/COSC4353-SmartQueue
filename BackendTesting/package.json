@@ -3,6 +3,23 @@
   "private": true,
   "type": "commonjs",
   "scripts": {
-    "test": "node --test --test-concurrency=1"
+    "test": "node --test --test-concurrency=1",
+    "coverage": "node --experimental-test-coverage --test --test-concurrency=1"
+  },
+  "devDependencies": {
+    "c8": "^11.0.0",
+    "nyc": "^18.0.0"
+  },
+  "nyc": {
+    "all": true,
+    "include": [
+      "../Backend/**/*.js"
+    ],
+    "exclude": [
+      "../Backend/node_modules/**",
+      "../Backend/server.js"
+    ],
+    "report-dir": "./coverage",
+    "temp-dir": "./.nyc_output"
   }
 }
