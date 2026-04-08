@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import '../components/ui/ConfirmDialog.css';
 import '../styling/QueuePage.css';
 
 interface QueueStatus {
@@ -36,6 +37,22 @@ const QueuePage: React.FC = () => {
   const [isInQueue, setIsInQueue] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeQueueDialog, setActiveQueueDialog] = useState<{
+    open: boolean;
+    otherConcertId: number | null;
+  }>({ open: false, otherConcertId: null });
+  const [queueSwitchBusy, setQueueSwitchBusy] = useState(false);
+
+  useEffect(() => {
+    if (!activeQueueDialog.open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !queueSwitchBusy) {
+        setActiveQueueDialog({ open: false, otherConcertId: null });
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [activeQueueDialog.open, queueSwitchBusy]);
 
   useEffect(() => {
     if (!concertId) {
@@ -100,11 +117,8 @@ const QueuePage: React.FC = () => {
       });
       const payload = (await res.json()) as { success: boolean; message?: string; activeConcertId?: number };
       if (!res.ok || !payload.success) {
-        if (payload.activeConcertId) {
-          const goToActive = window.confirm('You are already in another active queue. Go to that queue now?');
-          if (goToActive) {
-            navigate(`/queue/${payload.activeConcertId}`);
-          }
+        if (payload.activeConcertId != null) {
+          setActiveQueueDialog({ open: true, otherConcertId: payload.activeConcertId });
           return;
         }
         window.alert(payload.message || 'Unable to join queue.');
@@ -114,6 +128,49 @@ const QueuePage: React.FC = () => {
       // Queue status is re-polled every 5 seconds by useEffect.
     } catch {
       window.alert('Unable to connect to server.');
+    }
+  };
+
+  const closeConflictDialog = () => {
+    if (queueSwitchBusy) return;
+    setActiveQueueDialog({ open: false, otherConcertId: null });
+  };
+
+  const handleLeaveOtherQueueAndJoinThis = async () => {
+    const otherId = activeQueueDialog.otherConcertId;
+    if (!concertId || !user?.id || otherId == null) return;
+    setQueueSwitchBusy(true);
+    try {
+      const leaveRes = await fetch('http://localhost:5000/api/queue/leave', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ concertId: otherId, userId: user.id }),
+      });
+      const leavePayload = (await leaveRes.json()) as { success: boolean; message?: string };
+      if (!leaveRes.ok || !leavePayload.success) {
+        window.alert(leavePayload.message || 'Could not leave the other queue.');
+        return;
+      }
+      const joinRes = await fetch('http://localhost:5000/api/queue/join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ concertId, userId: user.id }),
+      });
+      const joinPayload = (await joinRes.json()) as { success: boolean; message?: string; activeConcertId?: number };
+      if (!joinRes.ok || !joinPayload.success) {
+        setActiveQueueDialog({ open: false, otherConcertId: null });
+        window.alert(
+          joinPayload.message ||
+            'You left the other queue, but joining this one failed. Try “Join Queue” again.',
+        );
+        return;
+      }
+      setActiveQueueDialog({ open: false, otherConcertId: null });
+      setIsInQueue(true);
+    } catch {
+      window.alert('Unable to connect to server.');
+    } finally {
+      setQueueSwitchBusy(false);
     }
   };
 
@@ -168,6 +225,60 @@ const QueuePage: React.FC = () => {
 
   return (
     <div className="queue-page">
+      {activeQueueDialog.open && (
+        <div
+          className="confirm-dialog-overlay"
+          role="presentation"
+          onClick={closeConflictDialog}
+          onKeyDown={(e) => e.key === 'Escape' && closeConflictDialog()}
+        >
+          <div
+            className="confirm-dialog queue-conflict-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="queue-conflict-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="queue-conflict-title" className="confirm-dialog-title">
+              Already in a queue
+            </h2>
+            <div className="confirm-dialog-message">
+              <p>You’re already in line for another concert.</p>
+            </div>
+            <div className="queue-conflict-dialog-actions">
+              <button
+                type="button"
+                className="confirm-dialog-btn confirm--primary queue-conflict-btn-primary"
+                disabled={queueSwitchBusy}
+                onClick={handleLeaveOtherQueueAndJoinThis}
+              >
+                {queueSwitchBusy ? 'Processing…' : 'Join Current Queue'}
+              </button>
+              <button
+                type="button"
+                className="confirm-dialog-btn queue-conflict-btn-outline"
+                disabled={queueSwitchBusy}
+                onClick={() => {
+                  const id = activeQueueDialog.otherConcertId;
+                  closeConflictDialog();
+                  if (id != null) navigate(`/queue/${id}`);
+                }}
+              >
+                View Other Queue
+              </button>
+              <button
+                type="button"
+                className="confirm-dialog-btn cancel queue-conflict-btn-secondary"
+                disabled={queueSwitchBusy}
+                onClick={closeConflictDialog}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <header className="queue-header">
         <Link to="/home" className="back-link">← Back to Home</Link>
         <h1>Queue Status</h1>

@@ -74,8 +74,8 @@ function validateEditPayload(payload) {
   if (Object.prototype.hasOwnProperty.call(payload, 'artistName')) {
     if (typeof payload.artistName !== 'string' || !payload.artistName.trim()) {
       errors.push('artistName must be a non-empty string');
-    } else if (payload.artistName.trim().length > 120) {
-      errors.push('artistName must be at most 120 characters');
+    } else if (payload.artistName.trim().length > 50) {
+      errors.push('artistName must be at most 50 characters');
     }
   }
 
@@ -144,6 +144,8 @@ async function createConcert(req, res) {
     }
     if (!payload.artistName || typeof payload.artistName !== 'string' || !payload.artistName.trim()) {
       errors.push('artistName is required');
+    } else if (payload.artistName.trim().length > 50) {
+      errors.push('artistName must be at most 50 characters');
     }
     if (!payload.genre || typeof payload.genre !== 'string' || !payload.genre.trim()) {
       errors.push('genre is required');
