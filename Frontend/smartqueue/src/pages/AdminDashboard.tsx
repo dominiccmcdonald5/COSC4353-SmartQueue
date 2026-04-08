@@ -14,144 +14,18 @@ import {
 } from 'react-icons/md';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Tooltip } from 'recharts';
 import '../styling/AdminDashboard.css';
-import { ADMIN_EVENTS_STORAGE_KEY } from '../data/adminEventsStorage';
-import type { ConcertEvent } from '../types/concertEvent';
-import ConcertEventEditForm from '../components/admin/ConcertEventEditForm';
-import EventEditModal from '../components/admin/EventEditModal';
-import ConfirmDialog from '../components/ui/ConfirmDialog';
-import {
-  VENUE_MAX_LEN,
-  VENUE_OTHER,
-  VENUE_PRESETS,
-  venueOtherInputValue,
-  venueSelectValue,
-} from '../utils/concertVenue';
 
-const DEFAULT_CONCERT_IMAGE = '/concert1.jpg';
-const API_BASE = 'http://localhost:5000';
-
-type PendingDelete =
-  | { kind: 'concert'; id: string; title: string }
-  | { kind: 'user'; id: string; title: string }
-  | null;
-
-// Maps a raw concert record from the backend to a ConcertEvent used by the UI
-function mapApiConcert(c: {
-  concertID: number;
-  concertName: string;
-  artistName: string;
+interface ConcertEvent {
+  id: string;
+  name: string;
+  artist: string;
   genre: string;
   date: string;
   venue: string;
+  image: string;
   capacity: number;
   ticketPrice: number;
-  concertImage: string;
-  concertStatus: string;
-}): ConcertEvent {
-  const soldOut = String(c.concertStatus).toLowerCase() === 'sold_out';
-  const price = Number(c.ticketPrice);
-  return {
-    id: String(c.concertID),
-    name: c.concertName || `Event ${c.concertID}`,
-    artist: c.artistName || '',
-    genre: c.genre || '',
-    date: typeof c.date === 'string' && c.date.length >= 10 ? c.date.slice(0, 10) : c.date,
-    venue: c.venue || '',
-    image: c.concertImage || DEFAULT_CONCERT_IMAGE,
-    capacity: Number(c.capacity) || 0,
-    ticketPriceMin: Number.isFinite(price) ? price : 0,
-    ticketPriceMax: Number.isFinite(price) ? price : 0,
-    status: soldOut ? 'completed' : 'upcoming',
-    published: !soldOut,
-  };
-}
-
-function migrateStoredEvents(raw: unknown): ConcertEvent[] | null {
-  if (!Array.isArray(raw) || raw.length === 0) return null;
-  const out: ConcertEvent[] = [];
-  for (const item of raw) {
-    if (!item || typeof item !== 'object') continue;
-    const e = item as Partial<ConcertEvent> & { ticketPrice?: number };
-    if (!e.id || !e.name) continue;
-    const legacy = typeof e.ticketPrice === 'number' ? e.ticketPrice : 0;
-    const min = typeof e.ticketPriceMin === 'number' ? e.ticketPriceMin : legacy;
-    const max = typeof e.ticketPriceMax === 'number' ? e.ticketPriceMax : legacy;
-    out.push({
-      id: e.id,
-      name: e.name,
-      artist: e.artist ?? '',
-      genre: e.genre ?? '',
-      date: e.date ?? '',
-      venue: e.venue ?? '',
-      image: e.image ?? DEFAULT_CONCERT_IMAGE,
-      capacity: e.capacity ?? 0,
-      ticketPriceMin: min,
-      ticketPriceMax: max,
-      status: e.status ?? 'upcoming',
-      published: e.published ?? true,
-    });
-  }
-  return out.length ? out : null;
-}
-
-const DEMO_ADMIN_EVENTS: ConcertEvent[] = [
-  {
-    id: '1',
-    name: 'Summer Rock Festival',
-    artist: 'Various Artists',
-    genre: 'Rock',
-    date: '2026-07-15',
-    venue: 'Central Stadium',
-    image: '/concert1.jpg',
-    capacity: 50000,
-    ticketPriceMin: 79.99,
-    ticketPriceMax: 99.99,
-    status: 'upcoming',
-    published: true,
-  },
-  {
-    id: '2',
-    name: 'Jazz Night Live',
-    artist: 'The Jazz Collective',
-    genre: 'Jazz',
-    date: '2026-06-20',
-    venue: 'Downtown Theater',
-    image: '/concert2.jpg',
-    capacity: 2500,
-    ticketPriceMin: 55,
-    ticketPriceMax: 75,
-    status: 'active',
-    published: true,
-  },
-  {
-    id: '3',
-    name: 'Pop Extravaganza',
-    artist: 'PopStar',
-    genre: 'Pop',
-    date: '2026-05-10',
-    venue: 'Arena Center',
-    image: '/concert3.jpg',
-    capacity: 15000,
-    ticketPriceMin: 100,
-    ticketPriceMax: 140,
-    status: 'completed',
-    published: false,
-  },
-];
-
-function getFallbackConcertEvents(): ConcertEvent[] {
-  try {
-    const raw = localStorage.getItem(ADMIN_EVENTS_STORAGE_KEY);
-    if (raw) {
-      const migrated = migrateStoredEvents(JSON.parse(raw));
-      if (migrated && migrated.length > 0) {
-        return migrated;
-      }
-    }
-  } catch {
-    /* use demo */
-  }
-  return DEMO_ADMIN_EVENTS;
+  status: 'upcoming' | 'active' | 'completed' | 'cancelled';
 }
 
 interface User {
@@ -162,56 +36,6 @@ interface User {
   passType: 'none' | 'silver' | 'gold';
   totalSpent: number;
   status: 'active' | 'suspended' | 'banned';
-}
-
-const DEMO_ADMIN_USERS: User[] = [
-  {
-    id: '1',
-    name: 'John Doe',
-    email: 'john.doe@email.com',
-    joinDate: '2025-12-01',
-    passType: 'gold',
-    totalSpent: 850.0,
-    status: 'active',
-  },
-  {
-    id: '2',
-    name: 'Jane Smith',
-    email: 'jane.smith@email.com',
-    joinDate: '2026-01-15',
-    passType: 'silver',
-    totalSpent: 450.0,
-    status: 'active',
-  },
-  {
-    id: '3',
-    name: 'Mike Johnson',
-    email: 'mike.j@email.com',
-    joinDate: '2026-01-20',
-    passType: 'none',
-    totalSpent: 120.0,
-    status: 'suspended',
-  },
-];
-
-function mapApiUserRow(u: {
-  id: string;
-  name: string;
-  email: string;
-  joinDate: string;
-  passType: string;
-  totalSpent: number;
-  status: string;
-}): User {
-  return {
-    id: String(u.id),
-    name: u.name,
-    email: u.email,
-    joinDate: u.joinDate,
-    passType: (['none', 'silver', 'gold'].includes(u.passType) ? u.passType : 'none') as User['passType'],
-    totalSpent: Number(u.totalSpent) || 0,
-    status: (['active', 'suspended', 'banned'].includes(u.status) ? u.status : 'active') as User['status'],
-  };
 }
 
 interface ReportData {
@@ -225,16 +49,7 @@ interface ReportData {
   passDistribution: Array<{ name: string; value: number; fill: string }>;
 }
 
-interface ApiReportData {
-  totalUsers: number;
-  totalEvents: number;
-  totalRevenue: number;
-  averageQueueTime: string;
-  topGenres: Array<{ genre: string; count: number }>;
-  passDistribution: Array<{ passType: string; count: number; percentage: string }>;
-  monthlyRevenueTrend: Array<{ month: string; revenue: number }>;
-  userGrowth: Array<{ month: string; newUsers: number; totalUsers: number }>;
-}
+const DEFAULT_CONCERT_IMAGE = '/concert1.jpg';
 
 const AdminDashboard: React.FC = () => {
   const { user, logout } = useAuth();
@@ -242,8 +57,6 @@ const AdminDashboard: React.FC = () => {
   const [events, setEvents] = useState<ConcertEvent[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [reportData, setReportData] = useState<ReportData | null>(null);
-  const [reportLoading, setReportLoading] = useState(false);
-  const [reportError, setReportError] = useState<string | null>(null);
   const [editingEvent, setEditingEvent] = useState<ConcertEvent | null>(null);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [showAddEventForm, setShowAddEventForm] = useState(false);
@@ -252,7 +65,6 @@ const AdminDashboard: React.FC = () => {
   const [eventStatusFilter, setEventStatusFilter] = useState<'all' | ConcertEvent['status']>('all');
   const [userSearchTerm, setUserSearchTerm] = useState('');
   const [userStatusFilter, setUserStatusFilter] = useState<'all' | User['status']>('all');
-  const [pendingDelete, setPendingDelete] = useState<PendingDelete>(null);
 
   // Form data for new events
   const [newEvent, setNewEvent] = useState<Omit<ConcertEvent, 'id'>>({
@@ -263,10 +75,8 @@ const AdminDashboard: React.FC = () => {
     venue: '',
     image: DEFAULT_CONCERT_IMAGE,
     capacity: 0,
-    ticketPriceMin: 0,
-    ticketPriceMax: 0,
-    status: 'upcoming',
-    published: false,
+    ticketPrice: 0,
+    status: 'upcoming'
   });
 
   // Form data for new users
@@ -278,247 +88,179 @@ const AdminDashboard: React.FC = () => {
   });
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/admin/users`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.success && Array.isArray(data.users) && data.users.length > 0) {
-          setUsers(data.users.map(mapApiUserRow));
-        } else {
-          setUsers(DEMO_ADMIN_USERS);
-        }
-      })
-      .catch(() => setUsers(DEMO_ADMIN_USERS));
-
-    // Fetch concerts from API, fall back to local/demo data on failure
-    fetch(`${API_BASE}/api/admin/concerts`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.success && Array.isArray(data.concerts) && data.concerts.length > 0) {
-          setEvents(data.concerts.map(mapApiConcert));
-        } else {
-          setEvents(getFallbackConcertEvents());
-        }
-      })
-      .catch(() => setEvents(getFallbackConcertEvents()));
-  }, []);
-
-  // Fetch admin report data from API
-  useEffect(() => {
-    const fetchReportData = async () => {
-      setReportLoading(true);
-      setReportError(null);
-      try {
-        const response = await fetch('http://localhost:5000/api/admin/data-report');
-        if (!response.ok) {
-          throw new Error('Failed to fetch report data');
-        }
-        const data = await response.json();
-        
-        if (data.success && data.data) {
-          const apiData = data.data as ApiReportData;
-          
-          // Transform API data to match ReportData interface
-          const colors = ['#f59e0b', '#10b981', '#6366f1', '#ec4899', '#8b5cf6'];
-          const transformedReport: ReportData = {
-            totalUsers: apiData.totalUsers,
-            totalEvents: apiData.totalEvents,
-            totalRevenue: apiData.totalRevenue,
-            averageQueueTime: apiData.averageQueueTime,
-            topGenres: apiData.topGenres.map((g, idx) => ({
-              name: g.genre,
-              count: g.count,
-              fill: colors[idx % colors.length]
-            })),
-            monthlyRevenue: apiData.monthlyRevenueTrend.map(m => ({
-              month: m.month,
-              revenue: m.revenue
-            })),
-            userGrowth: apiData.userGrowth.map(u => ({
-              month: u.month,
-              users: u.totalUsers
-            })),
-            passDistribution: apiData.passDistribution.map(p => {
-              const passMap: Record<string, string> = {
-                'None': '#9ca3af',
-                'Gold': '#ffd700',
-                'Silver': '#c0c0c0'
-              };
-              return {
-                name: p.passType,
-                value: parseInt(p.percentage),
-                fill: passMap[p.passType] || '#9ca3af'
-              };
-            })
-          };
-          
-          setReportData(transformedReport);
-        }
-      } catch (error) {
-        console.error('Error fetching report data:', error);
-        setReportError(error instanceof Error ? error.message : 'Failed to load report data');
-      } finally {
-        setReportLoading(false);
+    // TODO: Replace with actual API calls
+    // Mock data for demonstration
+    const mockEvents: ConcertEvent[] = [
+      {
+        id: '1',
+        name: 'Summer Rock Festival',
+        artist: 'Various Artists',
+        genre: 'Rock',
+        date: '2026-07-15',
+        venue: 'Central Stadium',
+        image: '/concert1.jpg',
+        capacity: 50000,
+        ticketPrice: 89.99,
+        status: 'upcoming'
+      },
+      {
+        id: '2',
+        name: 'Jazz Night Live',
+        artist: 'The Jazz Collective',
+        genre: 'Jazz',
+        date: '2026-06-20',
+        venue: 'Downtown Theater',
+        image: '/concert2.jpg',
+        capacity: 2500,
+        ticketPrice: 65.00,
+        status: 'active'
+      },
+      {
+        id: '3',
+        name: 'Pop Extravaganza',
+        artist: 'PopStar',
+        genre: 'Pop',
+        date: '2026-05-10',
+        venue: 'Arena Center',
+        image: '/concert3.jpg',
+        capacity: 15000,
+        ticketPrice: 120.00,
+        status: 'completed'
       }
+    ];
+
+    const mockUsers: User[] = [
+      {
+        id: '1',
+        name: 'John Doe',
+        email: 'john.doe@email.com',
+        joinDate: '2025-12-01',
+        passType: 'gold',
+        totalSpent: 850.00,
+        status: 'active'
+      },
+      {
+        id: '2',
+        name: 'Jane Smith',
+        email: 'jane.smith@email.com',
+        joinDate: '2026-01-15',
+        passType: 'silver',
+        totalSpent: 450.00,
+        status: 'active'
+      },
+      {
+        id: '3',
+        name: 'Mike Johnson',
+        email: 'mike.j@email.com',
+        joinDate: '2026-01-20',
+        passType: 'none',
+        totalSpent: 120.00,
+        status: 'suspended'
+      }
+    ];
+
+    const mockReportData: ReportData = {
+      totalUsers: 1247,
+      totalEvents: 24,
+      totalRevenue: 284750,
+      averageQueueTime: '23 minutes',
+      topGenres: [
+        { name: 'Rock', count: 8, fill: '#f59e0b' },
+        { name: 'Pop', count: 6, fill: '#10b981' },
+        { name: 'Jazz', count: 4, fill: '#6366f1' },
+        { name: 'Electronic', count: 3, fill: '#ec4899' },
+        { name: 'Classical', count: 3, fill: '#8b5cf6' }
+      ],
+      monthlyRevenue: [
+        { month: 'Jan', revenue: 45000 },
+        { month: 'Feb', revenue: 52000 },
+        { month: 'Mar', revenue: 48000 },
+        { month: 'Apr', revenue: 61000 },
+        { month: 'May', revenue: 67000 },
+        { month: 'Jun', revenue: 59000 }
+      ],
+      userGrowth: [
+        { month: 'Jan', users: 1100 },
+        { month: 'Feb', users: 1150 },
+        { month: 'Mar', users: 1180 },
+        { month: 'Apr', users: 1210 },
+        { month: 'May', users: 1235 },
+        { month: 'Jun', users: 1247 }
+      ],
+      passDistribution: [
+        { name: 'None', value: 68, fill: '#9ca3af' },
+        { name: 'Silver', value: 22, fill: '#c0c0c0' },
+        { name: 'Gold', value: 10, fill: '#ffd700' }
+      ]
     };
 
-    fetchReportData();
+    setEvents(mockEvents);
+    setUsers(mockUsers);
+    setReportData(mockReportData);
   }, []);
 
-  const handleAddEvent = async () => {
-    const venueTrimmed = newEvent.venue.trim();
-    if (!venueTrimmed || venueTrimmed === VENUE_OTHER) {
-      window.alert('Please select a venue or choose Other and enter a venue name.');
-      return;
-    }
-    let min = newEvent.ticketPriceMin;
-    let max = newEvent.ticketPriceMax;
-    if (min > max) { const t = min; min = max; max = t; }
-
-    const body = {
-      concertName: newEvent.name.trim(),
-      artistName: newEvent.artist.trim(),
-      genre: newEvent.genre.trim(),
-      date: newEvent.date,
-      venue: venueTrimmed.slice(0, VENUE_MAX_LEN),
-      capacity: newEvent.capacity,
-      ticketPrice: (min + max) / 2,
-      concertImage: newEvent.image || DEFAULT_CONCERT_IMAGE,
+  // Event Management Functions
+  const handleAddEvent = () => {
+    const event: ConcertEvent = {
+      ...newEvent,
+      id: Date.now().toString()
     };
-
-    try {
-      const res = await fetch(`${API_BASE}/api/admin/concerts`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (data.success && data.concert) {
-        setEvents((prev) => [...prev, mapApiConcert(data.concert)]);
-      } else {
-        window.alert(`Failed to add concert: ${data.errors?.join(', ') || data.message || 'Unknown error'}`);
-        return;
-      }
-    } catch {
-      window.alert('Failed to connect to server. Concert not saved.');
-      return;
-    }
-
+    setEvents([...events, event]);
     setNewEvent({
-      name: '', artist: '', genre: '', date: '', venue: '',
-      image: DEFAULT_CONCERT_IMAGE, capacity: 0,
-      ticketPriceMin: 0, ticketPriceMax: 0, status: 'upcoming', published: false,
+      name: '',
+      artist: '',
+      genre: '',
+      date: '',
+      venue: '',
+      image: DEFAULT_CONCERT_IMAGE,
+      capacity: 0,
+      ticketPrice: 0,
+      status: 'upcoming'
     });
     setShowAddEventForm(false);
   };
 
+  const handleNewEventImageChange = (file: File | null) => {
+    if (!file) return;
+    const imageUrl = URL.createObjectURL(file);
+    setNewEvent({ ...newEvent, image: imageUrl });
+  };
+
+  const handleEditingEventImageChange = (file: File | null) => {
+    if (!file || !editingEvent) return;
+    const imageUrl = URL.createObjectURL(file);
+    setEditingEvent({ ...editingEvent, image: imageUrl });
+  };
+
   const handleEditEvent = (event: ConcertEvent) => {
-    setEditingEvent({ ...event, published: event.published ?? false });
+    setEditingEvent({ ...event });
   };
 
-  const handleSaveEvent = async () => {
-    if (!editingEvent) return;
-    const venueTrimmed = editingEvent.venue.trim();
-    if (!venueTrimmed || venueTrimmed === VENUE_OTHER) {
-      window.alert('Please select a venue or choose Other and enter a venue name.');
-      return;
+  const handleSaveEvent = () => {
+    if (editingEvent) {
+      setEvents(events.map(e => e.id === editingEvent.id ? editingEvent : e));
+      setEditingEvent(null);
     }
-    let min = editingEvent.ticketPriceMin;
-    let max = editingEvent.ticketPriceMax;
-    if (min > max) { const t = min; min = max; max = t; }
-
-    const body = {
-      concertName: editingEvent.name.trim(),
-      artistName: editingEvent.artist.trim(),
-      genre: editingEvent.genre.trim(),
-      date: editingEvent.date,
-      venue: venueTrimmed.slice(0, VENUE_MAX_LEN),
-      capacity: editingEvent.capacity,
-      ticketPrice: (min + max) / 2,
-      concertImage: editingEvent.image || DEFAULT_CONCERT_IMAGE,
-      concertStatus: editingEvent.status === 'completed' || editingEvent.status === 'cancelled'
-        ? 'sold_out' : 'open',
-    };
-
-    try {
-      const res = await fetch(`${API_BASE}/api/admin/concerts/${editingEvent.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (data.success && data.concert) {
-        const updated = mapApiConcert(data.concert);
-        setEvents((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
-      } else {
-        window.alert(`Failed to save concert: ${data.errors?.join(', ') || data.message || 'Unknown error'}`);
-        return;
-      }
-    } catch {
-      window.alert('Failed to connect to server. Changes not saved.');
-      return;
-    }
-
-    setEditingEvent(null);
   };
 
-  const requestDeleteEvent = (id: string) => {
-    const ev = events.find((e) => e.id === id);
-    setPendingDelete({
-      kind: 'concert',
-      id,
-      title: ev?.name?.trim() ? ev.name : `Event #${id}`,
-    });
-  };
-
-  const executeDeleteEvent = async (id: string) => {
-    try {
-      const res = await fetch(`${API_BASE}/api/admin/concerts/${id}`, { method: 'DELETE' });
-      const data = await res.json();
-      if (data.success) {
-        setEvents((prev) => prev.filter((e) => e.id !== id));
-      } else {
-        window.alert(`Failed to delete concert: ${data.message || 'Unknown error'}`);
-      }
-    } catch {
-      window.alert('Failed to connect to server. Concert not deleted.');
-    }
+  const handleDeleteEvent = (id: string) => {
+    setEvents(events.filter(e => e.id !== id));
   };
 
   // User Management Functions
-  const handleAddUser = async () => {
-    const nameTrim = newUser.name.trim();
-    const emailTrim = newUser.email.trim();
-    if (!nameTrim || !emailTrim) {
-      window.alert('Name and email are required.');
-      return;
-    }
-    try {
-      const res = await fetch(`${API_BASE}/api/admin/users`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: nameTrim,
-          email: emailTrim,
-          passType: newUser.passType,
-          status: newUser.status,
-        }),
-      });
-      const data = await res.json();
-      if (data.success && data.user) {
-        setUsers((prev) => [...prev, mapApiUserRow(data.user)]);
-      } else {
-        window.alert(`Failed to add user: ${data.errors?.join(', ') || data.message || 'Unknown error'}`);
-        return;
-      }
-    } catch {
-      window.alert('Failed to connect to server. User not created.');
-      return;
-    }
+  const handleAddUser = () => {
+    const user: User = {
+      ...newUser,
+      id: Date.now().toString(),
+      joinDate: new Date().toISOString().split('T')[0],
+      totalSpent: 0
+    };
+    setUsers([...users, user]);
     setNewUser({
       name: '',
       email: '',
       passType: 'none',
-      status: 'active',
+      status: 'active'
     });
     setShowAddUserForm(false);
   };
@@ -527,67 +269,15 @@ const AdminDashboard: React.FC = () => {
     setEditingUser({ ...user });
   };
 
-  const handleSaveUser = async () => {
-    if (!editingUser) return;
-    try {
-      const res = await fetch(`${API_BASE}/api/admin/users/${editingUser.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: editingUser.name.trim(),
-          email: editingUser.email.trim(),
-          passType: editingUser.passType,
-          status: editingUser.status,
-          totalSpent: editingUser.totalSpent,
-        }),
-      });
-      const data = await res.json();
-      if (data.success && data.user) {
-        const updated = mapApiUserRow(data.user);
-        setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
-      } else {
-        window.alert(`Failed to save user: ${data.errors?.join(', ') || data.message || 'Unknown error'}`);
-        return;
-      }
-    } catch {
-      window.alert('Failed to connect to server. Changes not saved.');
-      return;
-    }
-    setEditingUser(null);
-  };
-
-  const requestDeleteUser = (id: string) => {
-    const u = users.find((x) => x.id === id);
-    setPendingDelete({
-      kind: 'user',
-      id,
-      title: u?.name?.trim() ? u.name : `User #${id}`,
-    });
-  };
-
-  const executeDeleteUser = async (id: string) => {
-    try {
-      const res = await fetch(`${API_BASE}/api/admin/users/${id}`, { method: 'DELETE' });
-      const data = await res.json();
-      if (data.success) {
-        setUsers((prev) => prev.filter((x) => x.id !== id));
-      } else {
-        window.alert(`Failed to delete user: ${data.message || 'Unknown error'}`);
-      }
-    } catch {
-      window.alert('Failed to connect to server. User not deleted.');
+  const handleSaveUser = () => {
+    if (editingUser) {
+      setUsers(users.map(u => u.id === editingUser.id ? editingUser : u));
+      setEditingUser(null);
     }
   };
 
-  const handleConfirmDelete = () => {
-    if (!pendingDelete) return;
-    const { kind, id } = pendingDelete;
-    setPendingDelete(null);
-    if (kind === 'concert') {
-      void executeDeleteEvent(id);
-    } else {
-      void executeDeleteUser(id);
-    }
+  const handleDeleteUser = (id: string) => {
+    setUsers(users.filter(u => u.id !== id));
   };
 
   const filteredEvents = events.filter((event) => {
@@ -680,13 +370,6 @@ const AdminDashboard: React.FC = () => {
               </select>
             </div>
 
-            <p className="admin-concert-count-line" aria-live="polite">
-              Showing {filteredEvents.length} of {events.length} events
-              {eventStatusFilter !== 'all' || eventSearchTerm.trim()
-                ? ' (filters applied)'
-                : ''}
-            </p>
-
             {showAddEventForm && (
               <div className="add-form">
                 <h4>Add New Concert Event</h4>
@@ -695,17 +378,17 @@ const AdminDashboard: React.FC = () => {
                     type="text"
                     placeholder="Event Name"
                     value={newEvent.name}
-                    onChange={(e) => setNewEvent({ ...newEvent, name: e.target.value })}
+                    onChange={(e) => setNewEvent({...newEvent, name: e.target.value})}
                   />
                   <input
                     type="text"
                     placeholder="Artist"
                     value={newEvent.artist}
-                    onChange={(e) => setNewEvent({ ...newEvent, artist: e.target.value })}
+                    onChange={(e) => setNewEvent({...newEvent, artist: e.target.value})}
                   />
                   <select
                     value={newEvent.genre}
-                    onChange={(e) => setNewEvent({ ...newEvent, genre: e.target.value })}
+                    onChange={(e) => setNewEvent({...newEvent, genre: e.target.value})}
                   >
                     <option value="">Select Genre</option>
                     <option value="Rock">Rock</option>
@@ -718,114 +401,47 @@ const AdminDashboard: React.FC = () => {
                   <input
                     type="date"
                     value={newEvent.date}
-                    onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })}
+                    onChange={(e) => setNewEvent({...newEvent, date: e.target.value})}
                   />
-                  <div className="form-field-venue">
-                    <span className="form-field-label">Venue</span>
-                    <select
-                      className="form-field-control"
-                      value={venueSelectValue(newEvent.venue)}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        if (v === VENUE_OTHER) {
-                          setNewEvent({ ...newEvent, venue: VENUE_OTHER });
-                        } else {
-                          setNewEvent({ ...newEvent, venue: v });
-                        }
-                      }}
-                    >
-                      <option value="">Select venue</option>
-                      {VENUE_PRESETS.map((opt) => (
-                        <option key={opt} value={opt}>
-                          {opt}
-                        </option>
-                      ))}
-                      <option value={VENUE_OTHER}>Other (type below)</option>
-                    </select>
-                    {venueSelectValue(newEvent.venue) === VENUE_OTHER && (
-                      <input
-                        type="text"
-                        className="venue-other-input"
-                        placeholder="Venue name (max 100 characters)"
-                        maxLength={VENUE_MAX_LEN}
-                        value={venueOtherInputValue(newEvent.venue)}
-                        onChange={(e) =>
-                          setNewEvent({
-                            ...newEvent,
-                            venue: e.target.value.slice(0, VENUE_MAX_LEN),
-                          })
-                        }
-                        aria-label="Custom venue name"
-                      />
-                    )}
-                  </div>
+                  <input
+                    type="text"
+                    placeholder="Venue"
+                    value={newEvent.venue}
+                    onChange={(e) => setNewEvent({...newEvent, venue: e.target.value})}
+                  />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleNewEventImageChange(e.target.files?.[0] || null)}
+                  />
                   <input
                     type="number"
                     placeholder="Capacity"
                     value={newEvent.capacity || ''}
-                    onChange={(e) => setNewEvent({ ...newEvent, capacity: parseInt(e.target.value, 10) || 0 })}
+                    onChange={(e) => setNewEvent({...newEvent, capacity: parseInt(e.target.value) || 0})}
                   />
-                  <div className="form-field-price-range">
-                    <span className="form-field-label">Ticket price range ($)</span>
-                    <div className="event-price-range-inputs">
-                      <input
-                        type="number"
-                        step="0.01"
-                        min={0}
-                        placeholder="Min"
-                        value={newEvent.ticketPriceMin || ''}
-                        onChange={(e) =>
-                          setNewEvent({
-                            ...newEvent,
-                            ticketPriceMin: parseFloat(e.target.value) || 0,
-                          })
-                        }
-                        aria-label="Minimum ticket price"
-                      />
-                      <span className="price-range-sep" aria-hidden>
-                        to
-                      </span>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min={0}
-                        placeholder="Max"
-                        value={newEvent.ticketPriceMax || ''}
-                        onChange={(e) =>
-                          setNewEvent({
-                            ...newEvent,
-                            ticketPriceMax: parseFloat(e.target.value) || 0,
-                          })
-                        }
-                        aria-label="Maximum ticket price"
-                      />
-                    </div>
-                  </div>
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="Ticket Price"
+                    value={newEvent.ticketPrice || ''}
+                    onChange={(e) => setNewEvent({...newEvent, ticketPrice: parseFloat(e.target.value) || 0})}
+                  />
                   <select
                     value={newEvent.status}
-                    onChange={(e) =>
-                      setNewEvent({ ...newEvent, status: e.target.value as ConcertEvent['status'] })
-                    }
+                    onChange={(e) => setNewEvent({...newEvent, status: e.target.value as ConcertEvent['status']})}
                   >
                     <option value="upcoming">Upcoming</option>
                     <option value="active">Active</option>
                     <option value="completed">Completed</option>
                     <option value="cancelled">Cancelled</option>
                   </select>
-                  <label className="form-publish-option">
-                    <input
-                      type="checkbox"
-                      checked={newEvent.published}
-                      onChange={(e) => setNewEvent({ ...newEvent, published: e.target.checked })}
-                    />
-                    Publish on home page when saved
-                  </label>
                 </div>
                 <div className="form-actions">
-                  <button type="button" className="save-btn" onClick={handleAddEvent}>
+                  <button className="save-btn" onClick={handleAddEvent}>
                     <MdSave /> Save Event
                   </button>
-                  <button type="button" className="cancel-btn" onClick={() => setShowAddEventForm(false)}>
+                  <button className="cancel-btn" onClick={() => setShowAddEventForm(false)}>
                     <MdCancel /> Cancel
                   </button>
                 </div>
@@ -835,92 +451,115 @@ const AdminDashboard: React.FC = () => {
             <div className="events-list">
               {filteredEvents.map((event) => (
                 <div key={event.id} className="event-card">
-                  <div className="event-info">
-                    <div className="event-info-header">
-                      <h4 className="event-title">{event.name}</h4>
-                      <div className="event-info-toolbar">
-                        <span className={`status-badge ${event.status}`}>{event.status}</span>
-                        <span
-                          className={`event-publish-badge ${event.published ?? false ? 'is-published' : 'is-draft'}`}
+                  {editingEvent?.id === event.id ? (
+                    <div className="edit-form">
+                      <div className="form-grid">
+                        <input
+                          type="text"
+                          value={editingEvent.name}
+                          onChange={(e) => setEditingEvent({...editingEvent, name: e.target.value})}
+                        />
+                        <input
+                          type="text"
+                          value={editingEvent.artist}
+                          onChange={(e) => setEditingEvent({...editingEvent, artist: e.target.value})}
+                        />
+                        <select
+                          value={editingEvent.genre}
+                          onChange={(e) => setEditingEvent({...editingEvent, genre: e.target.value})}
                         >
-                          {event.published ?? false ? 'Listed' : 'Not listed'}
-                        </span>
+                          <option value="Rock">Rock</option>
+                          <option value="Pop">Pop</option>
+                          <option value="Jazz">Jazz</option>
+                          <option value="Electronic">Electronic</option>
+                          <option value="Classical">Classical</option>
+                          <option value="Hip-Hop">Hip-Hop</option>
+                        </select>
+                        <input
+                          type="date"
+                          value={editingEvent.date}
+                          onChange={(e) => setEditingEvent({...editingEvent, date: e.target.value})}
+                        />
+                        <input
+                          type="text"
+                          value={editingEvent.venue}
+                          onChange={(e) => setEditingEvent({...editingEvent, venue: e.target.value})}
+                        />
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handleEditingEventImageChange(e.target.files?.[0] || null)}
+                        />
+                        <input
+                          type="number"
+                          value={editingEvent.capacity}
+                          onChange={(e) => setEditingEvent({...editingEvent, capacity: parseInt(e.target.value)})}
+                        />
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={editingEvent.ticketPrice}
+                          onChange={(e) => setEditingEvent({...editingEvent, ticketPrice: parseFloat(e.target.value)})}
+                        />
+                        <select
+                          value={editingEvent.status}
+                          onChange={(e) => setEditingEvent({...editingEvent, status: e.target.value as ConcertEvent['status']})}
+                        >
+                          <option value="upcoming">Upcoming</option>
+                          <option value="active">Active</option>
+                          <option value="completed">Completed</option>
+                          <option value="cancelled">Cancelled</option>
+                        </select>
+                      </div>
+                      <div className="form-actions">
+                        <button className="save-btn" onClick={handleSaveEvent}>
+                          <MdSave /> Save
+                        </button>
+                        <button className="cancel-btn" onClick={() => setEditingEvent(null)}>
+                          <MdCancel /> Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="event-info">
+                        <div className="event-top-row">
+                          <h4>{event.name}</h4>
+                          <img
+                            src={event.image || DEFAULT_CONCERT_IMAGE}
+                            alt={`${event.name} concert`}
+                            className="event-image-preview"
+                            onError={(e) => {
+                              e.currentTarget.src = DEFAULT_CONCERT_IMAGE;
+                            }}
+                          />
+                        </div>
+                        <p><strong>Artist:</strong> {event.artist}</p>
+                        <p><strong>Genre:</strong> {event.genre}</p>
+                        <p><strong>Date:</strong> {new Date(event.date).toLocaleDateString()}</p>
+                        <p><strong>Venue:</strong> {event.venue}</p>
+                        <p><strong>Capacity:</strong> {event.capacity.toLocaleString()}</p>
+                        <p><strong>Ticket Price:</strong> ${event.ticketPrice.toFixed(2)}</p>
+                        <span className={`status-badge ${event.status}`}>{event.status}</span>
+                      </div>
+                      <div className="event-side">
                         <div className="event-actions">
-                          <button
-                            type="button"
-                            className="edit-btn"
-                            onClick={() => handleEditEvent(event)}
-                            aria-label={`Edit ${event.name}`}
-                            title="Edit event"
-                          >
+                          <button className="edit-btn" onClick={() => handleEditEvent(event)}>
                             <MdEdit />
                           </button>
-                          <button
-                            type="button"
-                            className="delete-btn"
-                            onClick={() => requestDeleteEvent(event.id)}
-                            aria-label={`Delete ${event.name}`}
-                            title="Delete event"
-                          >
+                          <button className="delete-btn" onClick={() => handleDeleteEvent(event.id)}>
                             <MdDelete />
                           </button>
                         </div>
                       </div>
-                    </div>
-                    <dl className="event-detail-rows">
-                      <div className="event-detail-row">
-                        <dt>Artist</dt>
-                        <dd>{event.artist}</dd>
-                      </div>
-                      <div className="event-detail-row">
-                        <dt>Genre</dt>
-                        <dd>{event.genre}</dd>
-                      </div>
-                      <div className="event-detail-row">
-                        <dt>Date</dt>
-                        <dd>{new Date(event.date).toLocaleDateString(undefined, { dateStyle: 'long' })}</dd>
-                      </div>
-                      <div className="event-detail-row">
-                        <dt>Venue</dt>
-                        <dd>{event.venue}</dd>
-                      </div>
-                      <div className="event-detail-row">
-                        <dt>Capacity</dt>
-                        <dd>{event.capacity.toLocaleString()} seats</dd>
-                      </div>
-                      <div className="event-detail-row">
-                        <dt>Ticket price</dt>
-                        <dd>
-                          ${event.ticketPriceMin.toFixed(2)} – ${event.ticketPriceMax.toFixed(2)}
-                        </dd>
-                      </div>
-                    </dl>
-                  </div>
+                    </>
+                  )}
                 </div>
               ))}
               {filteredEvents.length === 0 && (
-                <p className="empty-results">
-                  {events.length === 0
-                    ? 'No concert events yet. Add one with the button above.'
-                    : 'No events match your search or status filter. Try changing the filter to “All Statuses” or clear the search.'}
-                </p>
+                <p className="empty-results">No events found for your current search/filter.</p>
               )}
             </div>
-
-            {editingEvent && (
-              <EventEditModal
-                open
-                title={`Edit event — ${editingEvent.name}`}
-                onClose={() => setEditingEvent(null)}
-              >
-                <ConcertEventEditForm
-                  value={editingEvent}
-                  onChange={setEditingEvent}
-                  onSave={handleSaveEvent}
-                  onCancel={() => setEditingEvent(null)}
-                />
-              </EventEditModal>
-            )}
           </section>
         )}
 
@@ -1001,313 +640,214 @@ const AdminDashboard: React.FC = () => {
               </div>
             )}
 
-            <div className="users-table-wrap">
-              <table className="admin-users-table">
-                <thead>
-                  <tr>
-                    <th scope="col">Name</th>
-                    <th scope="col">Email</th>
-                    <th scope="col">Joined</th>
-                    <th scope="col">Pass</th>
-                    <th scope="col">Spent</th>
-                    <th scope="col">Status</th>
-                    <th scope="col" className="admin-users-table-actions">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredUsers.map((user) =>
-                    editingUser?.id === user.id ? (
-                      <tr key={user.id} className="admin-users-table-row is-editing">
-                        <td>
-                          <input
-                            type="text"
-                            aria-label="Name"
-                            value={editingUser.name}
-                            onChange={(e) => setEditingUser({ ...editingUser, name: e.target.value })}
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="email"
-                            aria-label="Email"
-                            value={editingUser.email}
-                            onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
-                          />
-                        </td>
-                        <td className="admin-users-table-muted">
-                          {new Date(editingUser.joinDate).toLocaleDateString()}
-                        </td>
-                        <td>
-                          <select
-                            aria-label="Pass type"
-                            value={editingUser.passType}
-                            onChange={(e) =>
-                              setEditingUser({
-                                ...editingUser,
-                                passType: e.target.value as User['passType'],
-                              })
-                            }
-                          >
-                            <option value="none">None</option>
-                            <option value="silver">Silver</option>
-                            <option value="gold">Gold</option>
-                          </select>
-                        </td>
-                        <td>
-                          <input
-                            type="number"
-                            min={0}
-                            step={0.01}
-                            aria-label="Total spent"
-                            className="admin-users-spent-input"
-                            value={editingUser.totalSpent}
-                            onChange={(e) =>
-                              setEditingUser({
-                                ...editingUser,
-                                totalSpent: parseFloat(e.target.value) || 0,
-                              })
-                            }
-                          />
-                        </td>
-                        <td>
-                          <select
-                            aria-label="Account status"
-                            value={editingUser.status}
-                            onChange={(e) =>
-                              setEditingUser({
-                                ...editingUser,
-                                status: e.target.value as User['status'],
-                              })
-                            }
-                          >
-                            <option value="active">Active</option>
-                            <option value="suspended">Suspended</option>
-                            <option value="banned">Banned</option>
-                          </select>
-                        </td>
-                        <td className="admin-users-table-actions">
-                          <button type="button" className="save-btn save-btn--compact" onClick={() => void handleSaveUser()}>
-                            <MdSave /> Save
-                          </button>
-                          <button type="button" className="cancel-btn cancel-btn--compact" onClick={() => setEditingUser(null)}>
-                            <MdCancel /> Cancel
-                          </button>
-                        </td>
-                      </tr>
-                    ) : (
-                      <tr key={user.id} className="admin-users-table-row">
-                        <td className="admin-users-table-strong">{user.name}</td>
-                        <td>{user.email}</td>
-                        <td className="admin-users-table-muted">{new Date(user.joinDate).toLocaleDateString()}</td>
-                        <td>
-                          <span className={`pass-type pass-type--pill ${user.passType}`}>{user.passType}</span>
-                        </td>
-                        <td>${user.totalSpent.toFixed(2)}</td>
-                        <td>
-                          <span className={`status-badge status-badge--table ${user.status}`}>{user.status}</span>
-                        </td>
-                        <td className="admin-users-table-actions">
-                          <button type="button" className="edit-btn" onClick={() => handleEditUser(user)} aria-label={`Edit ${user.name}`} title="Edit">
-                            <MdEdit />
-                          </button>
-                          <button type="button" className="delete-btn" onClick={() => requestDeleteUser(user.id)} aria-label={`Delete ${user.name}`} title="Delete">
-                            <MdDelete />
-                          </button>
-                        </td>
-                      </tr>
-                    ),
+            <div className="users-list">
+              {filteredUsers.map((user) => (
+                <div key={user.id} className="user-card">
+                  {editingUser?.id === user.id ? (
+                    <div className="edit-form">
+                      <div className="form-grid">
+                        <input
+                          type="text"
+                          value={editingUser.name}
+                          onChange={(e) => setEditingUser({...editingUser, name: e.target.value})}
+                        />
+                        <input
+                          type="email"
+                          value={editingUser.email}
+                          onChange={(e) => setEditingUser({...editingUser, email: e.target.value})}
+                        />
+                        <select
+                          value={editingUser.passType}
+                          onChange={(e) => setEditingUser({...editingUser, passType: e.target.value as User['passType']})}
+                        >
+                          <option value="none">No Pass</option>
+                          <option value="silver">Silver Pass</option>
+                          <option value="gold">Gold Pass</option>
+                        </select>
+                        <select
+                          value={editingUser.status}
+                          onChange={(e) => setEditingUser({...editingUser, status: e.target.value as User['status']})}
+                        >
+                          <option value="active">Active</option>
+                          <option value="suspended">Suspended</option>
+                          <option value="banned">Banned</option>
+                        </select>
+                      </div>
+                      <div className="form-actions">
+                        <button className="save-btn" onClick={handleSaveUser}>
+                          <MdSave /> Save
+                        </button>
+                        <button className="cancel-btn" onClick={() => setEditingUser(null)}>
+                          <MdCancel /> Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="user-info">
+                        <h4>{user.name}</h4>
+                        <p><strong>Email:</strong> {user.email}</p>
+                        <p><strong>Member Since:</strong> {new Date(user.joinDate).toLocaleDateString()}</p>
+                        <p><strong>Pass Type:</strong> <span className={`pass-type ${user.passType}`}>{user.passType}</span></p>
+                        <p><strong>Total Spent:</strong> ${user.totalSpent.toFixed(2)}</p>
+                        <span className={`status-badge ${user.status}`}>{user.status}</span>
+                      </div>
+                      <div className="user-actions">
+                        <button className="edit-btn" onClick={() => handleEditUser(user)}>
+                          <MdEdit />
+                        </button>
+                        <button className="delete-btn" onClick={() => handleDeleteUser(user.id)}>
+                          <MdDelete />
+                        </button>
+                      </div>
+                    </>
                   )}
-                </tbody>
-              </table>
+                </div>
+              ))}
               {filteredUsers.length === 0 && (
-                <p className="empty-results empty-results--users-table">No users found for your current search/filter.</p>
+                <p className="empty-results">No users found for your current search/filter.</p>
               )}
             </div>
           </section>
         )}
 
         {/* Data Reports Section */}
-        {activeSection === 'reports' && (
+        {activeSection === 'reports' && reportData && (
           <section className="reports-section">
             <h3>Data Reports & Analytics</h3>
             
-            {reportLoading && (
-              <div className="loading-state">
-                <p>Loading report data...</p>
-              </div>
-            )}
-            
-            {reportError && (
-              <div className="error-state">
-                <p>Error: {reportError}</p>
-              </div>
-            )}
-            
-            {reportData && (
-              <>
-                {/* Key Metrics */}
-                <div className="metrics-grid">
-                  <div className="metric-card">
-                    <div className="metric-icon">
-                      <MdPeople />
-                    </div>
-                    <div className="metric-info">
-                      <h4>{reportData.totalUsers.toLocaleString()}</h4>
-                      <p>Total Users</p>
-                    </div>
-                  </div>
-                  <div className="metric-card">
-                    <div className="metric-icon">
-                      <MdEvent />
-                    </div>
-                    <div className="metric-info">
-                      <h4>{reportData.totalEvents}</h4>
-                      <p>Total Events</p>
-                    </div>
-                  </div>
-                  <div className="metric-card">
-                    <div className="metric-icon">
-                      <MdAnalytics />
-                    </div>
-                    <div className="metric-info">
-                      <h4>${reportData.totalRevenue.toLocaleString()}</h4>
-                      <p>Total Revenue</p>
-                    </div>
-                  </div>
-                  <div className="metric-card">
-                    <div className="metric-icon">
-                      <MdVisibility />
-                    </div>
-                    <div className="metric-info">
-                      <h4>{reportData.averageQueueTime}</h4>
-                      <p>Avg Queue Time</p>
-                    </div>
-                  </div>
+            {/* Key Metrics */}
+            <div className="metrics-grid">
+              <div className="metric-card">
+                <div className="metric-icon">
+                  <MdPeople />
                 </div>
-
-                {/* Charts Container */}
-                <div className="charts-container">
-                  {/* Genre Distribution */}
-                  <div className="chart-card">
-                    <h4>Popular Genres</h4>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <BarChart data={reportData.topGenres}>
-                        <XAxis dataKey="name" />
-                        <YAxis />
-                        <Tooltip />
-                        <Bar dataKey="count" radius={[4, 4, 0, 0]}>
-                          {reportData.topGenres.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.fill} />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-
-                  {/* Monthly Revenue */}
-                  <div className="chart-card">
-                    <h4>Monthly Revenue Trend</h4>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <LineChart data={reportData.monthlyRevenue}>
-                        <XAxis dataKey="month" />
-                        <YAxis />
-                        <Tooltip
-                          formatter={(value) => {
-                            const numericValue = typeof value === 'number' ? value : Number(value ?? 0);
-                            return [`$${numericValue.toLocaleString()}`, 'Revenue'];
-                          }}
-                        />
-                        <Line 
-                          type="monotone" 
-                          dataKey="revenue" 
-                          stroke="#6366f1" 
-                          strokeWidth={3}
-                          dot={{ r: 5 }}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
-
-                  {/* User Growth */}
-                  <div className="chart-card">
-                    <h4>User Growth</h4>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <LineChart data={reportData.userGrowth}>
-                        <XAxis dataKey="month" />
-                        <YAxis />
-                        <Tooltip
-                          formatter={(value) => {
-                            const numericValue = typeof value === 'number' ? value : Number(value ?? 0);
-                            return [numericValue.toLocaleString(), 'Users'];
-                          }}
-                        />
-                        <Line 
-                          type="monotone" 
-                          dataKey="users" 
-                          stroke="#10b981" 
-                          strokeWidth={3}
-                          dot={{ r: 5 }}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
-
-                  {/* Pass Distribution */}
-                  <div className="chart-card">
-                    <h4>Pass Type Distribution</h4>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <PieChart>
-                        <Pie
-                          data={reportData.passDistribution}
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={80}
-                          dataKey="value"
-                          label={({ name, value }) => `${name}: ${value}%`}
-                        >
-                          {reportData.passDistribution.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.fill} />
-                          ))}
-                        </Pie>
-                        <Tooltip />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
+                <div className="metric-info">
+                  <h4>{reportData.totalUsers.toLocaleString()}</h4>
+                  <p>Total Users</p>
                 </div>
-              </>
-            )}
+              </div>
+              <div className="metric-card">
+                <div className="metric-icon">
+                  <MdEvent />
+                </div>
+                <div className="metric-info">
+                  <h4>{reportData.totalEvents}</h4>
+                  <p>Total Events</p>
+                </div>
+              </div>
+              <div className="metric-card">
+                <div className="metric-icon">
+                  <MdAnalytics />
+                </div>
+                <div className="metric-info">
+                  <h4>${reportData.totalRevenue.toLocaleString()}</h4>
+                  <p>Total Revenue</p>
+                </div>
+              </div>
+              <div className="metric-card">
+                <div className="metric-icon">
+                  <MdVisibility />
+                </div>
+                <div className="metric-info">
+                  <h4>{reportData.averageQueueTime}</h4>
+                  <p>Avg Queue Time</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Charts Container */}
+            <div className="charts-container">
+              {/* Genre Distribution */}
+              <div className="chart-card">
+                <h4>Popular Genres</h4>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={reportData.topGenres}>
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip />
+                    <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                      {reportData.topGenres.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Monthly Revenue */}
+              <div className="chart-card">
+                <h4>Monthly Revenue Trend</h4>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={reportData.monthlyRevenue}>
+                    <XAxis dataKey="month" />
+                    <YAxis />
+                    <Tooltip
+                      formatter={(value) => {
+                        const numericValue = typeof value === 'number' ? value : Number(value ?? 0);
+                        return [`$${numericValue.toLocaleString()}`, 'Revenue'];
+                      }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="revenue" 
+                      stroke="#6366f1" 
+                      strokeWidth={3}
+                      dot={{ r: 5 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* User Growth */}
+              <div className="chart-card">
+                <h4>User Growth</h4>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={reportData.userGrowth}>
+                    <XAxis dataKey="month" />
+                    <YAxis />
+                    <Tooltip
+                      formatter={(value) => {
+                        const numericValue = typeof value === 'number' ? value : Number(value ?? 0);
+                        return [numericValue.toLocaleString(), 'Users'];
+                      }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="users" 
+                      stroke="#10b981" 
+                      strokeWidth={3}
+                      dot={{ r: 5 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Pass Distribution */}
+              <div className="chart-card">
+                <h4>Pass Type Distribution</h4>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={reportData.passDistribution}
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={80}
+                      dataKey="value"
+                      label={({ name, value }) => `${name}: ${value}%`}
+                    >
+                      {reportData.passDistribution.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
           </section>
         )}
       </main>
-
-      <ConfirmDialog
-        open={pendingDelete !== null}
-        title={
-          pendingDelete?.kind === 'concert'
-            ? 'Delete concert?'
-            : pendingDelete?.kind === 'user'
-              ? 'Delete user?'
-              : ''
-        }
-        message={
-          pendingDelete?.kind === 'concert' ? (
-            <p>
-              Remove <strong>{pendingDelete.title}</strong> from the catalog? This cannot be undone.
-            </p>
-          ) : pendingDelete?.kind === 'user' ? (
-            <p>
-              Remove <strong>{pendingDelete.title}</strong>? Their queue history will be removed as well.
-            </p>
-          ) : null
-        }
-        confirmLabel="Delete"
-        cancelLabel="Cancel"
-        confirmVariant="danger"
-        onConfirm={handleConfirmDelete}
-        onCancel={() => setPendingDelete(null)}
-      />
     </div>
   );
 };
