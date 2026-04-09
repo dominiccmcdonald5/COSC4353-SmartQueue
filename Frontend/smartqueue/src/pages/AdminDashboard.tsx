@@ -75,27 +75,27 @@ type PendingDelete =
 
 // Maps a raw concert record from the backend to a ConcertEvent used by the UI
 function mapApiConcert(c: {
-  concertID: number;
-  concertName: string;
-  artistName: string;
+  concert_id: number;
+  concert_name: string;
+  artist_name: string;
   genre: string;
-  date: string;
+  event_date: string;
   venue: string;
   capacity: number;
-  ticketPrice: number;
-  concertImage: string;
-  concertStatus: string;
+  ticket_price: number;
+  concert_image: string;
+  concert_status: string;
 }): ConcertEvent {
-  const soldOut = String(c.concertStatus).toLowerCase() === 'sold_out';
-  const price = Number(c.ticketPrice);
+  const soldOut = String(c.concert_status).toLowerCase() === 'sold_out';
+  const price = Number(c.ticket_price);
   return {
-    id: String(c.concertID),
-    name: c.concertName || `Event ${c.concertID}`,
-    artist: c.artistName || '',
+    id: String(c.concert_id),
+    name: c.concert_name || `Event ${c.concert_id}`,
+    artist: c.artist_name || '',
     genre: c.genre || '',
-    date: typeof c.date === 'string' && c.date.length >= 10 ? c.date.slice(0, 10) : c.date,
+    date: typeof c.event_date === 'string' && c.event_date.length >= 10 ? c.event_date.slice(0, 10) : c.event_date,
     venue: c.venue || '',
-    image: c.concertImage || DEFAULT_CONCERT_IMAGE,
+    image: c.concert_image || DEFAULT_CONCERT_IMAGE,
     capacity: Number(c.capacity) || 0,
     ticketPriceMin: Number.isFinite(price) ? price : 0,
     ticketPriceMax: Number.isFinite(price) ? price : 0,
@@ -439,15 +439,16 @@ const AdminDashboard: React.FC = () => {
         ? venueOtherInputValue(newEvent.venue).trim()
         : newEvent.venue.trim();
 
+    // FIXED: Use snake_case field names to match backend
     const body = {
-      concertName: newEvent.name.trim(),
-      artistName: newEvent.artist.trim(),
+      concert_name: newEvent.name.trim(),
+      artist_name: newEvent.artist.trim(),
       genre: newEvent.genre.trim(),
-      date: newEvent.date,
+      event_date: newEvent.date,
       venue: venueTrimmed.slice(0, VENUE_MAX_LEN),
       capacity: newEvent.capacity,
-      ticketPrice: (min + max) / 2,
-      concertImage: newEvent.image || DEFAULT_CONCERT_IMAGE,
+      ticket_price: (min + max) / 2,
+      concert_image: newEvent.image || DEFAULT_CONCERT_IMAGE,
     };
 
     try {
@@ -492,16 +493,17 @@ const AdminDashboard: React.FC = () => {
     const min = editingEvent.ticketPriceMin;
     const max = editingEvent.ticketPriceMax;
 
+    // FIXED: Use snake_case field names to match backend
     const body = {
-      concertName: editingEvent.name.trim(),
-      artistName: editingEvent.artist.trim(),
+      concert_name: editingEvent.name.trim(),
+      artist_name: editingEvent.artist.trim(),
       genre: editingEvent.genre.trim(),
-      date: editingEvent.date,
+      event_date: editingEvent.date,
       venue: venueTrimmed.slice(0, VENUE_MAX_LEN),
       capacity: editingEvent.capacity,
-      ticketPrice: (min + max) / 2,
-      concertImage: editingEvent.image || DEFAULT_CONCERT_IMAGE,
-      concertStatus: editingEvent.status === 'completed' || editingEvent.status === 'cancelled'
+      ticket_price: (min + max) / 2,
+      concert_image: editingEvent.image || DEFAULT_CONCERT_IMAGE,
+      concert_status: editingEvent.status === 'completed' || editingEvent.status === 'cancelled'
         ? 'sold_out' : 'open',
     };
 
