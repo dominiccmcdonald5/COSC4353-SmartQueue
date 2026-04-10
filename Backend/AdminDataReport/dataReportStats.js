@@ -174,27 +174,207 @@ const getDataReportStats = async (req, res) => {
       reportGeneratedAt: new Date().toISOString(),
     };
 
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(
-      JSON.stringify(
-        {
-          success: true,
-          data: reportStats,
-        },
-        null,
-        2
-      )
-    );
-  } catch (error) {
-    console.error('Error generating data report stats:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(
-      JSON.stringify({
-        success: false,
-        error: error.message || 'Failed to generate data report',
-      })
-    );
-  }
+        // 1. Total number of users
+        const totalUsers = users.length;
+
+        // 2. Total number of events
+        const totalEvents = concerts.length;
+
+        // 3. Total revenue (sum of completed transactions)
+        const totalRevenue = history
+            .filter(h => h.status === 'completed')
+            .reduce((sum, h) => sum + (h.totalCost || 0), 0);
+
+        // 4. Average queue time (from all history records)
+        const averageQueueTime = history.length > 0
+            ? Math.round(history.reduce((sum, h) => sum + (h.waitTime || 0), 0) / history.length)
+            : 0;
+
+        // 5. Top 5 most popular genres
+        const genreCount = {};
+        concerts.forEach(concert => {
+            if (concert.genre) {
+                genreCount[concert.genre] = (genreCount[concert.genre] || 0) + 1;
+            }
+        });
+
+        const topGenres = Object.entries(genreCount)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5)
+            .map(([genre, count]) => ({
+                genre,
+                count
+            }));
+
+        // 6. Pass distribution (None, Gold, Silver, etc.)
+        const passDistribution = {};
+        users.forEach(user => {
+            const passType = user.passStatus || 'None';
+            passDistribution[passType] = (passDistribution[passType] || 0) + 1;
+        });
+
+        const passDistributionFormatted = Object.entries(passDistribution)
+            .map(([passType, count]) => ({
+                passType,
+                count,
+                percentage: ((count / totalUsers) * 100).toFixed(2)
+            }));
+
+        // 7. Monthly revenue trend
+        const monthlyRevenue = {};
+        history
+            .filter(h => h.status === 'completed')
+            .forEach(h => {
+                if (h.queuedAt) {
+                    const date = new Date(h.queuedAt);
+                    const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                    monthlyRevenue[monthKey] = (monthlyRevenue[monthKey] || 0) + (h.totalCost || 0);
+                }
+            });
+
+        const monthlyRevenueArray = Object.entries(monthlyRevenue)
+            .sort((a, b) => a[0].localeCompare(b[0]))
+            .map(([month, revenue]) => ({
+                month,
+                revenue: parseFloat(revenue.toFixed(2))
+            }));
+
+        // 8. User growth (cumulative count of users by signup month)
+        const usersByMonth = {};
+        users.forEach(user => {
+            if (user.createdAt) {
+                const date = new Date(user.createdAt);
+                const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                usersByMonth[monthKey] = (usersByMonth[monthKey] || 0) + 1;
+            }
+        });
+
+        // Convert to cumulative growth
+        const userGrowthArray = Object.entries(usersByMonth)
+            .sort((a, b) => a[0].localeCompare(b[0]))
+            .map(([month, count], index, arr) => {
+                // Calculate cumulative count
+                const cumulativeCount = arr
+                    .slice(0, index + 1)
+                    .reduce((sum, [_, c]) => sum + c, 0);
+                return {
+                    month,
+                    newUsers: count,
+                    totalUsers: cumulativeCount
+                };
+            });
+
+
+            // QUEUE ANALYTICS
+
+            // 1. Total queued, completed, left
+            const totalQueued = history.filter(h => h.status === 'queued').length;
+            const totalCompleted = history.filter(h => h.status === 'completed').length;
+            const totalLeft = history.filter(h => String(h.inLineStatus).toLowerCase() === 'left').length;
+
+            // 2. Average wait time per concert
+            const waitTimeByConcert = {};
+            history.forEach(h => {
+                if (!waitTimeByConcert[h.concertID]) {
+                    waitTimeByConcert[h.concertID] = { total: 0, count: 0 };
+                }
+                waitTimeByConcert[h.concertID].total += h.waitTime || 0;
+                waitTimeByConcert[h.concertID].count += 1;
+            });
+
+            const avgWaitTimePerConcert = Object.entries(waitTimeByConcert).map(([concertID, data]) => ({
+                concertID: Number(concertID),
+                concertName: concerts.find(c => c.concertID === Number(concertID))?.concertName || 'Unknown',
+                avgWaitTime: Math.round(data.total / data.count)
+            }));
+
+            // 3. Queue length per concert
+            const queueLengthPerConcert = concerts.map(concert => {
+                const count = history.filter(
+                    h =>
+                        h.concertID === concert.concertID &&
+                        h.status === 'queued' &&
+                        String(h.inLineStatus).toLowerCase() === 'in_line'
+                ).length;
+
+                return {
+                    concertID: concert.concertID,
+                    concertName: concert.concertName,
+                    queueLength: count
+                };
+            });
+
+            // 4. Revenue per concert
+            const revenuePerConcert = concerts.map(concert => {
+                const revenue = history
+                    .filter(h => h.concertID === concert.concertID && h.status === 'completed')
+                    .reduce((sum, h) => sum + (h.totalCost || 0), 0);
+
+                return {
+                    concertID: concert.concertID,
+                    concertName: concert.concertName,
+                    revenue: parseFloat(revenue.toFixed(2))
+                };
+            });
+
+            // 5. Ticket count per concert
+            const ticketCountPerConcert = concerts.map(concert => {
+                const tickets = history
+                    .filter(h => h.concertID === concert.concertID && h.status === 'completed')
+                    .reduce((sum, h) => sum + (h.ticketCount || 0), 0);
+
+                return {
+                    concertID: concert.concertID,
+                    concertName: concert.concertName,
+                    ticketsSold: tickets
+                };
+            });
+
+            // 6. Peak queue hours
+            const hourBuckets = {};
+            history.forEach(h => {
+                if (h.queuedAt) {
+                    const hour = new Date(h.queuedAt).getHours();
+                    hourBuckets[hour] = (hourBuckets[hour] || 0) + 1;
+                }
+            });
+
+            const peakQueueHours = Object.entries(hourBuckets)
+                .sort((a, b) => b[1] - a[1])
+                .map(([hour, count]) => ({
+                    hour: Number(hour),
+                    count
+                }));
+
+
+        // Compile all statistics
+        const reportStats = {
+            totalUsers,
+            totalEvents,
+            totalRevenue: parseFloat(totalRevenue.toFixed(2)),
+            averageQueueTime: `${averageQueueTime} minutes`,
+            topGenres,
+            passDistribution: passDistributionFormatted,
+            monthlyRevenueTrend: monthlyRevenueArray,
+            userGrowth: userGrowthArray,
+            reportGeneratedAt: new Date().toISOString()
+        };
+
+        // Send response
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+            success: true,
+            data: reportStats
+        }, null, 2));
+
+    } catch (error) {
+        console.error('Error generating data report stats:', error);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+            success: false,
+            error: error.message || 'Failed to generate data report'
+        }));
+    }
 };
 
 module.exports = {
