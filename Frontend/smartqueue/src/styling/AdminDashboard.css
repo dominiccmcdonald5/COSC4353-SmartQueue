@@ -369,6 +369,96 @@
   background: #ede9fe;
 }
 
+.admin-users-edit-panel {
+  padding: 1.25rem 1.5rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.admin-users-edit-panel-grid {
+  display: grid;
+  gap: 1rem 1.25rem;
+  align-items: end;
+}
+
+.admin-users-edit-panel-grid--names {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 2fr);
+}
+
+.admin-users-edit-panel-grid--meta {
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+}
+
+@media (max-width: 768px) {
+  .admin-users-edit-panel-grid--names {
+    grid-template-columns: 1fr;
+  }
+}
+
+.admin-users-edit-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.admin-users-edit-field--grow {
+  min-width: 12rem;
+}
+
+.admin-users-edit-field label,
+.admin-users-edit-readonly-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #4b5563;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.admin-users-edit-readonly-value {
+  font-size: 0.9375rem;
+  color: #6b7280;
+  padding: 0.5rem 0;
+}
+
+.admin-users-edit-panel .admin-users-edit-field input,
+.admin-users-edit-panel .admin-users-edit-field select {
+  width: 100%;
+  max-width: none;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.9375rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  box-sizing: border-box;
+}
+
+.admin-users-edit-panel .admin-users-edit-field input:focus,
+.admin-users-edit-panel .admin-users-edit-field select:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.12);
+}
+
+.admin-users-edit-password-block {
+  padding-top: 0.25rem;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.admin-users-edit-password-block .admin-user-password-fields {
+  max-width: 32rem;
+}
+
+.admin-users-edit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
 .admin-users-password-row td {
   background: #f9fafb;
   padding: 1rem 1.25rem;

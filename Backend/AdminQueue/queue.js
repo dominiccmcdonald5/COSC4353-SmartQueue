@@ -1,4 +1,4 @@
-const pool = require('../database');
+const { pool } = require('../database');
 
 function sendJson(res, statusCode, payload) {
   res.writeHead(statusCode, { 'Content-Type': 'application/json' });
