@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { formatLocalDateFromApi } from '../utils/apiDate';
 import { GiPoliceBadge } from 'react-icons/gi';
 import { FaDollarSign } from 'react-icons/fa';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell } from 'recharts';
@@ -354,7 +355,7 @@ const UserDashboard: React.FC = () => {
                       <p className="concert-artist">{item.artist}</p>
                       <div className="concert-meta">
                         <span className="concert-genre">{item.genre}</span>
-                        <span className="concert-date">{new Date(item.date).toLocaleDateString()}</span>
+                        <span className="concert-date">{formatLocalDateFromApi(item.date)}</span>
                       </div>
                       <div className="queue-metrics-inline">
                         <span className="metric-inline">Wait Time: {item.waitTime}</span>
@@ -395,15 +396,12 @@ const UserDashboard: React.FC = () => {
           </section>
         )}
 
-        {activeTab === 'stats' && (
+        {activeTab === 'stats' && userStats && (
           <section className="user-stats">
             <h3>Your Concert Statistics</h3>
             {statsLoading && <p>Loading stats...</p>}
             {statsError && <p className="error-message">{statsError}</p>}
-            {!statsLoading && !statsError && !userStats && <p>No stats found for this user.</p>}
-
-            {userStats && (
-            <>
+            
             {/* Success Rate Container */}
             <div className="stats-container success-container">
               <div className="pie-chart-container">
@@ -507,8 +505,6 @@ const UserDashboard: React.FC = () => {
                 </div>
               </div>
             </div>
-            </>
-            )}
           </section>
         )}
 

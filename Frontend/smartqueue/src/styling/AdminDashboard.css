@@ -245,6 +245,10 @@
   min-width: 0;
 }
 
+.form-field-stacked--full-row {
+  grid-column: 1 / -1;
+}
+
 .form-grid input,
 .form-grid select {
   padding: 0.75rem;
@@ -363,6 +367,42 @@
 
 .admin-users-table-row.is-editing:hover {
   background: #ede9fe;
+}
+
+.admin-users-password-row td {
+  background: #f9fafb;
+  padding: 1rem 1.25rem;
+  vertical-align: top;
+}
+
+.admin-user-password-fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+}
+
+.admin-user-password-label {
+  flex: 0 0 100%;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.admin-user-password-fields input[type='password'] {
+  min-width: 140px;
+  flex: 1 1 160px;
+  max-width: 240px;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.9375rem;
+}
+
+.admin-user-password-fields input[type='password']:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.12);
 }
 
 .admin-users-table td input,

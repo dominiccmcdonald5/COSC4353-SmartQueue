@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { formatLocalDateFromApi } from '../utils/apiDate';
 import '../components/ui/ConfirmDialog.css';
 import '../styling/QueuePage.css';
 
@@ -289,7 +290,7 @@ const QueuePage: React.FC = () => {
           <h2>{queueStatus.concertName}</h2>
           <p className="artist">{queueStatus.artist}</p>
           <p className="venue">{queueStatus.venue}</p>
-          <p className="date">{new Date(queueStatus.date).toLocaleDateString()}</p>
+          <p className="date">{formatLocalDateFromApi(queueStatus.date)}</p>
         </div>
 
         {!isInQueue ? (
