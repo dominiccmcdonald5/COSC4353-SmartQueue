@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Fragment } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { 
@@ -19,6 +19,7 @@ import { CONCERT_ARTIST_MAX_LEN, type ConcertEvent } from '../types/concertEvent
 import ConcertEventEditForm from '../components/admin/ConcertEventEditForm';
 import EventEditModal from '../components/admin/EventEditModal';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
+import { formatLocalDateFromApi } from '../utils/apiDate';
 import {
   VENUE_MAX_LEN,
   VENUE_OTHER,
@@ -67,6 +68,8 @@ function parseSpentForSave(s: string): number | null {
 
 const DEFAULT_CONCERT_IMAGE = '/concert1.jpg';
 const API_BASE = 'http://localhost:5000';
+/** Matches backend admin user API minimum password length. */
+const ADMIN_USER_PASSWORD_MIN_LEN = 4;
 
 type PendingDelete =
   | { kind: 'concert'; id: string; title: string }
@@ -75,27 +78,27 @@ type PendingDelete =
 
 // Maps a raw concert record from the backend to a ConcertEvent used by the UI
 function mapApiConcert(c: {
-  concert_id: number;
-  concert_name: string;
-  artist_name: string;
+  concertID: number;
+  concertName: string;
+  artistName: string;
   genre: string;
-  event_date: string;
+  date: string;
   venue: string;
   capacity: number;
-  ticket_price: number;
-  concert_image: string;
-  concert_status: string;
+  ticketPrice: number;
+  concertImage: string;
+  concertStatus: string;
 }): ConcertEvent {
-  const soldOut = String(c.concert_status).toLowerCase() === 'sold_out';
-  const price = Number(c.ticket_price);
+  const soldOut = String(c.concertStatus).toLowerCase() === 'sold_out';
+  const price = Number(c.ticketPrice);
   return {
-    id: String(c.concert_id),
-    name: c.concert_name || `Event ${c.concert_id}`,
-    artist: c.artist_name || '',
+    id: String(c.concertID),
+    name: c.concertName || `Event ${c.concertID}`,
+    artist: c.artistName || '',
     genre: c.genre || '',
-    date: typeof c.event_date === 'string' && c.event_date.length >= 10 ? c.event_date.slice(0, 10) : c.event_date,
+    date: typeof c.date === 'string' && c.date.length >= 10 ? c.date.slice(0, 10) : c.date,
     venue: c.venue || '',
-    image: c.concert_image || DEFAULT_CONCERT_IMAGE,
+    image: c.concertImage || DEFAULT_CONCERT_IMAGE,
     capacity: Number(c.capacity) || 0,
     ticketPriceMin: Number.isFinite(price) ? price : 0,
     ticketPriceMax: Number.isFinite(price) ? price : 0,
@@ -320,9 +323,15 @@ const AdminDashboard: React.FC = () => {
   });
   const [addUserEmptyName, setAddUserEmptyName] = useState(false);
   const [addUserEmptyEmail, setAddUserEmptyEmail] = useState(false);
+  const [newUserPassword, setNewUserPassword] = useState('');
+  const [newUserPasswordConfirm, setNewUserPasswordConfirm] = useState('');
+  const [addUserPasswordError, setAddUserPasswordError] = useState<string | null>(null);
   const [userEditSpentStr, setUserEditSpentStr] = useState('');
   const [editUserEmptyName, setEditUserEmptyName] = useState(false);
   const [editUserEmptySpent, setEditUserEmptySpent] = useState(false);
+  const [editUserPassword, setEditUserPassword] = useState('');
+  const [editUserPasswordConfirm, setEditUserPasswordConfirm] = useState('');
+  const [editUserPasswordError, setEditUserPasswordError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch(`${API_BASE}/api/admin/users`)
@@ -439,16 +448,15 @@ const AdminDashboard: React.FC = () => {
         ? venueOtherInputValue(newEvent.venue).trim()
         : newEvent.venue.trim();
 
-    // FIXED: Use snake_case field names to match backend
     const body = {
-      concert_name: newEvent.name.trim(),
-      artist_name: newEvent.artist.trim(),
+      concertName: newEvent.name.trim(),
+      artistName: newEvent.artist.trim(),
       genre: newEvent.genre.trim(),
-      event_date: newEvent.date,
+      date: newEvent.date,
       venue: venueTrimmed.slice(0, VENUE_MAX_LEN),
       capacity: newEvent.capacity,
-      ticket_price: (min + max) / 2,
-      concert_image: newEvent.image || DEFAULT_CONCERT_IMAGE,
+      ticketPrice: (min + max) / 2,
+      concertImage: newEvent.image || DEFAULT_CONCERT_IMAGE,
     };
 
     try {
@@ -493,17 +501,16 @@ const AdminDashboard: React.FC = () => {
     const min = editingEvent.ticketPriceMin;
     const max = editingEvent.ticketPriceMax;
 
-    // FIXED: Use snake_case field names to match backend
     const body = {
-      concert_name: editingEvent.name.trim(),
-      artist_name: editingEvent.artist.trim(),
+      concertName: editingEvent.name.trim(),
+      artistName: editingEvent.artist.trim(),
       genre: editingEvent.genre.trim(),
-      event_date: editingEvent.date,
+      date: editingEvent.date,
       venue: venueTrimmed.slice(0, VENUE_MAX_LEN),
       capacity: editingEvent.capacity,
-      ticket_price: (min + max) / 2,
-      concert_image: editingEvent.image || DEFAULT_CONCERT_IMAGE,
-      concert_status: editingEvent.status === 'completed' || editingEvent.status === 'cancelled'
+      ticketPrice: (min + max) / 2,
+      concertImage: editingEvent.image || DEFAULT_CONCERT_IMAGE,
+      concertStatus: editingEvent.status === 'completed' || editingEvent.status === 'cancelled'
         ? 'sold_out' : 'open',
     };
 
@@ -560,17 +567,39 @@ const AdminDashboard: React.FC = () => {
     const emailBad = !emailTrim;
     setAddUserEmptyName(nameBad);
     setAddUserEmptyEmail(emailBad);
+    setAddUserPasswordError(null);
     if (nameBad || emailBad) return;
+
+    const pw = newUserPassword;
+    const pw2 = newUserPasswordConfirm;
+    if (!pw || !pw2) {
+      setAddUserPasswordError('Password and confirmation are required.');
+      return;
+    }
+    if (pw.length < ADMIN_USER_PASSWORD_MIN_LEN) {
+      setAddUserPasswordError(
+        `Password must be at least ${ADMIN_USER_PASSWORD_MIN_LEN} characters.`
+      );
+      return;
+    }
+    if (pw !== pw2) {
+      setAddUserPasswordError('Passwords do not match.');
+      return;
+    }
+
+    const body: Record<string, unknown> = {
+      name: nameTrim,
+      email: emailTrim,
+      passType: newUser.passType,
+      status: newUser.status,
+      password: pw,
+    };
+
     try {
       const res = await fetch(`${API_BASE}/api/admin/users`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: nameTrim,
-          email: emailTrim,
-          passType: newUser.passType,
-          status: newUser.status,
-        }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (data.success && data.user) {
@@ -589,6 +618,9 @@ const AdminDashboard: React.FC = () => {
       passType: 'none',
       status: 'active',
     });
+    setNewUserPassword('');
+    setNewUserPasswordConfirm('');
+    setAddUserPasswordError(null);
     setAddUserEmptyName(false);
     setAddUserEmptyEmail(false);
     setShowAddUserForm(false);
@@ -599,6 +631,9 @@ const AdminDashboard: React.FC = () => {
     setUserEditSpentStr(String(user.totalSpent));
     setEditUserEmptyName(false);
     setEditUserEmptySpent(false);
+    setEditUserPassword('');
+    setEditUserPasswordConfirm('');
+    setEditUserPasswordError(null);
   };
 
   const handleSaveUser = async () => {
@@ -609,19 +644,40 @@ const AdminDashboard: React.FC = () => {
     const spentBad = spentNum === null;
     setEditUserEmptyName(nameBad);
     setEditUserEmptySpent(spentBad);
+    setEditUserPasswordError(null);
     if (nameBad || spentBad) return;
+
+    const pw = editUserPassword;
+    const pw2 = editUserPasswordConfirm;
+    if (pw || pw2) {
+      if (pw.length < ADMIN_USER_PASSWORD_MIN_LEN) {
+        setEditUserPasswordError(
+          `Password must be at least ${ADMIN_USER_PASSWORD_MIN_LEN} characters, or leave both fields blank to keep the current password.`
+        );
+        return;
+      }
+      if (pw !== pw2) {
+        setEditUserPasswordError('Passwords do not match.');
+        return;
+      }
+    }
+
+    const body: Record<string, unknown> = {
+      name: nameTrim,
+      email: editingUser.email.trim(),
+      passType: editingUser.passType,
+      status: editingUser.status,
+      totalSpent: spentNum,
+    };
+    if (pw.length >= ADMIN_USER_PASSWORD_MIN_LEN && pw === pw2) {
+      body.password = pw;
+    }
 
     try {
       const res = await fetch(`${API_BASE}/api/admin/users/${editingUser.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: nameTrim,
-          email: editingUser.email.trim(),
-          passType: editingUser.passType,
-          status: editingUser.status,
-          totalSpent: spentNum,
-        }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (data.success && data.user) {
@@ -637,6 +693,9 @@ const AdminDashboard: React.FC = () => {
     }
     setEditingUser(null);
     setUserEditSpentStr('');
+    setEditUserPassword('');
+    setEditUserPasswordConfirm('');
+    setEditUserPasswordError(null);
   };
 
   const requestDeleteUser = (id: string) => {
@@ -1059,7 +1118,7 @@ const AdminDashboard: React.FC = () => {
                       </div>
                       <div className="event-detail-row">
                         <dt>Date</dt>
-                        <dd>{new Date(event.date).toLocaleDateString(undefined, { dateStyle: 'long' })}</dd>
+                        <dd>{formatLocalDateFromApi(event.date, { dateStyle: 'long' })}</dd>
                       </div>
                       <div className="event-detail-row">
                         <dt>Venue</dt>
@@ -1115,6 +1174,9 @@ const AdminDashboard: React.FC = () => {
                 onClick={() => {
                   setAddUserEmptyName(false);
                   setAddUserEmptyEmail(false);
+                  setNewUserPassword('');
+                  setNewUserPasswordConfirm('');
+                  setAddUserPasswordError(null);
                   setShowAddUserForm(true);
                 }}
               >
@@ -1184,6 +1246,37 @@ const AdminDashboard: React.FC = () => {
                       </span>
                     )}
                   </div>
+                  <div className="form-field-stacked form-field-stacked--full-row">
+                    <input
+                      type="password"
+                      autoComplete="new-password"
+                      placeholder={`Login password (required, min ${ADMIN_USER_PASSWORD_MIN_LEN} chars)`}
+                      className={addUserPasswordError ? 'is-invalid' : undefined}
+                      value={newUserPassword}
+                      onChange={(e) => {
+                        setAddUserPasswordError(null);
+                        setNewUserPassword(e.target.value);
+                      }}
+                    />
+                  </div>
+                  <div className="form-field-stacked form-field-stacked--full-row">
+                    <input
+                      type="password"
+                      autoComplete="new-password"
+                      placeholder="Confirm password (required)"
+                      className={addUserPasswordError ? 'is-invalid' : undefined}
+                      value={newUserPasswordConfirm}
+                      onChange={(e) => {
+                        setAddUserPasswordError(null);
+                        setNewUserPasswordConfirm(e.target.value);
+                      }}
+                    />
+                    {addUserPasswordError && (
+                      <span className="field-inline-error" role="alert">
+                        {addUserPasswordError}
+                      </span>
+                    )}
+                  </div>
                   <select
                     value={newUser.passType}
                     onChange={(e) => setNewUser({...newUser, passType: e.target.value as User['passType']})}
@@ -1210,6 +1303,9 @@ const AdminDashboard: React.FC = () => {
                     onClick={() => {
                       setAddUserEmptyName(false);
                       setAddUserEmptyEmail(false);
+                      setNewUserPassword('');
+                      setNewUserPasswordConfirm('');
+                      setAddUserPasswordError(null);
                       setShowAddUserForm(false);
                     }}
                   >
@@ -1237,7 +1333,8 @@ const AdminDashboard: React.FC = () => {
                 <tbody>
                   {filteredUsers.map((user) =>
                     editingUser?.id === user.id ? (
-                      <tr key={user.id} className="admin-users-table-row is-editing">
+                      <Fragment key={user.id}>
+                      <tr className="admin-users-table-row is-editing">
                         <td>
                           <div className="admin-users-cell-stack">
                             <input
@@ -1338,12 +1435,50 @@ const AdminDashboard: React.FC = () => {
                               setUserEditSpentStr('');
                               setEditUserEmptyName(false);
                               setEditUserEmptySpent(false);
+                              setEditUserPassword('');
+                              setEditUserPasswordConfirm('');
+                              setEditUserPasswordError(null);
                             }}
                           >
                             <MdCancel /> Cancel
                           </button>
                         </td>
                       </tr>
+                      <tr className="admin-users-table-row admin-users-password-row">
+                        <td colSpan={7}>
+                          <div className="admin-user-password-fields">
+                            <span className="admin-user-password-label">New login password (optional)</span>
+                            <input
+                              type="password"
+                              autoComplete="new-password"
+                              aria-label="New password"
+                              placeholder={`Min ${ADMIN_USER_PASSWORD_MIN_LEN} characters`}
+                              value={editUserPassword}
+                              onChange={(e) => {
+                                setEditUserPasswordError(null);
+                                setEditUserPassword(e.target.value);
+                              }}
+                            />
+                            <input
+                              type="password"
+                              autoComplete="new-password"
+                              aria-label="Confirm new password"
+                              placeholder="Confirm password"
+                              value={editUserPasswordConfirm}
+                              onChange={(e) => {
+                                setEditUserPasswordError(null);
+                                setEditUserPasswordConfirm(e.target.value);
+                              }}
+                            />
+                            {editUserPasswordError && (
+                              <span className="field-inline-error" role="alert">
+                                {editUserPasswordError}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                      </Fragment>
                     ) : (
                       <tr key={user.id} className="admin-users-table-row">
                         <td className="admin-users-table-strong">{user.name}</td>
