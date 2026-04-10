@@ -1,30 +1,35 @@
-require('dotenv').config()
-// Connects .env database information to database.js
+require('dotenv').config();
 
-const MYSQL = require('mysql2')
-// MySQL package for Node.js
-console.log(process.env.DB_DATABASE);
+const mysql = require('mysql2');
 
-const pool = MYSQL.createPool({
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_DATABASE,
-    port: process.env.DB_PORT,
-    ssl: {
-        rejectUnauthorized: true // This is important for Heroku deployment
-    }
+function toBool(value, defaultValue) {
+  if (value == null) return defaultValue;
+  const s = String(value).trim().toLowerCase();
+  if (s === 'true' || s === '1' || s === 'yes') return true;
+  if (s === 'false' || s === '0' || s === 'no') return false;
+  return defaultValue;
+}
+
+const sslEnabled = toBool(process.env.DB_SSL, true);
+const sslRejectUnauthorized = toBool(process.env.DB_SSL_REJECT_UNAUTHORIZED, true);
+
+const pool = mysql.createPool({
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_DATABASE,
+  port: process.env.DB_PORT ? Number(process.env.DB_PORT) : undefined,
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
+  ssl: sslEnabled
+    ? {
+        rejectUnauthorized: sslRejectUnauthorized,
+      }
+    : undefined,
 });
-// Creates a connection pool to the MySQL database using the credentials from .env
 
-pool.getConnection((err, connection) => {
-    if (err) {
-        console.error('Error connecting to the database:', err)
-        return
-    }
-    console.log('Connected to the database')
-    connection.release() // Release the connection back to the pool
-});
-
-module.exports = pool;
-// Exports the connection pool for use in other modules
+module.exports = {
+  pool,
+  promisePool: pool.promise(),
+};
