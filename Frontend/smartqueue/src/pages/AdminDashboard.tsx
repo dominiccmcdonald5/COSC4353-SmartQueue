@@ -391,67 +391,83 @@ const AdminDashboard: React.FC = () => {
       .catch(() => setEvents(getFallbackConcertEvents()));
   }, []);
 
-  // Fetch admin report data from API
+  // Load report when opening Data Reports (uses same API base as the rest of the admin dashboard)
   useEffect(() => {
+    if (activeSection !== 'reports') return;
+
+    let cancelled = false;
     const fetchReportData = async () => {
       setReportLoading(true);
       setReportError(null);
       try {
-        const response = await fetch('http://localhost:5000/api/admin/data-report');
+        const response = await fetch(`${API_BASE}/api/admin/data-report`);
+        const data = await response.json().catch(() => null);
+
+        if (cancelled) return;
+
         if (!response.ok) {
-          throw new Error('Failed to fetch report data');
+          throw new Error(
+            typeof data?.error === 'string' ? data.error : `Report request failed (${response.status})`
+          );
         }
-        const data = await response.json();
-        
-        if (data.success && data.data) {
-          const apiData = data.data as ApiReportData;
-          
-          // Transform API data to match ReportData interface
-          const colors = ['#f59e0b', '#10b981', '#6366f1', '#ec4899', '#8b5cf6'];
-          const transformedReport: ReportData = {
-            totalUsers: apiData.totalUsers,
-            totalEvents: apiData.totalEvents,
-            totalRevenue: apiData.totalRevenue,
-            averageQueueTime: apiData.averageQueueTime,
-            topGenres: apiData.topGenres.map((g, idx) => ({
-              name: g.genre,
-              count: g.count,
-              fill: colors[idx % colors.length]
-            })),
-            monthlyRevenue: apiData.monthlyRevenueTrend.map(m => ({
-              month: m.month,
-              revenue: m.revenue
-            })),
-            userGrowth: apiData.userGrowth.map(u => ({
-              month: u.month,
-              users: u.totalUsers
-            })),
-            passDistribution: apiData.passDistribution.map(p => {
-              const passMap: Record<string, string> = {
-                'None': '#9ca3af',
-                'Gold': '#ffd700',
-                'Silver': '#c0c0c0'
-              };
-              return {
-                name: p.passType,
-                value: parseInt(p.percentage),
-                fill: passMap[p.passType] || '#9ca3af'
-              };
-            })
-          };
-          
-          setReportData(transformedReport);
+        if (!data?.success || data.data == null) {
+          throw new Error(
+            typeof data?.error === 'string' ? data.error : 'Report API returned no data'
+          );
         }
+
+        const apiData = data.data as ApiReportData;
+
+        const colors = ['#f59e0b', '#10b981', '#6366f1', '#ec4899', '#8b5cf6'];
+        const passFill = (passType: string) => {
+          const key = String(passType).toLowerCase();
+          if (key === 'gold') return '#ffd700';
+          if (key === 'silver') return '#c0c0c0';
+          return '#9ca3af';
+        };
+
+        const transformedReport: ReportData = {
+          totalUsers: Number(apiData.totalUsers) || 0,
+          totalEvents: Number(apiData.totalEvents) || 0,
+          totalRevenue: Number(apiData.totalRevenue) || 0,
+          averageQueueTime: String(apiData.averageQueueTime ?? '0 minutes'),
+          topGenres: (apiData.topGenres || []).map((g, idx) => ({
+            name: g.genre,
+            count: Number(g.count) || 0,
+            fill: colors[idx % colors.length],
+          })),
+          monthlyRevenue: (apiData.monthlyRevenueTrend || []).map((m) => ({
+            month: m.month,
+            revenue: Number(m.revenue) || 0,
+          })),
+          userGrowth: (apiData.userGrowth || []).map((u) => ({
+            month: u.month,
+            users: Number(u.totalUsers) || 0,
+          })),
+          passDistribution: (apiData.passDistribution || []).map((p) => ({
+            name: p.passType,
+            value: Number(p.count) || 0,
+            fill: passFill(p.passType),
+          })),
+        };
+
+        setReportData(transformedReport);
       } catch (error) {
         console.error('Error fetching report data:', error);
-        setReportError(error instanceof Error ? error.message : 'Failed to load report data');
+        if (!cancelled) {
+          setReportError(error instanceof Error ? error.message : 'Failed to load report data');
+          setReportData(null);
+        }
       } finally {
-        setReportLoading(false);
+        if (!cancelled) setReportLoading(false);
       }
     };
 
-    fetchReportData();
-  }, []);
+    void fetchReportData();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSection]);
 
   const handleAddEvent = async () => {
     const artistTrim = newEvent.artist.trim();
@@ -1729,7 +1745,10 @@ const AdminDashboard: React.FC = () => {
                           cy="50%"
                           outerRadius={80}
                           dataKey="value"
-                          label={({ name, value }) => `${name}: ${value}%`}
+                          nameKey="name"
+                          label={({ name, percent }) =>
+                            `${name}: ${((percent ?? 0) * 100).toFixed(0)}%`
+                          }
                         >
                           {reportData.passDistribution.map((entry, index) => (
                             <Cell key={`cell-${index}`} fill={entry.fill} />

@@ -23,74 +23,91 @@ function normalizePassLabel(raw) {
 }
 
 async function fetchUserReportStats() {
-  const cols = await getUsersColumnSet();
-  const [[{ totalUsers }]] = await promisePool.query(
-    `SELECT COUNT(*) AS totalUsers FROM users WHERE ${USER_ROLE_FILTER}`
-  );
-  const n = Number(totalUsers) || 0;
-
-  const [passRows] = await promisePool.query(
-    `SELECT TRIM(COALESCE(pass_status, '')) AS pass_raw, COUNT(*) AS cnt
-     FROM users WHERE ${USER_ROLE_FILTER}
-     GROUP BY TRIM(COALESCE(pass_status, ''))`
-  );
-  const passDistributionFormatted = (passRows || []).map((row) => {
-    const passType = normalizePassLabel(row.pass_raw);
-    const count = Number(row.cnt) || 0;
-    return {
-      passType,
-      count,
-      percentage: n > 0 ? ((count / n) * 100).toFixed(2) : '0.00',
-    };
-  });
-
-  let userGrowthArray = [];
-  if (cols.has('created_at')) {
-    const [byMonth] = await promisePool.query(
-      `SELECT DATE_FORMAT(created_at, '%Y-%m') AS month, COUNT(*) AS cnt
-       FROM users
-       WHERE ${USER_ROLE_FILTER} AND created_at IS NOT NULL
-       GROUP BY DATE_FORMAT(created_at, '%Y-%m')
-       ORDER BY month ASC`
+  try {
+    const cols = await getUsersColumnSet();
+    const [[{ totalUsers }]] = await promisePool.query(
+      `SELECT COUNT(*) AS totalUsers FROM users WHERE ${USER_ROLE_FILTER}`
     );
-    const sorted = (byMonth || []).map((r) => ({
-      month: String(r.month),
-      cnt: Number(r.cnt) || 0,
-    }));
-    let cumulative = 0;
-    userGrowthArray = sorted.map(({ month, cnt }) => {
-      cumulative += cnt;
-      return { month, newUsers: cnt, totalUsers: cumulative };
-    });
-  }
+    const n = Number(totalUsers) || 0;
 
-  return {
-    totalUsers: n,
-    passDistribution: passDistributionFormatted,
-    userGrowth: userGrowthArray,
-  };
+    const [passRows] = await promisePool.query(
+      `SELECT TRIM(COALESCE(pass_status, '')) AS pass_raw, COUNT(*) AS cnt
+       FROM users WHERE ${USER_ROLE_FILTER}
+       GROUP BY TRIM(COALESCE(pass_status, ''))`
+    );
+    const passDistributionFormatted = (passRows || []).map((row) => {
+      const passType = normalizePassLabel(row.pass_raw);
+      const count = Number(row.cnt) || 0;
+      return {
+        passType,
+        count,
+        percentage: n > 0 ? ((count / n) * 100).toFixed(2) : '0.00',
+      };
+    });
+
+    let userGrowthArray = [];
+    if (cols.has('created_at')) {
+      const [byMonth] = await promisePool.query(
+        `SELECT DATE_FORMAT(created_at, '%Y-%m') AS month, COUNT(*) AS cnt
+         FROM users
+         WHERE ${USER_ROLE_FILTER} AND created_at IS NOT NULL
+         GROUP BY DATE_FORMAT(created_at, '%Y-%m')
+         ORDER BY month ASC`
+      );
+      const sorted = (byMonth || []).map((r) => ({
+        month: String(r.month),
+        cnt: Number(r.cnt) || 0,
+      }));
+      let cumulative = 0;
+      userGrowthArray = sorted.map(({ month, cnt }) => {
+        cumulative += cnt;
+        return { month, newUsers: cnt, totalUsers: cumulative };
+      });
+    }
+
+    return {
+      totalUsers: n,
+      passDistribution: passDistributionFormatted,
+      userGrowth: userGrowthArray,
+    };
+  } catch (e) {
+    console.error('fetchUserReportStats:', e);
+    return {
+      totalUsers: 0,
+      passDistribution: [],
+      userGrowth: [],
+    };
+  }
 }
 
 async function fetchConcertReportStats() {
-  const [[{ totalEvents }]] = await promisePool.query(`SELECT COUNT(*) AS totalEvents FROM concerts`);
+  try {
+    const [[{ totalEvents }]] = await promisePool.query(`SELECT COUNT(*) AS totalEvents FROM concerts`);
 
-  const [genreRows] = await promisePool.query(
-    `SELECT genre, COUNT(*) AS cnt
-     FROM concerts
-     WHERE genre IS NOT NULL AND TRIM(genre) <> ''
-     GROUP BY genre
-     ORDER BY cnt DESC
-     LIMIT 5`
-  );
-  const topGenres = (genreRows || []).map((r) => ({
-    genre: String(r.genre),
-    count: Number(r.cnt) || 0,
-  }));
+    const [genreRows] = await promisePool.query(
+      `SELECT genre, COUNT(*) AS cnt
+       FROM concerts
+       WHERE genre IS NOT NULL AND TRIM(genre) <> ''
+       GROUP BY genre
+       ORDER BY cnt DESC
+       LIMIT 5`
+    );
+    const topGenres = (genreRows || []).map((r) => ({
+      genre: String(r.genre),
+      count: Number(r.cnt) || 0,
+    }));
 
-  return {
-    totalEvents: Number(totalEvents) || 0,
-    topGenres,
-  };
+    return {
+      totalEvents: Number(totalEvents) || 0,
+      topGenres,
+    };
+  } catch (e) {
+    console.error('fetchConcertReportStats:', e);
+    return {
+      totalEvents: 0,
+      topGenres: [],
+    };
+  }
 }
 
 /**
