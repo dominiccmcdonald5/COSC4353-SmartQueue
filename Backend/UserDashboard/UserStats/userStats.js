@@ -1,4 +1,4 @@
-const pool = require('../../database');
+const { pool } = require('../../database');
 
 function toNumber(value, fallback = 0) {
     const num = Number(value);

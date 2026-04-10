@@ -1,5 +1,5 @@
 const { stringify } = require('qs');
-const pool = require('./database.js');
+const { pool } = require('./database.js');
 const nodemailer = require('nodemailer');
 const {uploadToAzureBlobFromServer} = require('./azure.js');
 const fs = require('fs');

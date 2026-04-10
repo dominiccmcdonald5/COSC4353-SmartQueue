@@ -87,6 +87,8 @@ function rowToAdminShape(row) {
     userID: row.userID,
     id: String(row.userID),
     name,
+    firstName,
+    lastName,
     email: typeof row.email === 'string' ? row.email : '',
     joinDate,
     passType,
@@ -341,18 +343,21 @@ async function editUser(req, res, rawId) {
     const sets = [];
     const vals = [];
 
-    if (payload.name != null) {
+    const hasFirst = Object.prototype.hasOwnProperty.call(payload, 'firstName');
+    const hasLast = Object.prototype.hasOwnProperty.call(payload, 'lastName');
+    if (hasFirst || hasLast) {
+      if (hasFirst) {
+        sets.push('first_name = ?');
+        vals.push(String(payload.firstName ?? '').trim());
+      }
+      if (hasLast) {
+        sets.push('last_name = ?');
+        vals.push(String(payload.lastName ?? '').trim());
+      }
+    } else if (payload.name != null) {
       const { firstName, lastName } = splitName(payload.name);
       sets.push('first_name = ?', 'last_name = ?');
       vals.push(firstName, lastName);
-    }
-    if (payload.firstName != null) {
-      sets.push('first_name = ?');
-      vals.push(String(payload.firstName).trim());
-    }
-    if (payload.lastName != null) {
-      sets.push('last_name = ?');
-      vals.push(String(payload.lastName).trim());
     }
     if (payload.email != null) {
       sets.push('email = ?');

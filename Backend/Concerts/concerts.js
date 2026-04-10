@@ -1,4 +1,4 @@
-const pool = require('../database');
+const { pool } = require('../database');
 
 // Helper function to format concert for frontend
 const formatConcertForFrontend = (concert) => {
