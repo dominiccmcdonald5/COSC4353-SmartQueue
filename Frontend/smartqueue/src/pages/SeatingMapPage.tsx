@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
+import { formatLocalDateFromApi } from '../utils/apiDate';
 import '../styling/SeatingMapPage.css';
 
 interface Seat {
@@ -277,7 +278,7 @@ const SeatingMapPage: React.FC = () => {
         {concertInfo && (
           <div className="concert-info">
             <h2>{concertInfo.name}</h2>
-            <p>{concertInfo.artist} • {concertInfo.venue} • {new Date(concertInfo.date).toLocaleDateString()}</p>
+            <p>{concertInfo.artist} • {concertInfo.venue} • {formatLocalDateFromApi(concertInfo.date)}</p>
             <p>
               Seats Available:{' '}
               {concertInfo.availableTickets != null && concertInfo.totalTickets != null

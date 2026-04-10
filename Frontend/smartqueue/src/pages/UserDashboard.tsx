@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { formatLocalDateFromApi } from '../utils/apiDate';
 import { GiPoliceBadge } from 'react-icons/gi';
 import { FaDollarSign } from 'react-icons/fa';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell } from 'recharts';
@@ -354,7 +355,7 @@ const UserDashboard: React.FC = () => {
                       <p className="concert-artist">{item.artist}</p>
                       <div className="concert-meta">
                         <span className="concert-genre">{item.genre}</span>
-                        <span className="concert-date">{new Date(item.date).toLocaleDateString()}</span>
+                        <span className="concert-date">{formatLocalDateFromApi(item.date)}</span>
                       </div>
                       <div className="queue-metrics-inline">
                         <span className="metric-inline">Wait Time: {item.waitTime}</span>

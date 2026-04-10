@@ -5,7 +5,7 @@ const signup = require('./SignUp/signup');
 const userHistory = require('./UserDashboard/ConcertHistory/userHistory');
 const userStats = require('./UserDashboard/UserStats/userStats');
 const updatePass = require('./PassPurchase/updatePass');
-const services = require('./ServiceManagement/services');
+// const services = require('./ServiceManagement/services');
 const adminQueue = require('./AdminQueue/queue');
 const concerts = require('./ConcertManagement/concerts');
 const concertsLegacy = require('./Concerts/concerts');
@@ -57,20 +57,6 @@ function routes(req, res) {
     return concertsLegacy.handleGetConcertById(req, res, concertId);
   }
 
-  /* —— Service management (admin) —— */
-  if (pathname === '/api/services' && method === 'GET') {
-    return services.listServices(req, res);
-  }
-
-  if (pathname === '/api/services' && method === 'POST') {
-    return services.createService(req, res);
-  }
-
-  if (method === 'PUT' && /^\/api\/services\/\d+$/.test(pathname)) {
-    const serviceID = pathname.split('/').pop();
-    return services.updateService(req, res, serviceID);
-  }
-
   /* —— Concert events admin CRUD —— */
   if (pathname === '/api/admin/concerts' && method === 'GET') {
     return concerts.getAllConcerts(req, res);
@@ -114,11 +100,6 @@ function routes(req, res) {
     return adminQueue.getQueue(req, res);
   }
 
-  if (method === 'GET' && /^\/api\/queue\/\d+$/.test(pathname)) {
-    const concertID = pathname.split('/').pop();
-    return adminQueue.getQueueStatusByConcert(req, res, concertID, parsed.query?.userId);
-  }
-
   if (pathname === '/api/admin/queue/serve-next' && method === 'POST') {
     return adminQueue.serveNext(req, res);
   }
@@ -126,14 +107,6 @@ function routes(req, res) {
   /** Optional: POST { label?, priorityLevel? } — for manual / Postman tests */
   if (pathname === '/api/queue/join' && method === 'POST') {
     return adminQueue.joinQueue(req, res);
-  }
-
-  if (pathname === '/api/queue/leave' && method === 'POST') {
-    return adminQueue.leaveQueue(req, res);
-  }
-
-  if (pathname === '/api/payment/complete' && method === 'POST') {
-    return adminQueue.completePayment(req, res);
   }
 
   res.writeHead(404, { 'Content-Type': 'application/json' });
