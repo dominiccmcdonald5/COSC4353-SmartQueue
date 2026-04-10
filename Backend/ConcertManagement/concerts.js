@@ -1,4 +1,4 @@
-const { allMockData, persistMockData } = require('../mockData');
+const pool = require('../database');
 
 const CONCERT_STATUSES = new Set(['open', 'sold_out']);
 
@@ -28,26 +28,49 @@ function readJsonBody(req) {
   });
 }
 
-/** GET — list every concert (mock / JSON store). */
+/** GET — list every concert from database */
 function getAllConcerts(req, res) {
-  const concerts = [...allMockData.CONCERT].sort((a, b) => a.concertID - b.concertID);
-  sendJson(res, 200, {
-    success: true,
-    count: concerts.length,
-    concerts,
+  const query = `
+    SELECT 
+      concert_id,
+      concert_name,
+      artist_name,
+      genre,
+      event_date,
+      venue,
+      capacity,
+      ticket_price,
+      concert_image,
+      concert_status
+    FROM concerts
+    ORDER BY concert_id ASC
+  `;
+  
+  pool.query(query, (error, rows) => {
+    if (error) {
+      console.error('Error fetching concerts:', error);
+      sendJson(res, 500, { success: false, message: 'Database error', error: error.message });
+      return;
+    }
+    
+    sendJson(res, 200, {
+      success: true,
+      count: rows.length,
+      concerts: rows,
+    });
   });
 }
 
 const EDITABLE_FIELDS = [
-  'concertName',
-  'artistName',
+  'concert_name',
+  'artist_name',
   'genre',
-  'date',
+  'event_date',
   'venue',
   'capacity',
-  'ticketPrice',
-  'concertImage',
-  'concertStatus',
+  'ticket_price',
+  'concert_image',
+  'concert_status',
 ];
 
 function validateEditPayload(payload) {
@@ -63,27 +86,27 @@ function validateEditPayload(payload) {
     errors.push(`Invalid field(s): ${invalid.join(', ')}`);
   }
 
-  if (Object.prototype.hasOwnProperty.call(payload, 'concertName')) {
-    if (typeof payload.concertName !== 'string' || !payload.concertName.trim()) {
-      errors.push('concertName must be a non-empty string');
-    } else if (payload.concertName.trim().length > 200) {
-      errors.push('concertName must be at most 200 characters');
+  if (Object.prototype.hasOwnProperty.call(payload, 'concert_name')) {
+    if (typeof payload.concert_name !== 'string' || !payload.concert_name.trim()) {
+      errors.push('concert_name must be a non-empty string');
+    } else if (payload.concert_name.trim().length > 200) {
+      errors.push('concert_name must be at most 200 characters');
     }
   }
 
-  if (Object.prototype.hasOwnProperty.call(payload, 'artistName')) {
-    if (typeof payload.artistName !== 'string' || !payload.artistName.trim()) {
-      errors.push('artistName must be a non-empty string');
-    } else if (payload.artistName.trim().length > 120) {
-      errors.push('artistName must be at most 120 characters');
+  if (Object.prototype.hasOwnProperty.call(payload, 'artist_name')) {
+    if (typeof payload.artist_name !== 'string' || !payload.artist_name.trim()) {
+      errors.push('artist_name must be a non-empty string');
+    } else if (payload.artist_name.trim().length > 200) {
+      errors.push('artist_name must be at most 200 characters');
     }
   }
 
   if (Object.prototype.hasOwnProperty.call(payload, 'genre')) {
     if (typeof payload.genre !== 'string' || !payload.genre.trim()) {
       errors.push('genre must be a non-empty string');
-    } else if (payload.genre.trim().length > 80) {
-      errors.push('genre must be at most 80 characters');
+    } else if (payload.genre.trim().length > 100) {
+      errors.push('genre must be at most 100 characters');
     }
   }
 
@@ -95,10 +118,10 @@ function validateEditPayload(payload) {
     }
   }
 
-  if (Object.prototype.hasOwnProperty.call(payload, 'date')) {
-    const d = new Date(payload.date);
+  if (Object.prototype.hasOwnProperty.call(payload, 'event_date')) {
+    const d = new Date(payload.event_date);
     if (Number.isNaN(d.getTime())) {
-      errors.push('date must be a valid date (ISO string recommended)');
+      errors.push('event_date must be a valid date (ISO string recommended)');
     }
   }
 
@@ -108,42 +131,42 @@ function validateEditPayload(payload) {
     }
   }
 
-  if (Object.prototype.hasOwnProperty.call(payload, 'ticketPrice')) {
-    const p = Number(payload.ticketPrice);
+  if (Object.prototype.hasOwnProperty.call(payload, 'ticket_price')) {
+    const p = Number(payload.ticket_price);
     if (!Number.isFinite(p) || p < 0) {
-      errors.push('ticketPrice must be a non-negative number');
+      errors.push('ticket_price must be a non-negative number');
     }
   }
 
-  if (Object.prototype.hasOwnProperty.call(payload, 'concertImage')) {
-    if (typeof payload.concertImage !== 'string' || !payload.concertImage.trim()) {
-      errors.push('concertImage must be a non-empty string');
-    } else if (payload.concertImage.trim().length > 500) {
-      errors.push('concertImage URL must be at most 500 characters');
+  if (Object.prototype.hasOwnProperty.call(payload, 'concert_image')) {
+    if (typeof payload.concert_image !== 'string' || !payload.concert_image.trim()) {
+      errors.push('concert_image must be a non-empty string');
+    } else if (payload.concert_image.trim().length > 500) {
+      errors.push('concert_image URL must be at most 500 characters');
     }
   }
 
-  if (Object.prototype.hasOwnProperty.call(payload, 'concertStatus')) {
-    const s = String(payload.concertStatus).toLowerCase();
+  if (Object.prototype.hasOwnProperty.call(payload, 'concert_status')) {
+    const s = String(payload.concert_status).toLowerCase();
     if (!CONCERT_STATUSES.has(s)) {
-      errors.push('concertStatus must be one of: open, sold_out');
+      errors.push('concert_status must be one of: open, sold_out');
     }
   }
 
   return errors;
 }
 
-/** POST — create a new concert; persists to mockDataStore.json. */
+/** POST — create a new concert in database */
 async function createConcert(req, res) {
   try {
     const payload = await readJsonBody(req);
     const errors = [];
 
-    if (!payload.concertName || typeof payload.concertName !== 'string' || !payload.concertName.trim()) {
-      errors.push('concertName is required');
+    if (!payload.concert_name || typeof payload.concert_name !== 'string' || !payload.concert_name.trim()) {
+      errors.push('concert_name is required');
     }
-    if (!payload.artistName || typeof payload.artistName !== 'string' || !payload.artistName.trim()) {
-      errors.push('artistName is required');
+    if (!payload.artist_name || typeof payload.artist_name !== 'string' || !payload.artist_name.trim()) {
+      errors.push('artist_name is required');
     }
     if (!payload.genre || typeof payload.genre !== 'string' || !payload.genre.trim()) {
       errors.push('genre is required');
@@ -151,15 +174,15 @@ async function createConcert(req, res) {
     if (!payload.venue || typeof payload.venue !== 'string' || !payload.venue.trim()) {
       errors.push('venue is required');
     }
-    if (!payload.date || Number.isNaN(new Date(payload.date).getTime())) {
-      errors.push('date must be a valid date');
+    if (!payload.event_date || Number.isNaN(new Date(payload.event_date).getTime())) {
+      errors.push('event_date must be a valid date');
     }
     if (!Number.isInteger(Number(payload.capacity)) || Number(payload.capacity) < 1) {
       errors.push('capacity must be a positive integer');
     }
-    const price = Number(payload.ticketPrice);
+    const price = Number(payload.ticket_price);
     if (!Number.isFinite(price) || price < 0) {
-      errors.push('ticketPrice must be a non-negative number');
+      errors.push('ticket_price must be a non-negative number');
     }
 
     if (errors.length > 0) {
@@ -167,49 +190,80 @@ async function createConcert(req, res) {
       return;
     }
 
-    const maxID = allMockData.CONCERT.reduce((max, c) => Math.max(max, c.concertID), 0);
-    const newConcert = {
-      concertID: maxID + 1,
-      concertName: payload.concertName.trim(),
-      artistName: payload.artistName.trim(),
-      genre: payload.genre.trim(),
-      date: new Date(payload.date).toISOString(),
-      venue: payload.venue.trim(),
-      capacity: Number(payload.capacity),
-      ticketPrice: Number(price.toFixed(2)),
-      concertImage: (typeof payload.concertImage === 'string' && payload.concertImage.trim())
-        ? payload.concertImage.trim()
-        : `https://picsum.photos/seed/smartqueue-concert-${maxID + 1}/600/400`,
-      concertStatus: 'open',
-    };
-
-    allMockData.CONCERT.push(newConcert);
-    persistMockData(allMockData);
-
-    sendJson(res, 201, {
-      success: true,
-      message: 'Concert created successfully',
-      concert: newConcert,
+    const insertQuery = `
+      INSERT INTO concerts (
+        concert_name, artist_name, genre, event_date, venue, 
+        capacity, ticket_price, concert_image, concert_status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+    
+    const concertImage = (typeof payload.concert_image === 'string' && payload.concert_image.trim())
+      ? payload.concert_image.trim()
+      : `https://picsum.photos/seed/concert-${Date.now()}/600/400`;
+    
+    pool.query(insertQuery, [
+      payload.concert_name.trim(),
+      payload.artist_name.trim(),
+      payload.genre.trim(),
+      payload.event_date,
+      payload.venue.trim(),
+      Number(payload.capacity),
+      Number(price.toFixed(2)),
+      concertImage,
+      'open'
+    ], (error, result) => {
+      if (error) {
+        console.error('Error creating concert:', error);
+        sendJson(res, 500, { success: false, message: 'Database error', error: error.message });
+        return;
+      }
+      
+      // Fetch the newly created concert
+      pool.query('SELECT * FROM concerts WHERE concert_id = ?', [result.insertId], (err, rows) => {
+        if (err) {
+          sendJson(res, 500, { success: false, message: 'Failed to retrieve new concert' });
+          return;
+        }
+        
+        sendJson(res, 201, {
+          success: true,
+          message: 'Concert created successfully',
+          concert: rows[0],
+        });
+      });
     });
   } catch (error) {
-    sendJson(res, 400, { success: false, message: error.message || 'Unable to create concert' });
+    console.error('Error in createConcert:', error);
+    sendJson(res, 500, { success: false, message: error.message || 'Unable to create concert' });
   }
 }
 
-/** PUT — partial update by concertID; persists to mockDataStore.json. */
+/** PUT — partial update by concert_id */
 async function editConcert(req, res, rawId) {
-  const concertID = Number(rawId);
-  if (!Number.isInteger(concertID) || concertID <= 0) {
-    sendJson(res, 400, { success: false, message: 'concertID must be a positive integer' });
+  const concert_id = Number(rawId);
+  if (!Number.isInteger(concert_id) || concert_id <= 0) {
+    sendJson(res, 400, { success: false, message: 'concert_id must be a positive integer' });
     return;
   }
 
-  const index = allMockData.CONCERT.findIndex((c) => c.concertID === concertID);
-  if (index === -1) {
-    sendJson(res, 404, { success: false, message: 'Concert not found' });
-    return;
-  }
+  // Check if concert exists
+  pool.query('SELECT * FROM concerts WHERE concert_id = ?', [concert_id], (err, existing) => {
+    if (err) {
+      sendJson(res, 500, { success: false, message: 'Database error' });
+      return;
+    }
+    
+    if (existing.length === 0) {
+      sendJson(res, 404, { success: false, message: 'Concert not found' });
+      return;
+    }
+    
+    // Continue with update
+    updateConcert(req, res, concert_id, existing[0]);
+  });
+}
 
+async function updateConcert(req, res, concert_id, currentConcert) {
   try {
     const payload = await readJsonBody(req);
     const errors = validateEditPayload(payload);
@@ -218,78 +272,126 @@ async function editConcert(req, res, rawId) {
       return;
     }
 
-    const current = allMockData.CONCERT[index];
-    const updated = { ...current };
+    const updates = [];
+    const values = [];
 
-    if (Object.prototype.hasOwnProperty.call(payload, 'concertName')) {
-      updated.concertName = payload.concertName.trim();
+    if (Object.prototype.hasOwnProperty.call(payload, 'concert_name')) {
+      updates.push('concert_name = ?');
+      values.push(payload.concert_name.trim());
     }
-    if (Object.prototype.hasOwnProperty.call(payload, 'artistName')) {
-      updated.artistName = payload.artistName.trim();
+    if (Object.prototype.hasOwnProperty.call(payload, 'artist_name')) {
+      updates.push('artist_name = ?');
+      values.push(payload.artist_name.trim());
     }
     if (Object.prototype.hasOwnProperty.call(payload, 'genre')) {
-      updated.genre = payload.genre.trim();
+      updates.push('genre = ?');
+      values.push(payload.genre.trim());
     }
     if (Object.prototype.hasOwnProperty.call(payload, 'venue')) {
-      updated.venue = payload.venue.trim();
+      updates.push('venue = ?');
+      values.push(payload.venue.trim());
     }
-    if (Object.prototype.hasOwnProperty.call(payload, 'date')) {
-      updated.date = new Date(payload.date).toISOString();
+    if (Object.prototype.hasOwnProperty.call(payload, 'event_date')) {
+      updates.push('event_date = ?');
+      values.push(payload.event_date);
     }
     if (Object.prototype.hasOwnProperty.call(payload, 'capacity')) {
-      updated.capacity = payload.capacity;
+      updates.push('capacity = ?');
+      values.push(payload.capacity);
     }
-    if (Object.prototype.hasOwnProperty.call(payload, 'ticketPrice')) {
-      updated.ticketPrice = Number(Number(payload.ticketPrice).toFixed(2));
+    if (Object.prototype.hasOwnProperty.call(payload, 'ticket_price')) {
+      updates.push('ticket_price = ?');
+      values.push(Number(payload.ticket_price).toFixed(2));
     }
-    if (Object.prototype.hasOwnProperty.call(payload, 'concertImage')) {
-      updated.concertImage = payload.concertImage.trim();
+    if (Object.prototype.hasOwnProperty.call(payload, 'concert_image')) {
+      updates.push('concert_image = ?');
+      values.push(payload.concert_image.trim());
     }
-    if (Object.prototype.hasOwnProperty.call(payload, 'concertStatus')) {
-      updated.concertStatus = String(payload.concertStatus).toLowerCase();
+    if (Object.prototype.hasOwnProperty.call(payload, 'concert_status')) {
+      updates.push('concert_status = ?');
+      values.push(String(payload.concert_status).toLowerCase());
     }
 
-    allMockData.CONCERT[index] = updated;
-    persistMockData(allMockData);
+    if (updates.length === 0) {
+      sendJson(res, 400, { success: false, message: 'No valid fields to update' });
+      return;
+    }
 
-    sendJson(res, 200, {
-      success: true,
-      message: 'Concert updated successfully',
-      concert: updated,
+    values.push(concert_id);
+    const updateQuery = `UPDATE concerts SET ${updates.join(', ')} WHERE concert_id = ?`;
+    
+    pool.query(updateQuery, values, (error) => {
+      if (error) {
+        console.error('Error updating concert:', error);
+        sendJson(res, 500, { success: false, message: 'Database error', error: error.message });
+        return;
+      }
+      
+      // Fetch the updated concert
+      pool.query('SELECT * FROM concerts WHERE concert_id = ?', [concert_id], (err, rows) => {
+        if (err) {
+          sendJson(res, 500, { success: false, message: 'Failed to retrieve updated concert' });
+          return;
+        }
+        
+        sendJson(res, 200, {
+          success: true,
+          message: 'Concert updated successfully',
+          concert: rows[0],
+        });
+      });
     });
   } catch (error) {
-    sendJson(res, 400, {
-      success: false,
-      message: error.message || 'Unable to update concert',
-    });
+    console.error('Error in editConcert:', error);
+    sendJson(res, 500, { success: false, message: error.message || 'Unable to update concert' });
   }
 }
 
-/** DELETE — remove concert and related HISTORY rows; persists store. */
+/** DELETE — remove concert and related queue_history rows */
 function deleteConcert(req, res, rawId) {
-  const concertID = Number(rawId);
-  if (!Number.isInteger(concertID) || concertID <= 0) {
-    sendJson(res, 400, { success: false, message: 'concertID must be a positive integer' });
+  const concert_id = Number(rawId);
+  if (!Number.isInteger(concert_id) || concert_id <= 0) {
+    sendJson(res, 400, { success: false, message: 'concert_id must be a positive integer' });
     return;
   }
 
-  const index = allMockData.CONCERT.findIndex((c) => c.concertID === concertID);
-  if (index === -1) {
-    sendJson(res, 404, { success: false, message: 'Concert not found' });
-    return;
-  }
+  // First check if concert exists
+  pool.query('SELECT * FROM concerts WHERE concert_id = ?', [concert_id], (err, existing) => {
+    if (err) {
+      console.error('Error checking concert:', err);
+      sendJson(res, 500, { success: false, message: 'Database error' });
+      return;
+    }
+    
+    if (existing.length === 0) {
+      sendJson(res, 404, { success: false, message: 'Concert not found' });
+      return;
+    }
 
-  const [removed] = allMockData.CONCERT.splice(index, 1);
-  const historyBefore = allMockData.HISTORY.length;
-  allMockData.HISTORY = allMockData.HISTORY.filter((h) => h.concertID !== concertID);
-  persistMockData(allMockData);
-
-  sendJson(res, 200, {
-    success: true,
-    message: 'Concert deleted successfully',
-    concertID,
-    removedConcert: removed,
-    historyEntriesRemoved: historyBefore - allMockData.HISTORY.length,
+    // Delete related queue_history entries first (due to foreign key constraint with ON DELETE CASCADE)
+    // The foreign key has ON DELETE CASCADE, so this will happen automatically, but we can do it explicitly
+    pool.query('DELETE FROM queue_history WHERE concert_id = ?', [concert_id], (error) => {
+      if (error) {
+        console.error('Error deleting queue_history:', error);
+        // Continue anyway - cascade might handle it
+      }
+      
+      // Delete the concert
+      pool.query('DELETE FROM concerts WHERE concert_id = ?', [concert_id], (err2) => {
+        if (err2) {
+          console.error('Error deleting concert:', err2);
+          sendJson(res, 500, { success: false, message: 'Failed to delete concert', error: err2.message });
+          return;
+        }
+        
+        sendJson(res, 200, {
+          success: true,
+          message: 'Concert deleted successfully',
+          concert_id: concert_id,
+          removedConcert: existing[0],
+        });
+      });
+    });
   });
 }
 

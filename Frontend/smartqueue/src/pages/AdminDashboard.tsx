@@ -15,7 +15,7 @@ import {
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Tooltip } from 'recharts';
 import '../styling/AdminDashboard.css';
 import { ADMIN_EVENTS_STORAGE_KEY } from '../data/adminEventsStorage';
-import type { ConcertEvent } from '../types/concertEvent';
+import { CONCERT_ARTIST_MAX_LEN, type ConcertEvent } from '../types/concertEvent';
 import ConcertEventEditForm from '../components/admin/ConcertEventEditForm';
 import EventEditModal from '../components/admin/EventEditModal';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
@@ -23,9 +23,47 @@ import {
   VENUE_MAX_LEN,
   VENUE_OTHER,
   VENUE_PRESETS,
+  isVenueIncomplete,
   venueOtherInputValue,
   venueSelectValue,
 } from '../utils/concertVenue';
+
+type AddRequiredKey = 'name' | 'artist' | 'genre' | 'date' | 'venue' | 'capacity';
+
+const initialAddRequiredEmpty: Record<AddRequiredKey, boolean> = {
+  name: false,
+  artist: false,
+  genre: false,
+  date: false,
+  venue: false,
+  capacity: false,
+};
+
+/** Letters A–Z, a–z, and spaces only; other keys are ignored. */
+function sanitizeUserNameInput(value: string): string {
+  return value.replace(/[^A-Za-z\s]/g, '');
+}
+
+/** Digits and at most one decimal point. */
+function sanitizeSpentInput(value: string): string {
+  let sawDot = false;
+  let out = '';
+  for (const ch of value) {
+    if (ch >= '0' && ch <= '9') out += ch;
+    else if (ch === '.' && !sawDot) {
+      sawDot = true;
+      out += ch;
+    }
+  }
+  return out;
+}
+
+function parseSpentForSave(s: string): number | null {
+  const t = s.trim();
+  if (t === '' || t === '.') return null;
+  const n = parseFloat(t);
+  return Number.isFinite(n) ? n : null;
+}
 
 const DEFAULT_CONCERT_IMAGE = '/concert1.jpg';
 const API_BASE = 'http://localhost:5000';
@@ -37,27 +75,27 @@ type PendingDelete =
 
 // Maps a raw concert record from the backend to a ConcertEvent used by the UI
 function mapApiConcert(c: {
-  concertID: number;
-  concertName: string;
-  artistName: string;
+  concert_id: number;
+  concert_name: string;
+  artist_name: string;
   genre: string;
-  date: string;
+  event_date: string;
   venue: string;
   capacity: number;
-  ticketPrice: number;
-  concertImage: string;
-  concertStatus: string;
+  ticket_price: number;
+  concert_image: string;
+  concert_status: string;
 }): ConcertEvent {
-  const soldOut = String(c.concertStatus).toLowerCase() === 'sold_out';
-  const price = Number(c.ticketPrice);
+  const soldOut = String(c.concert_status).toLowerCase() === 'sold_out';
+  const price = Number(c.ticket_price);
   return {
-    id: String(c.concertID),
-    name: c.concertName || `Event ${c.concertID}`,
-    artist: c.artistName || '',
+    id: String(c.concert_id),
+    name: c.concert_name || `Event ${c.concert_id}`,
+    artist: c.artist_name || '',
     genre: c.genre || '',
-    date: typeof c.date === 'string' && c.date.length >= 10 ? c.date.slice(0, 10) : c.date,
+    date: typeof c.event_date === 'string' && c.event_date.length >= 10 ? c.event_date.slice(0, 10) : c.event_date,
     venue: c.venue || '',
-    image: c.concertImage || DEFAULT_CONCERT_IMAGE,
+    image: c.concert_image || DEFAULT_CONCERT_IMAGE,
     capacity: Number(c.capacity) || 0,
     ticketPriceMin: Number.isFinite(price) ? price : 0,
     ticketPriceMax: Number.isFinite(price) ? price : 0,
@@ -253,6 +291,10 @@ const AdminDashboard: React.FC = () => {
   const [userSearchTerm, setUserSearchTerm] = useState('');
   const [userStatusFilter, setUserStatusFilter] = useState<'all' | User['status']>('all');
   const [pendingDelete, setPendingDelete] = useState<PendingDelete>(null);
+  const [addRequiredEmpty, setAddRequiredEmpty] =
+    useState<Record<AddRequiredKey, boolean>>(initialAddRequiredEmpty);
+  const [addEventInvalidArtist, setAddEventInvalidArtist] = useState(false);
+  const [addEventInvalidPriceRange, setAddEventInvalidPriceRange] = useState(false);
 
   // Form data for new events
   const [newEvent, setNewEvent] = useState<Omit<ConcertEvent, 'id'>>({
@@ -276,6 +318,11 @@ const AdminDashboard: React.FC = () => {
     passType: 'none',
     status: 'active'
   });
+  const [addUserEmptyName, setAddUserEmptyName] = useState(false);
+  const [addUserEmptyEmail, setAddUserEmptyEmail] = useState(false);
+  const [userEditSpentStr, setUserEditSpentStr] = useState('');
+  const [editUserEmptyName, setEditUserEmptyName] = useState(false);
+  const [editUserEmptySpent, setEditUserEmptySpent] = useState(false);
 
   useEffect(() => {
     fetch(`${API_BASE}/api/admin/users`)
@@ -365,24 +412,43 @@ const AdminDashboard: React.FC = () => {
   }, []);
 
   const handleAddEvent = async () => {
-    const venueTrimmed = newEvent.venue.trim();
-    if (!venueTrimmed || venueTrimmed === VENUE_OTHER) {
-      window.alert('Please select a venue or choose Other and enter a venue name.');
-      return;
-    }
-    let min = newEvent.ticketPriceMin;
-    let max = newEvent.ticketPriceMax;
-    if (min > max) { const t = min; min = max; max = t; }
+    const artistTrim = newEvent.artist.trim();
+    const artistEmpty = !artistTrim;
+    const artistLenBad = !artistEmpty && newEvent.artist.length > CONCERT_ARTIST_MAX_LEN;
+    const min = newEvent.ticketPriceMin;
+    const max = newEvent.ticketPriceMax;
+    const priceBad = Number.isFinite(min) && Number.isFinite(max) && min > max;
 
+    const nextRequired: Record<AddRequiredKey, boolean> = {
+      name: !newEvent.name.trim(),
+      artist: artistEmpty,
+      genre: !newEvent.genre.trim(),
+      date: !newEvent.date,
+      venue: isVenueIncomplete(newEvent.venue),
+      capacity: !Number.isFinite(newEvent.capacity) || newEvent.capacity < 1,
+    };
+
+    setAddRequiredEmpty(nextRequired);
+    setAddEventInvalidArtist(artistLenBad);
+    setAddEventInvalidPriceRange(priceBad);
+
+    if (Object.values(nextRequired).some(Boolean) || artistLenBad || priceBad) return;
+
+    const venueTrimmed =
+      venueSelectValue(newEvent.venue) === VENUE_OTHER
+        ? venueOtherInputValue(newEvent.venue).trim()
+        : newEvent.venue.trim();
+
+    // FIXED: Use snake_case field names to match backend
     const body = {
-      concertName: newEvent.name.trim(),
-      artistName: newEvent.artist.trim(),
+      concert_name: newEvent.name.trim(),
+      artist_name: newEvent.artist.trim(),
       genre: newEvent.genre.trim(),
-      date: newEvent.date,
+      event_date: newEvent.date,
       venue: venueTrimmed.slice(0, VENUE_MAX_LEN),
       capacity: newEvent.capacity,
-      ticketPrice: (min + max) / 2,
-      concertImage: newEvent.image || DEFAULT_CONCERT_IMAGE,
+      ticket_price: (min + max) / 2,
+      concert_image: newEvent.image || DEFAULT_CONCERT_IMAGE,
     };
 
     try {
@@ -408,6 +474,9 @@ const AdminDashboard: React.FC = () => {
       image: DEFAULT_CONCERT_IMAGE, capacity: 0,
       ticketPriceMin: 0, ticketPriceMax: 0, status: 'upcoming', published: false,
     });
+    setAddRequiredEmpty(initialAddRequiredEmpty);
+    setAddEventInvalidArtist(false);
+    setAddEventInvalidPriceRange(false);
     setShowAddEventForm(false);
   };
 
@@ -417,25 +486,24 @@ const AdminDashboard: React.FC = () => {
 
   const handleSaveEvent = async () => {
     if (!editingEvent) return;
-    const venueTrimmed = editingEvent.venue.trim();
-    if (!venueTrimmed || venueTrimmed === VENUE_OTHER) {
-      window.alert('Please select a venue or choose Other and enter a venue name.');
-      return;
-    }
-    let min = editingEvent.ticketPriceMin;
-    let max = editingEvent.ticketPriceMax;
-    if (min > max) { const t = min; min = max; max = t; }
+    const venueTrimmed =
+      venueSelectValue(editingEvent.venue) === VENUE_OTHER
+        ? venueOtherInputValue(editingEvent.venue).trim()
+        : editingEvent.venue.trim();
+    const min = editingEvent.ticketPriceMin;
+    const max = editingEvent.ticketPriceMax;
 
+    // FIXED: Use snake_case field names to match backend
     const body = {
-      concertName: editingEvent.name.trim(),
-      artistName: editingEvent.artist.trim(),
+      concert_name: editingEvent.name.trim(),
+      artist_name: editingEvent.artist.trim(),
       genre: editingEvent.genre.trim(),
-      date: editingEvent.date,
+      event_date: editingEvent.date,
       venue: venueTrimmed.slice(0, VENUE_MAX_LEN),
       capacity: editingEvent.capacity,
-      ticketPrice: (min + max) / 2,
-      concertImage: editingEvent.image || DEFAULT_CONCERT_IMAGE,
-      concertStatus: editingEvent.status === 'completed' || editingEvent.status === 'cancelled'
+      ticket_price: (min + max) / 2,
+      concert_image: editingEvent.image || DEFAULT_CONCERT_IMAGE,
+      concert_status: editingEvent.status === 'completed' || editingEvent.status === 'cancelled'
         ? 'sold_out' : 'open',
     };
 
@@ -488,10 +556,11 @@ const AdminDashboard: React.FC = () => {
   const handleAddUser = async () => {
     const nameTrim = newUser.name.trim();
     const emailTrim = newUser.email.trim();
-    if (!nameTrim || !emailTrim) {
-      window.alert('Name and email are required.');
-      return;
-    }
+    const nameBad = !nameTrim;
+    const emailBad = !emailTrim;
+    setAddUserEmptyName(nameBad);
+    setAddUserEmptyEmail(emailBad);
+    if (nameBad || emailBad) return;
     try {
       const res = await fetch(`${API_BASE}/api/admin/users`, {
         method: 'POST',
@@ -520,25 +589,38 @@ const AdminDashboard: React.FC = () => {
       passType: 'none',
       status: 'active',
     });
+    setAddUserEmptyName(false);
+    setAddUserEmptyEmail(false);
     setShowAddUserForm(false);
   };
 
   const handleEditUser = (user: User) => {
     setEditingUser({ ...user });
+    setUserEditSpentStr(String(user.totalSpent));
+    setEditUserEmptyName(false);
+    setEditUserEmptySpent(false);
   };
 
   const handleSaveUser = async () => {
     if (!editingUser) return;
+    const nameTrim = editingUser.name.trim();
+    const spentNum = parseSpentForSave(userEditSpentStr);
+    const nameBad = !nameTrim;
+    const spentBad = spentNum === null;
+    setEditUserEmptyName(nameBad);
+    setEditUserEmptySpent(spentBad);
+    if (nameBad || spentBad) return;
+
     try {
       const res = await fetch(`${API_BASE}/api/admin/users/${editingUser.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: editingUser.name.trim(),
+          name: nameTrim,
           email: editingUser.email.trim(),
           passType: editingUser.passType,
           status: editingUser.status,
-          totalSpent: editingUser.totalSpent,
+          totalSpent: spentNum,
         }),
       });
       const data = await res.json();
@@ -554,6 +636,7 @@ const AdminDashboard: React.FC = () => {
       return;
     }
     setEditingUser(null);
+    setUserEditSpentStr('');
   };
 
   const requestDeleteUser = (id: string) => {
@@ -651,9 +734,14 @@ const AdminDashboard: React.FC = () => {
           <section className="events-section">
             <div className="section-header">
               <h3>Concert Events Management</h3>
-              <button 
+              <button
                 className="add-btn"
-                onClick={() => setShowAddEventForm(true)}
+                onClick={() => {
+                  setAddRequiredEmpty(initialAddRequiredEmpty);
+                  setAddEventInvalidArtist(false);
+                  setAddEventInvalidPriceRange(false);
+                  setShowAddEventForm(true);
+                }}
               >
                 <MdAdd /> Add New Event
               </button>
@@ -691,41 +779,98 @@ const AdminDashboard: React.FC = () => {
               <div className="add-form">
                 <h4>Add New Concert Event</h4>
                 <div className="form-grid">
-                  <input
-                    type="text"
-                    placeholder="Event Name"
-                    value={newEvent.name}
-                    onChange={(e) => setNewEvent({ ...newEvent, name: e.target.value })}
-                  />
-                  <input
-                    type="text"
-                    placeholder="Artist"
-                    value={newEvent.artist}
-                    onChange={(e) => setNewEvent({ ...newEvent, artist: e.target.value })}
-                  />
-                  <select
-                    value={newEvent.genre}
-                    onChange={(e) => setNewEvent({ ...newEvent, genre: e.target.value })}
-                  >
-                    <option value="">Select Genre</option>
-                    <option value="Rock">Rock</option>
-                    <option value="Pop">Pop</option>
-                    <option value="Jazz">Jazz</option>
-                    <option value="Electronic">Electronic</option>
-                    <option value="Classical">Classical</option>
-                    <option value="Hip-Hop">Hip-Hop</option>
-                  </select>
-                  <input
-                    type="date"
-                    value={newEvent.date}
-                    onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })}
-                  />
+                  <div className="form-field-stacked">
+                    <input
+                      type="text"
+                      placeholder="Event Name"
+                      className={addRequiredEmpty.name ? 'is-invalid' : undefined}
+                      value={newEvent.name}
+                      onChange={(e) => {
+                        setAddRequiredEmpty((r) => ({ ...r, name: false }));
+                        setNewEvent({ ...newEvent, name: e.target.value });
+                      }}
+                    />
+                    {addRequiredEmpty.name && (
+                      <span className="field-inline-error" role="alert">
+                        Need to fill
+                      </span>
+                    )}
+                  </div>
+                  <div className="form-field-stacked">
+                    <input
+                      type="text"
+                      placeholder="Artist"
+                      maxLength={CONCERT_ARTIST_MAX_LEN}
+                      className={
+                        addRequiredEmpty.artist || addEventInvalidArtist ? 'is-invalid' : undefined
+                      }
+                      value={newEvent.artist}
+                      onChange={(e) => {
+                        setAddRequiredEmpty((r) => ({ ...r, artist: false }));
+                        setAddEventInvalidArtist(false);
+                        setNewEvent({
+                          ...newEvent,
+                          artist: e.target.value.slice(0, CONCERT_ARTIST_MAX_LEN),
+                        });
+                      }}
+                    />
+                    {addRequiredEmpty.artist && (
+                      <span className="field-inline-error" role="alert">
+                        Need to fill
+                      </span>
+                    )}
+                    {!addRequiredEmpty.artist && addEventInvalidArtist && (
+                      <span className="field-inline-error" role="alert">
+                        Not valid
+                      </span>
+                    )}
+                  </div>
+                  <div className="form-field-stacked">
+                    <select
+                      className={addRequiredEmpty.genre ? 'is-invalid' : undefined}
+                      value={newEvent.genre}
+                      onChange={(e) => {
+                        setAddRequiredEmpty((r) => ({ ...r, genre: false }));
+                        setNewEvent({ ...newEvent, genre: e.target.value });
+                      }}
+                    >
+                      <option value="">Select Genre</option>
+                      <option value="Rock">Rock</option>
+                      <option value="Pop">Pop</option>
+                      <option value="Jazz">Jazz</option>
+                      <option value="Electronic">Electronic</option>
+                      <option value="Classical">Classical</option>
+                      <option value="Hip-Hop">Hip-Hop</option>
+                    </select>
+                    {addRequiredEmpty.genre && (
+                      <span className="field-inline-error" role="alert">
+                        Need to fill
+                      </span>
+                    )}
+                  </div>
+                  <div className="form-field-stacked">
+                    <input
+                      type="date"
+                      className={addRequiredEmpty.date ? 'is-invalid' : undefined}
+                      value={newEvent.date}
+                      onChange={(e) => {
+                        setAddRequiredEmpty((r) => ({ ...r, date: false }));
+                        setNewEvent({ ...newEvent, date: e.target.value });
+                      }}
+                    />
+                    {addRequiredEmpty.date && (
+                      <span className="field-inline-error" role="alert">
+                        Need to fill
+                      </span>
+                    )}
+                  </div>
                   <div className="form-field-venue">
                     <span className="form-field-label">Venue</span>
                     <select
-                      className="form-field-control"
+                      className={`form-field-control${addRequiredEmpty.venue ? ' is-invalid' : ''}`}
                       value={venueSelectValue(newEvent.venue)}
                       onChange={(e) => {
+                        setAddRequiredEmpty((r) => ({ ...r, venue: false }));
                         const v = e.target.value;
                         if (v === VENUE_OTHER) {
                           setNewEvent({ ...newEvent, venue: VENUE_OTHER });
@@ -745,26 +890,44 @@ const AdminDashboard: React.FC = () => {
                     {venueSelectValue(newEvent.venue) === VENUE_OTHER && (
                       <input
                         type="text"
-                        className="venue-other-input"
+                        className={`venue-other-input${addRequiredEmpty.venue ? ' is-invalid' : ''}`}
                         placeholder="Venue name (max 100 characters)"
                         maxLength={VENUE_MAX_LEN}
                         value={venueOtherInputValue(newEvent.venue)}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          setAddRequiredEmpty((r) => ({ ...r, venue: false }));
                           setNewEvent({
                             ...newEvent,
                             venue: e.target.value.slice(0, VENUE_MAX_LEN),
-                          })
-                        }
+                          });
+                        }}
                         aria-label="Custom venue name"
                       />
                     )}
+                    {addRequiredEmpty.venue && (
+                      <span className="field-inline-error" role="alert">
+                        Need to fill
+                      </span>
+                    )}
                   </div>
-                  <input
-                    type="number"
-                    placeholder="Capacity"
-                    value={newEvent.capacity || ''}
-                    onChange={(e) => setNewEvent({ ...newEvent, capacity: parseInt(e.target.value, 10) || 0 })}
-                  />
+                  <div className="form-field-stacked">
+                    <input
+                      type="number"
+                      placeholder="Capacity"
+                      min={0}
+                      className={addRequiredEmpty.capacity ? 'is-invalid' : undefined}
+                      value={newEvent.capacity || ''}
+                      onChange={(e) => {
+                        setAddRequiredEmpty((r) => ({ ...r, capacity: false }));
+                        setNewEvent({ ...newEvent, capacity: parseInt(e.target.value, 10) || 0 });
+                      }}
+                    />
+                    {addRequiredEmpty.capacity && (
+                      <span className="field-inline-error" role="alert">
+                        Need to fill
+                      </span>
+                    )}
+                  </div>
                   <div className="form-field-price-range">
                     <span className="form-field-label">Ticket price range ($)</span>
                     <div className="event-price-range-inputs">
@@ -773,13 +936,15 @@ const AdminDashboard: React.FC = () => {
                         step="0.01"
                         min={0}
                         placeholder="Min"
+                        className={addEventInvalidPriceRange ? 'is-invalid' : undefined}
                         value={newEvent.ticketPriceMin || ''}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          setAddEventInvalidPriceRange(false);
                           setNewEvent({
                             ...newEvent,
                             ticketPriceMin: parseFloat(e.target.value) || 0,
-                          })
-                        }
+                          });
+                        }}
                         aria-label="Minimum ticket price"
                       />
                       <span className="price-range-sep" aria-hidden>
@@ -790,16 +955,23 @@ const AdminDashboard: React.FC = () => {
                         step="0.01"
                         min={0}
                         placeholder="Max"
+                        className={addEventInvalidPriceRange ? 'is-invalid' : undefined}
                         value={newEvent.ticketPriceMax || ''}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          setAddEventInvalidPriceRange(false);
                           setNewEvent({
                             ...newEvent,
                             ticketPriceMax: parseFloat(e.target.value) || 0,
-                          })
-                        }
+                          });
+                        }}
                         aria-label="Maximum ticket price"
                       />
                     </div>
+                    {addEventInvalidPriceRange && (
+                      <span className="field-inline-error" role="alert">
+                        Not valid
+                      </span>
+                    )}
                   </div>
                   <select
                     value={newEvent.status}
@@ -825,7 +997,16 @@ const AdminDashboard: React.FC = () => {
                   <button type="button" className="save-btn" onClick={handleAddEvent}>
                     <MdSave /> Save Event
                   </button>
-                  <button type="button" className="cancel-btn" onClick={() => setShowAddEventForm(false)}>
+                  <button
+                    type="button"
+                    className="cancel-btn"
+                    onClick={() => {
+                      setAddRequiredEmpty(initialAddRequiredEmpty);
+                      setAddEventInvalidArtist(false);
+                      setAddEventInvalidPriceRange(false);
+                      setShowAddEventForm(false);
+                    }}
+                  >
                     <MdCancel /> Cancel
                   </button>
                 </div>
@@ -929,9 +1110,13 @@ const AdminDashboard: React.FC = () => {
           <section className="users-section">
             <div className="section-header">
               <h3>User Management</h3>
-              <button 
+              <button
                 className="add-btn"
-                onClick={() => setShowAddUserForm(true)}
+                onClick={() => {
+                  setAddUserEmptyName(false);
+                  setAddUserEmptyEmail(false);
+                  setShowAddUserForm(true);
+                }}
               >
                 <MdAdd /> Add New User
               </button>
@@ -961,18 +1146,44 @@ const AdminDashboard: React.FC = () => {
               <div className="add-form">
                 <h4>Add New User</h4>
                 <div className="form-grid">
-                  <input
-                    type="text"
-                    placeholder="Full Name"
-                    value={newUser.name}
-                    onChange={(e) => setNewUser({...newUser, name: e.target.value})}
-                  />
-                  <input
-                    type="email"
-                    placeholder="Email Address"
-                    value={newUser.email}
-                    onChange={(e) => setNewUser({...newUser, email: e.target.value})}
-                  />
+                  <div className="form-field-stacked">
+                    <input
+                      type="text"
+                      placeholder="Full Name (letters only)"
+                      autoComplete="name"
+                      className={addUserEmptyName ? 'is-invalid' : undefined}
+                      value={newUser.name}
+                      onChange={(e) => {
+                        setAddUserEmptyName(false);
+                        setNewUser({
+                          ...newUser,
+                          name: sanitizeUserNameInput(e.target.value),
+                        });
+                      }}
+                    />
+                    {addUserEmptyName && (
+                      <span className="field-inline-error" role="alert">
+                        Need to fill
+                      </span>
+                    )}
+                  </div>
+                  <div className="form-field-stacked">
+                    <input
+                      type="email"
+                      placeholder="Email Address"
+                      className={addUserEmptyEmail ? 'is-invalid' : undefined}
+                      value={newUser.email}
+                      onChange={(e) => {
+                        setAddUserEmptyEmail(false);
+                        setNewUser({ ...newUser, email: e.target.value });
+                      }}
+                    />
+                    {addUserEmptyEmail && (
+                      <span className="field-inline-error" role="alert">
+                        Need to fill
+                      </span>
+                    )}
+                  </div>
                   <select
                     value={newUser.passType}
                     onChange={(e) => setNewUser({...newUser, passType: e.target.value as User['passType']})}
@@ -994,7 +1205,14 @@ const AdminDashboard: React.FC = () => {
                   <button className="save-btn" onClick={handleAddUser}>
                     <MdSave /> Save User
                   </button>
-                  <button className="cancel-btn" onClick={() => setShowAddUserForm(false)}>
+                  <button
+                    className="cancel-btn"
+                    onClick={() => {
+                      setAddUserEmptyName(false);
+                      setAddUserEmptyEmail(false);
+                      setShowAddUserForm(false);
+                    }}
+                  >
                     <MdCancel /> Cancel
                   </button>
                 </div>
@@ -1021,12 +1239,27 @@ const AdminDashboard: React.FC = () => {
                     editingUser?.id === user.id ? (
                       <tr key={user.id} className="admin-users-table-row is-editing">
                         <td>
-                          <input
-                            type="text"
-                            aria-label="Name"
-                            value={editingUser.name}
-                            onChange={(e) => setEditingUser({ ...editingUser, name: e.target.value })}
-                          />
+                          <div className="admin-users-cell-stack">
+                            <input
+                              type="text"
+                              aria-label="Name"
+                              placeholder="Letters only"
+                              className={editUserEmptyName ? 'is-invalid' : undefined}
+                              value={editingUser.name}
+                              onChange={(e) => {
+                                setEditUserEmptyName(false);
+                                setEditingUser({
+                                  ...editingUser,
+                                  name: sanitizeUserNameInput(e.target.value),
+                                });
+                              }}
+                            />
+                            {editUserEmptyName && (
+                              <span className="field-inline-error" role="alert">
+                                Need to fill
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td>
                           <input
@@ -1056,20 +1289,26 @@ const AdminDashboard: React.FC = () => {
                           </select>
                         </td>
                         <td>
-                          <input
-                            type="number"
-                            min={0}
-                            step={0.01}
-                            aria-label="Total spent"
-                            className="admin-users-spent-input"
-                            value={editingUser.totalSpent}
-                            onChange={(e) =>
-                              setEditingUser({
-                                ...editingUser,
-                                totalSpent: parseFloat(e.target.value) || 0,
-                              })
-                            }
-                          />
+                          <div className="admin-users-cell-stack">
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              autoComplete="off"
+                              aria-label="Total spent"
+                              placeholder="0.00"
+                              className={`admin-users-spent-input${editUserEmptySpent ? ' is-invalid' : ''}`}
+                              value={userEditSpentStr}
+                              onChange={(e) => {
+                                setEditUserEmptySpent(false);
+                                setUserEditSpentStr(sanitizeSpentInput(e.target.value));
+                              }}
+                            />
+                            {editUserEmptySpent && (
+                              <span className="field-inline-error" role="alert">
+                                Need to fill
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td>
                           <select
@@ -1091,7 +1330,16 @@ const AdminDashboard: React.FC = () => {
                           <button type="button" className="save-btn save-btn--compact" onClick={() => void handleSaveUser()}>
                             <MdSave /> Save
                           </button>
-                          <button type="button" className="cancel-btn cancel-btn--compact" onClick={() => setEditingUser(null)}>
+                          <button
+                            type="button"
+                            className="cancel-btn cancel-btn--compact"
+                            onClick={() => {
+                              setEditingUser(null);
+                              setUserEditSpentStr('');
+                              setEditUserEmptyName(false);
+                              setEditUserEmptySpent(false);
+                            }}
+                          >
                             <MdCancel /> Cancel
                           </button>
                         </td>
