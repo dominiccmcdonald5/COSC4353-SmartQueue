@@ -9,7 +9,7 @@ const queue = require('../../Backend/AdminQueue/queue');
 const login = require('../../Backend/Login/login');
 const signup = require('../../Backend/SignUp/signup');
 const pass = require('../../Backend/PassPurchase/updatePass');
-const services = require('../../Backend/ServiceManagement/services');
+// const services = require('../../Backend/ServiceManagement/services');
 const history = require('../../Backend/UserDashboard/ConcertHistory/userHistory');
 const stats = require('../../Backend/UserDashboard/UserStats/userStats');
 const adminUsers = require('../../Backend/UserManagement/adminUsers');
@@ -437,47 +437,4 @@ test('getDataReportStats returns complete report', async () => {
   assert.ok(result.json.data.totalUsers >= 0);
   assert.ok(result.json.data.totalEvents >= 0);
   assert.ok(Array.isArray(result.json.data.topGenres));
-});
-
-// ========================
-// SERVICES
-// ========================
-test('listServices returns services', async () => {
-  resetMockData();
-  const result = await invoke(services.listServices, { method: 'GET' });
-  assert.equal(result.res.statusCode, 200);
-  assert.ok(Array.isArray(result.json.services));
-});
-
-test('createService adds new service', async () => {
-  resetMockData();
-  const result = await invoke(services.createService, {
-    body: { 
-      serviceName: 'Test Service', 
-      description: 'A test service description for testing purposes',
-      expectedDuration: 15,
-      priorityLevel: 'medium'
-    },
-  });
-  assert.equal(result.res.statusCode, 201);
-  assert.ok(result.json.service && result.json.service.serviceID);
-});
-
-test('createService requires name', async () => {
-  resetMockData();
-  const result = await invoke(services.createService, {
-    body: { description: 'No name' },
-  });
-  assert.equal(result.res.statusCode, 400);
-});
-
-test('updateService modifies service', async () => {
-  resetMockData();
-  if (mockData.allMockData.SERVICES && mockData.allMockData.SERVICES[0]) {
-    const serviceID = mockData.allMockData.SERVICES[0].serviceID;
-    const result = await invoke(services.updateService, {
-      body: { serviceID, serviceName: 'Updated' },
-    });
-    assert.equal(result.res.statusCode, 200);
-  }
 });

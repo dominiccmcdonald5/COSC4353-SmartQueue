@@ -263,7 +263,7 @@ const HomePage: React.FC = () => {
             )}
             
             <button onClick={handleLogout} className="logout-btn">
-              🚪 Logout
+              Logout
             </button>
           </div>
         </div>

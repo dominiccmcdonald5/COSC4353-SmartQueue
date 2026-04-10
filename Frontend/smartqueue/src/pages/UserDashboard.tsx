@@ -395,12 +395,15 @@ const UserDashboard: React.FC = () => {
           </section>
         )}
 
-        {activeTab === 'stats' && userStats && (
+        {activeTab === 'stats' && (
           <section className="user-stats">
             <h3>Your Concert Statistics</h3>
             {statsLoading && <p>Loading stats...</p>}
             {statsError && <p className="error-message">{statsError}</p>}
-            
+            {!statsLoading && !statsError && !userStats && <p>No stats found for this user.</p>}
+
+            {userStats && (
+            <>
             {/* Success Rate Container */}
             <div className="stats-container success-container">
               <div className="pie-chart-container">
@@ -504,6 +507,8 @@ const UserDashboard: React.FC = () => {
                 </div>
               </div>
             </div>
+            </>
+            )}
           </section>
         )}
 

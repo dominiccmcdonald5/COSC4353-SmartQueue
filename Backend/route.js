@@ -5,7 +5,7 @@ const signup = require('./SignUp/signup');
 const userHistory = require('./UserDashboard/ConcertHistory/userHistory');
 const userStats = require('./UserDashboard/UserStats/userStats');
 const updatePass = require('./PassPurchase/updatePass');
-const services = require('./ServiceManagement/services');
+// const services = require('./ServiceManagement/services');
 const adminQueue = require('./AdminQueue/queue');
 const concerts = require('./ConcertManagement/concerts');
 const concertsLegacy = require('./Concerts/concerts');
@@ -55,20 +55,6 @@ function routes(req, res) {
   if (/^\/api\/concerts\/\d+$/.test(pathname) && method === 'GET') {
     const concertId = pathname.split('/').pop();
     return concertsLegacy.handleGetConcertById(req, res, concertId);
-  }
-
-  /* —— Service management (admin) —— */
-  if (pathname === '/api/services' && method === 'GET') {
-    return services.listServices(req, res);
-  }
-
-  if (pathname === '/api/services' && method === 'POST') {
-    return services.createService(req, res);
-  }
-
-  if (method === 'PUT' && /^\/api\/services\/\d+$/.test(pathname)) {
-    const serviceID = pathname.split('/').pop();
-    return services.updateService(req, res, serviceID);
   }
 
   /* —— Concert events admin CRUD —— */
