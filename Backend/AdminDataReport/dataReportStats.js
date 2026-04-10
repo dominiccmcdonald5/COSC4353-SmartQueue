@@ -185,15 +185,16 @@ const getDataReportStats = async (req, res) => {
         2
       )
     );
-
-    } catch (error) {
-        console.error('Error generating data report stats:', error);
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({
-            success: false,
-            error: error.message || 'Failed to generate data report'
-        }));
-    }
+  } catch (error) {
+    console.error('Error generating data report stats:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(
+      JSON.stringify({
+        success: false,
+        error: error.message || 'Failed to generate data report',
+      })
+    );
+  }
 };
 
 module.exports = {
