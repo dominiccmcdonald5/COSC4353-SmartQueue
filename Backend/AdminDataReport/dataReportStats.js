@@ -1,5 +1,9 @@
-const fs = require('fs');
-const path = require('path');
+const pool = require('../database');
+
+function toNumber(value, fallback = 0) {
+    const num = Number(value);
+    return Number.isFinite(num) ? num : fallback;
+}
 
 /**
  * Get all admin data report statistics
@@ -8,104 +12,93 @@ const path = require('path');
  */
 const getDataReportStats = async (req, res) => {
     try {
-        // Read mock data from mockDataStore.json
-        const mockDataPath = path.join(__dirname, '../mockDataStore.json');
-        const mockDataRaw = fs.readFileSync(mockDataPath, 'utf8');
-        const mockData = JSON.parse(mockDataRaw);
+        const [
+            [userCountRows],
+            [eventCountRows],
+            [revenueRows],
+            [averageQueueTimeRows],
+            [topGenresRows],
+            [passDistributionRows],
+            [monthlyRevenueRows],
+            [userGrowthRows]
+        ] = await Promise.all([
+            pool.promise().query('SELECT COUNT(*) AS totalUsers FROM users'),
+            pool.promise().query('SELECT COUNT(*) AS totalEvents FROM concerts'),
+            pool.promise().query(`
+                SELECT COALESCE(SUM(total_cost), 0) AS totalRevenue
+                FROM queue_history
+                WHERE status = 'completed'
+            `),
+            pool.promise().query(`
+                SELECT COALESCE(ROUND(AVG(wait_time)), 0) AS averageQueueTime
+                FROM queue_history
+            `),
+            pool.promise().query(`
+                SELECT genre, COUNT(*) AS count
+                FROM concerts
+                WHERE genre IS NOT NULL AND genre != ''
+                GROUP BY genre
+                ORDER BY count DESC, genre ASC
+                LIMIT 5
+            `),
+            pool.promise().query(`
+                SELECT pass_status AS passType, COUNT(*) AS count
+                FROM users
+                GROUP BY pass_status
+                ORDER BY count DESC, pass_status ASC
+            `),
+            pool.promise().query(`
+                SELECT DATE_FORMAT(queued_at, '%Y-%m') AS month,
+                       COALESCE(SUM(total_cost), 0) AS revenue
+                FROM queue_history
+                WHERE status = 'completed' AND queued_at IS NOT NULL
+                GROUP BY DATE_FORMAT(queued_at, '%Y-%m')
+                ORDER BY month ASC
+            `),
+            pool.promise().query(`
+                SELECT DATE_FORMAT(created_at, '%Y-%m') AS month,
+                       COUNT(*) AS newUsers
+                FROM users
+                WHERE created_at IS NOT NULL
+                GROUP BY DATE_FORMAT(created_at, '%Y-%m')
+                ORDER BY month ASC
+            `)
+        ]);
 
-        const users = mockData.USER || [];
-        const concerts = mockData.CONCERT || [];
-        const history = mockData.HISTORY || [];
+        const totalUsers = toNumber(userCountRows[0]?.totalUsers);
+        const totalEvents = toNumber(eventCountRows[0]?.totalEvents);
+        const totalRevenue = toNumber(revenueRows[0]?.totalRevenue);
+        const averageQueueTime = toNumber(averageQueueTimeRows[0]?.averageQueueTime);
 
-        // 1. Total number of users
-        const totalUsers = users.length;
+        const topGenres = topGenresRows.map((row) => ({
+            genre: row.genre,
+            count: toNumber(row.count)
+        }));
 
-        // 2. Total number of events
-        const totalEvents = concerts.length;
-
-        // 3. Total revenue (sum of completed transactions)
-        const totalRevenue = history
-            .filter(h => h.status === 'completed')
-            .reduce((sum, h) => sum + (h.totalCost || 0), 0);
-
-        // 4. Average queue time (from all history records)
-        const averageQueueTime = history.length > 0
-            ? Math.round(history.reduce((sum, h) => sum + (h.waitTime || 0), 0) / history.length)
-            : 0;
-
-        // 5. Top 5 most popular genres
-        const genreCount = {};
-        concerts.forEach(concert => {
-            if (concert.genre) {
-                genreCount[concert.genre] = (genreCount[concert.genre] || 0) + 1;
-            }
-        });
-
-        const topGenres = Object.entries(genreCount)
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 5)
-            .map(([genre, count]) => ({
-                genre,
-                count
-            }));
-
-        // 6. Pass distribution (None, Gold, Silver, etc.)
-        const passDistribution = {};
-        users.forEach(user => {
-            const passType = user.passStatus || 'None';
-            passDistribution[passType] = (passDistribution[passType] || 0) + 1;
-        });
-
-        const passDistributionFormatted = Object.entries(passDistribution)
-            .map(([passType, count]) => ({
-                passType,
+        const passDistributionFormatted = passDistributionRows.map((row) => {
+            const count = toNumber(row.count);
+            return {
+                passType: row.passType || 'None',
                 count,
-                percentage: ((count / totalUsers) * 100).toFixed(2)
-            }));
-
-        // 7. Monthly revenue trend
-        const monthlyRevenue = {};
-        history
-            .filter(h => h.status === 'completed')
-            .forEach(h => {
-                if (h.queuedAt) {
-                    const date = new Date(h.queuedAt);
-                    const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-                    monthlyRevenue[monthKey] = (monthlyRevenue[monthKey] || 0) + (h.totalCost || 0);
-                }
-            });
-
-        const monthlyRevenueArray = Object.entries(monthlyRevenue)
-            .sort((a, b) => a[0].localeCompare(b[0]))
-            .map(([month, revenue]) => ({
-                month,
-                revenue: parseFloat(revenue.toFixed(2))
-            }));
-
-        // 8. User growth (cumulative count of users by signup month)
-        const usersByMonth = {};
-        users.forEach(user => {
-            if (user.createdAt) {
-                const date = new Date(user.createdAt);
-                const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-                usersByMonth[monthKey] = (usersByMonth[monthKey] || 0) + 1;
-            }
+                percentage: totalUsers > 0 ? ((count / totalUsers) * 100).toFixed(2) : '0.00'
+            };
         });
 
-        // Convert to cumulative growth
-        const userGrowthArray = Object.entries(usersByMonth)
-            .sort((a, b) => a[0].localeCompare(b[0]))
-            .map(([month, count], index, arr) => {
-                // Calculate cumulative count
-                const cumulativeCount = arr
-                    .slice(0, index + 1)
-                    .reduce((sum, [_, c]) => sum + c, 0);
-                return {
-                    month,
-                    newUsers: count,
-                    totalUsers: cumulativeCount
-                };
-            });
+        const monthlyRevenueArray = monthlyRevenueRows.map((row) => ({
+            month: row.month,
+            revenue: parseFloat(toNumber(row.revenue).toFixed(2))
+        }));
+
+        let runningUsers = 0;
+        const userGrowthArray = userGrowthRows.map((row) => {
+            const newUsers = toNumber(row.newUsers);
+            runningUsers += newUsers;
+            return {
+                month: row.month,
+                newUsers,
+                totalUsers: runningUsers
+            };
+        });
 
         // Compile all statistics
         const reportStats = {
