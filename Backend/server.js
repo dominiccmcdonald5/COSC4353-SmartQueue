@@ -5,7 +5,7 @@ const Routes = require('./route');
 const map_route = {
   GET: [
     '/api/ping',
-    '/api/services',
+    // '/api/services',
     '/api/admin/queue',
     '/api/concerts',
     '/api/queue/',
@@ -19,7 +19,7 @@ const map_route = {
     '/api/user/history',
     '/api/user/stats',
     '/api/user/pass/update',
-    '/api/services',
+    // '/api/services',
     '/api/admin/queue/serve-next',
     '/api/queue/join',
     '/api/queue/leave',
@@ -27,7 +27,9 @@ const map_route = {
     '/api/admin/concerts',
     '/api/admin/users',
   ],
-  PUT: ['/api/services/', '/api/admin/concerts/', '/api/admin/users/'],
+  PUT: [
+    //'/api/services/', 
+    '/api/admin/concerts/', '/api/admin/users/'],
   DELETE: ['/api/admin/concerts/', '/api/admin/users/'],
 };
 
