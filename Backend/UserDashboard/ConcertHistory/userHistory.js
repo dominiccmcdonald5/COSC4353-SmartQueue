@@ -23,7 +23,7 @@ const getConcertHistory = async (req, res) => {
 
             // Check if user exists
             const [userCheck] = await pool.promise().query(
-                'SELECT user_id FROM user WHERE user_id = ?',
+                'SELECT user_id FROM users WHERE user_id = ?',
                 [userID]
             );
 
@@ -40,10 +40,10 @@ const getConcertHistory = async (req, res) => {
             const [historyRecords] = await pool.promise().query(
                 `SELECT h.history_id, h.user_id, h.concert_id, h.ticket_count, h.total_cost, 
                         h.wait_time, h.status, h.in_line_status, h.queued_at,
-                        c.concert_id, c.concert_name, c.artist_name, c.genre, c.date, c.venue, 
+                        c.concert_id, c.concert_name, c.artist_name, c.genre, c.event_date, c.venue, 
                         c.capacity, c.ticket_price, c.concert_image, c.concert_status
-                 FROM history h
-                 JOIN concert c ON h.concert_id = c.concert_id
+                 FROM queue_history h
+                 JOIN concerts c ON h.concert_id = c.concert_id
                  WHERE h.user_id = ?
                  ORDER BY h.queued_at DESC`,
                 [userID]
@@ -55,7 +55,7 @@ const getConcertHistory = async (req, res) => {
                     concert_name: record.concert_name,
                     artist_name: record.artist_name,
                     genre: record.genre,
-                    date: record.date,
+                    event_date: record.event_date,
                     venue: record.venue,
                     capacity: record.capacity,
                     ticket_price: record.ticket_price,

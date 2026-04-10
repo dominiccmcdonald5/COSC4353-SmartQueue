@@ -43,7 +43,7 @@ const updateUserPassStatus = async (req, res) => {
 
       // Check if user exists
       const [userCheck] = await pool.promise().query(
-        'SELECT user_id, pass_status FROM user WHERE user_id = ?',
+        'SELECT user_id, pass_status FROM users WHERE user_id = ?',
         [userID]
       );
 
@@ -55,7 +55,7 @@ const updateUserPassStatus = async (req, res) => {
 
       // Update user's pass status
       await pool.promise().query(
-        'UPDATE user SET pass_status = ? WHERE user_id = ?',
+        'UPDATE users SET pass_status = ? WHERE user_id = ?',
         [passStatus, userID]
       );
 
