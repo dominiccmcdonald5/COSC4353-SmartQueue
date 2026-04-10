@@ -1,6 +1,6 @@
 const http = require('http');
 const url = require('url');
-const Routes = require('./route'); 
+const Routes = require('./route');
 
 const map_route = {
   GET: [
@@ -70,15 +70,25 @@ const server = http.createServer((req, res) => {
 // Port Configuration
 const PORT = process.env.PORT || 5000;
 
-// Start Server
+server.on('error', (err) => {
+  if (err && err.code === 'EADDRINUSE') {
+    console.error(
+      `Port ${PORT} is already in use. Stop the other process or set PORT in .env, e.g. PORT=5001`
+    );
+    console.error('Windows: netstat -ano | findstr :' + PORT + '  then  taskkill /PID <pid> /F');
+    process.exit(1);
+  }
+  throw err;
+});
+
 server.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-    console.log(`Available endpoints:`);
-    console.log(`  GET  /api/concerts`);
-    console.log(`  GET  /api/admin/data-report`);
-    console.log(`  POST /api/login`);
-    console.log(`  POST /api/signup`);
-    console.log(`  POST /api/user/history`);
-    console.log(`  POST /api/user/stats`);
-    console.log(`  POST /api/user/pass/update`);
+  console.log(`Server running on port ${PORT}`);
+  console.log(`Available endpoints:`);
+  console.log(`  GET  /api/concerts`);
+  console.log(`  GET  /api/admin/data-report`);
+  console.log(`  POST /api/login`);
+  console.log(`  POST /api/signup`);
+  console.log(`  POST /api/user/history`);
+  console.log(`  POST /api/user/stats`);
+  console.log(`  POST /api/user/pass/update`);
 });
