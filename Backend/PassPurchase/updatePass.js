@@ -1,4 +1,4 @@
-const pool = require('../database');
+const { promisePool } = require('../database');
 
 const VALID_PASS_STATUSES = ['Gold', 'Silver', 'None'];
 
@@ -42,7 +42,7 @@ const updateUserPassStatus = async (req, res) => {
       }
 
       // Check if user exists
-      const [userCheck] = await pool.promise().query(
+      const [userCheck] = await promisePool.query(
         'SELECT user_id, pass_status FROM users WHERE user_id = ?',
         [userID]
       );
@@ -54,7 +54,7 @@ const updateUserPassStatus = async (req, res) => {
       }
 
       // Update user's pass status
-      await pool.promise().query(
+      await promisePool.query(
         'UPDATE users SET pass_status = ? WHERE user_id = ?',
         [passStatus, userID]
       );

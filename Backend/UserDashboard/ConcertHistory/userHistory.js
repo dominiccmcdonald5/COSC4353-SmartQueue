@@ -1,4 +1,4 @@
-const pool = require('../../database');
+const { promisePool } = require('../../database');
 
 const getConcertHistory = async (req, res) => {
     let body = "";
@@ -22,7 +22,7 @@ const getConcertHistory = async (req, res) => {
             }
 
             // Check if user exists
-            const [userCheck] = await pool.promise().query(
+            const [userCheck] = await promisePool.query(
                 'SELECT user_id FROM users WHERE user_id = ?',
                 [userID]
             );
@@ -37,7 +37,7 @@ const getConcertHistory = async (req, res) => {
             }
 
             // Get user's history records with concert details
-            const [historyRecords] = await pool.promise().query(
+            const [historyRecords] = await promisePool.query(
                 `SELECT h.history_id, h.user_id, h.concert_id, h.ticket_count, h.total_cost, 
                         h.wait_time, h.status, h.in_line_status, h.queued_at,
                         c.concert_id, c.concert_name, c.artist_name, c.genre, c.event_date, c.venue, 
