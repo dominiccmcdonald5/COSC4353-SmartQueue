@@ -4,6 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import { formatLocalDateFromApi, parseLocalDateFromApi } from '../utils/apiDate';
 import '../styling/HomePage.css';
 
+const API_BASE = 'https://cosc-4353-smart-queue-6ixj.vercel.app';
+
 interface Concert {
   id: string;
   name: string;
@@ -58,7 +60,12 @@ const HomePage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/concerts');
+      const response = await fetch(`${API_BASE}/api/concerts`);
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        throw new Error('Backend returned non-JSON response');
+      }
+
       const data = await response.json();
       if (data.success) {
         setConcerts(data.concerts);
