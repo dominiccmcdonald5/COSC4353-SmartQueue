@@ -8,7 +8,7 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/api': {
-        target: 'http://localhost:5000',
+        target: 'https://cosc-4353-smart-queue-6ixj.vercel.app',
         changeOrigin: true,
         secure: false,
       }
