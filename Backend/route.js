@@ -109,6 +109,30 @@ function routes(req, res) {
     return adminQueue.joinQueue(req, res);
   }
 
+  if (pathname === '/api/queue/leave' && method === 'POST') {
+    return adminQueue.leaveQueue(req, res);
+  }
+
+  if (pathname === '/api/payment/complete' && method === 'POST') {
+    return adminQueue.completePayment(req, res);
+  }
+
+  /* —— Get queue status for a specific concert —— */
+  if (method === 'GET' && /^\/api\/queue\/\d+$/.test(pathname)) {
+    const concertId = pathname.split('/').pop();
+    const userId = parsed.query.userId;
+    return adminQueue.getQueueStatusByConcert(req, res, concertId, userId);
+  }
+
+  /* —— Notifications —— */
+  if (pathname === '/api/notifications' && method === 'POST') {
+    return adminQueue.getNotifications(req, res);
+  }
+
+  if (pathname === '/api/notifications/mark-viewed' && method === 'POST') {
+    return adminQueue.markNotificationAsViewed(req, res);
+  }
+
   res.writeHead(404, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify({ error: 'Route Not Found' }));
 }
