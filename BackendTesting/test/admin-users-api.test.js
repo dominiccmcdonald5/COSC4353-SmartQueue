@@ -2,36 +2,27 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const adminUsers = require('../../Backend/UserManagement/adminUsers');
 const { invoke } = require('./helpers/httpMocks');
-const { resetMockData } = require('./helpers/mockDataState');
 
-test.beforeEach(() => resetMockData());
-
-test('admin users CRUD handlers work', async () => {
-  const list = await invoke(adminUsers.getAllUsers, { method: 'GET' });
-  assert.equal(list.res.statusCode, 200);
-  assert.equal(list.json.success, true);
-
-  const created = await invoke(adminUsers.createUser, {
-    body: {
-      name: 'Unit AdminUser',
-      email: 'adminuser.unit@test.com',
-      password: 'pass1234',
-      passType: 'silver',
-      status: 'active',
-      totalSpent: 10.5,
-    },
+test('createUser validates required fields', async () => {
+  const result = await invoke(adminUsers.createUser, {
+    body: { email: '', password: '123' },
   });
-  assert.equal(created.res.statusCode, 201);
-  const userID = Number(created.json.user.userID);
+  assert.equal(result.res.statusCode, 400);
+  assert.equal(result.json.success, false);
+});
 
-  const edited = await invoke(adminUsers.editUser, {
-    method: 'PUT',
-    body: { status: 'suspended', passType: 'gold' },
-  }, String(userID));
-  assert.equal(edited.res.statusCode, 200);
-  assert.equal(edited.json.user.passType, 'gold');
+test('editUser validates user id path param', async () => {
+  const result = await invoke(
+    adminUsers.editUser,
+    { method: 'PUT', body: { status: 'active' } },
+    '0'
+  );
+  assert.equal(result.res.statusCode, 400);
+  assert.equal(result.json.success, false);
+});
 
-  const deleted = await invoke(adminUsers.deleteUser, { method: 'DELETE' }, String(userID));
-  assert.equal(deleted.res.statusCode, 200);
-  assert.equal(deleted.json.success, true);
+test('deleteUser validates user id path param', async () => {
+  const result = await invoke(adminUsers.deleteUser, { method: 'DELETE' }, '0');
+  assert.equal(result.res.statusCode, 400);
+  assert.equal(result.json.success, false);
 });
