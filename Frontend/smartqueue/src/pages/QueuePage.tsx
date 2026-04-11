@@ -67,7 +67,7 @@ const QueuePage: React.FC = () => {
     const fetchQueueStatus = async () => {
       try {
         const userIdParam = user?.id ? `?userId=${encodeURIComponent(user.id)}` : '';
-        const response = await fetch(`http://localhost:5000/api/queue/${concertId}${userIdParam}`);
+        const response = await fetch(`https://cosc-4353-smart-queue-6ixj.vercel.app/api/queue/${concertId}${userIdParam}`);
         const payload = (await response.json()) as QueueStatusResponse;
 
         if (!mounted) return;
@@ -111,7 +111,7 @@ const QueuePage: React.FC = () => {
       return;
     }
     try {
-      const res = await fetch('http://localhost:5000/api/queue/join', {
+      const res = await fetch('https://cosc-4353-smart-queue-6ixj.vercel.app/api/queue/join', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ concertId, userId: user.id }),
@@ -142,7 +142,7 @@ const QueuePage: React.FC = () => {
     if (!concertId || !user?.id || otherId == null) return;
     setQueueSwitchBusy(true);
     try {
-      const leaveRes = await fetch('http://localhost:5000/api/queue/leave', {
+      const leaveRes = await fetch('https://cosc-4353-smart-queue-6ixj.vercel.app/api/queue/leave', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ concertId: otherId, userId: user.id }),
@@ -152,7 +152,7 @@ const QueuePage: React.FC = () => {
         window.alert(leavePayload.message || 'Could not leave the other queue.');
         return;
       }
-      const joinRes = await fetch('http://localhost:5000/api/queue/join', {
+      const joinRes = await fetch('https://cosc-4353-smart-queue-6ixj.vercel.app/api/queue/join', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ concertId, userId: user.id }),
@@ -183,7 +183,7 @@ const QueuePage: React.FC = () => {
     }
 
     try {
-      const res = await fetch('http://localhost:5000/api/queue/leave', {
+      const res = await fetch('https://cosc-4353-smart-queue-6ixj.vercel.app/api/queue/leave', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ concertId, userId: user.id }),

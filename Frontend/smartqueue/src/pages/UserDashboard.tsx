@@ -124,7 +124,7 @@ const UserDashboard: React.FC = () => {
         setHistoryLoading(true);
         setHistoryError('');
 
-        const response = await fetch('http://localhost:5000/api/user/history', {
+        const response = await fetch('https://cosc-4353-smart-queue-6ixj.vercel.app/api/user/history', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -185,7 +185,7 @@ const UserDashboard: React.FC = () => {
         setStatsLoading(true);
         setStatsError('');
 
-        const response = await fetch('http://localhost:5000/api/user/stats', {
+        const response = await fetch('https://cosc-4353-smart-queue-6ixj.vercel.app/api/user/stats', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -256,7 +256,7 @@ const UserDashboard: React.FC = () => {
     try {
       setIsRemovingPass(true);
 
-      const response = await fetch('http://localhost:5000/api/user/pass/update', {
+      const response = await fetch('https://cosc-4353-smart-queue-6ixj.vercel.app/api/user/pass/update', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
