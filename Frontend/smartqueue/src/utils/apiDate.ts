@@ -30,3 +30,13 @@ export function formatLocalDateFromApi(
   if (!dt) return typeof value === 'string' ? value : '';
   return dt.toLocaleDateString(undefined, options ?? { year: 'numeric', month: 'long', day: 'numeric' });
 }
+
+/** Pass expiry from API (ISO or datetime string) for display / tooltips */
+export function formatPassExpiresForDisplay(value: string | null | undefined): string {
+  if (value == null || value === '') return '';
+  const dt = parseLocalDateFromApi(value);
+  if (dt) return dt.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+  const t = Date.parse(String(value));
+  if (!Number.isNaN(t)) return new Date(t).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+  return String(value);
+}

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { formatLocalDateFromApi } from '../utils/apiDate';
+import { formatLocalDateFromApi, formatPassExpiresForDisplay } from '../utils/apiDate';
 import { GiPoliceBadge } from 'react-icons/gi';
 import { FaDollarSign } from 'react-icons/fa';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell } from 'recharts';
@@ -48,7 +48,6 @@ const UserDashboard: React.FC = () => {
   const [statsError, setStatsError] = useState('');
   const [activeTab, setActiveTab] = useState<'history' | 'stats'>('history');
   const [showBadgePopup, setShowBadgePopup] = useState(false);
-  const [isRemovingPass, setIsRemovingPass] = useState(false);
 
   const userPassStatus: PassStatus = user?.passStatus ?? 'None';
 
@@ -242,47 +241,10 @@ const UserDashboard: React.FC = () => {
     }
   };
 
-  const handleRemovePass = async () => {
-    const parsedUserId = Number(user?.id || 0);
-    if (!parsedUserId || userPassStatus === 'None') {
-      return;
-    }
-
-    const shouldRemove = window.confirm('Remove your current pass and go back to None?');
-    if (!shouldRemove) {
-      return;
-    }
-
-    try {
-      setIsRemovingPass(true);
-
-      const response = await fetch('https://cosc-4353-smart-queue-6ixj.vercel.app/api/user/pass/update', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ userID: parsedUserId, passStatus: 'None' }),
-      });
-
-      const data = await response.json();
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || 'Failed to remove pass');
-      }
-
-      updatePassStatus('None');
-      setShowBadgePopup(false);
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        alert(error.message);
-      } else {
-        alert('Failed to remove pass');
-      }
-    } finally {
-      setIsRemovingPass(false);
-    }
-  };
-
   const badgeInfo = getBadgeInfo();
+  const passExpiryTitle = user?.passExpiresAt
+    ? `Expires ${formatPassExpiresForDisplay(user.passExpiresAt)}`
+    : undefined;
 
   return (
     <div className="dashboard-page">
@@ -291,16 +253,6 @@ const UserDashboard: React.FC = () => {
           <Link to="/home" className="back-link">← Back to Home</Link>
           <h1>My Dashboard</h1>
           <div className="header-actions">
-            {badgeInfo && (
-              <button
-                type="button"
-                className="remove-pass-btn"
-                onClick={handleRemovePass}
-                disabled={isRemovingPass}
-              >
-                {isRemovingPass ? 'Removing...' : 'Remove Pass'}
-              </button>
-            )}
             <button onClick={logout} className="logout-btn">Logout</button>
           </div>
         </div>
@@ -313,12 +265,20 @@ const UserDashboard: React.FC = () => {
               <h2>
                 Welcome back, {user?.name}!
                 {badgeInfo && (
-                  <GiPoliceBadge 
-                    className="pass-badge-icon"
-                    style={{ color: badgeInfo.color }}
-                    onClick={() => setShowBadgePopup(true)}
-                    title={`Click to see ${badgeInfo.label} pass details`}
-                  />
+                  <span
+                    className="styled-tooltip pass-badge-tooltip-wrap"
+                    data-tooltip={
+                      passExpiryTitle
+                        ? `${passExpiryTitle} — click for details`
+                        : `Click to see ${badgeInfo.label} pass details`
+                    }
+                  >
+                    <GiPoliceBadge
+                      className="pass-badge-icon"
+                      style={{ color: badgeInfo.color }}
+                      onClick={() => setShowBadgePopup(true)}
+                    />
+                  </span>
                 )}
               </h2>
             </div>
@@ -541,6 +501,18 @@ const UserDashboard: React.FC = () => {
               </div>
               <div className="badge-popup-content">
                 <p className="badge-description">{badgeInfo.description}</p>
+                {user?.passExpiresAt && (
+                  <p className="badge-expiry">
+                    <strong>Expires:</strong> {formatPassExpiresForDisplay(user.passExpiresAt)}
+                  </p>
+                )}
+                {userPassStatus === 'Silver' && (
+                  <p className="badge-upgrade">
+                    <Link to="/purchase-pass" onClick={() => setShowBadgePopup(false)}>
+                      Upgrade to Gold
+                    </Link>
+                  </p>
+                )}
               </div>
             </div>
           </div>
