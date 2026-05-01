@@ -47,6 +47,14 @@ function routes(req, res) {
     return dataReportStats.getDataReportStats(req, res);
   }
 
+  if (pathname === '/api/admin/data-report/details' && method === 'GET') {
+    return dataReportStats.getDataReportDetails(req, res);
+  }
+
+  if (pathname === '/api/admin/data-report/export.csv' && method === 'GET') {
+    return dataReportStats.exportDataReportCsv(req, res);
+  }
+
   /* —— Concert lookup (legacy) —— */
   if (pathname === '/api/concerts' && method === 'GET' ) {
     return concertsLegacy.handleGetConcerts(req, res);

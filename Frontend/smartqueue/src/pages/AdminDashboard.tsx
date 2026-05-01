@@ -5,12 +5,14 @@ import {
   MdEvent, 
   MdPeople, 
   MdAnalytics, 
+  MdTableChart,
   MdAdd, 
   MdEdit, 
   MdDelete, 
   MdSave, 
   MdCancel,
-  MdVisibility
+  MdVisibility,
+  MdDownload,
 } from 'react-icons/md';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Tooltip } from 'recharts';
 import '../styling/AdminDashboard.css';
@@ -274,14 +276,93 @@ interface ApiReportData {
   userGrowth: Array<{ month: string; newUsers: number; totalUsers: number }>;
 }
 
+interface DataReportHistoryEntry {
+  historyID: number;
+  concertID: number;
+  concertName: string;
+  status: string;
+  inLineStatus: string;
+  ticketCount: number;
+  totalCost: number;
+  waitTimeMinutes: number;
+  queuedAt: string | null;
+}
+
+interface DataReportUserHistory {
+  userID: number;
+  customerName: string;
+  email: string;
+  passStatus: string;
+  totalQueues: number;
+  completedQueues: number;
+  cancelledQueues: number;
+  activeQueues: number;
+  averageWaitTimeMinutes: number;
+  lastQueuedAt: string | null;
+  participationHistory: DataReportHistoryEntry[];
+}
+
+interface DataReportServiceActivity {
+  serviceID: number;
+  serviceName: string;
+  artistName: string;
+  genre: string;
+  venue: string;
+  scheduledAt: string;
+  totalQueueEntries: number;
+  usersServed: number;
+  activeQueueEntries: number;
+  cancelledEntries: number;
+  averageWaitTimeMinutes: number;
+  totalTicketsProcessed: number;
+  revenueFromCompleted: number;
+}
+
+interface DataReportQueueUsageStats {
+  totalQueueEntries: number;
+  usersServed: number;
+  activeQueueEntries: number;
+  cancelledEntries: number;
+  completionRatePercent: number;
+  averageWaitTimeMinutes: number;
+  averageWaitTimeForServedMinutes: number;
+  totalTicketsProcessed: number;
+  totalRevenueFromCompleted: number;
+  peakQueueHourUtc: string | null;
+  peakQueueHourEntryCount: number;
+}
+
+interface ApiDataReportDetails {
+  usersQueueHistory: DataReportUserHistory[];
+  serviceQueueActivity: DataReportServiceActivity[];
+  queueUsageStatistics: DataReportQueueUsageStats;
+  allQueueHistory: Array<
+    DataReportHistoryEntry & {
+      userID: number;
+      customerName: string;
+      email: string;
+      genre: string;
+      venue: string;
+    }
+  >;
+  recentQueueHistory: Array<DataReportHistoryEntry & { userID: number }>;
+  reportGeneratedAt: string;
+}
+
+type CsvReportKey = 'users' | 'services' | 'queue-usage';
+
 const AdminDashboard: React.FC = () => {
   const { user, logout } = useAuth();
-  const [activeSection, setActiveSection] = useState<'events' | 'users' | 'reports'>('events');
+  const [activeSection, setActiveSection] = useState<'events' | 'users' | 'analytics' | 'dataReports'>('events');
   const [events, setEvents] = useState<ConcertEvent[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [reportData, setReportData] = useState<ReportData | null>(null);
   const [reportLoading, setReportLoading] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
+  const [dataReportDetails, setDataReportDetails] = useState<ApiDataReportDetails | null>(null);
+  const [dataReportLoading, setDataReportLoading] = useState(false);
+  const [dataReportError, setDataReportError] = useState<string | null>(null);
+  const [exportingReport, setExportingReport] = useState<CsvReportKey | null>(null);
   const [editingEvent, setEditingEvent] = useState<ConcertEvent | null>(null);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [showAddEventForm, setShowAddEventForm] = useState(false);
@@ -355,7 +436,7 @@ const AdminDashboard: React.FC = () => {
       setReportLoading(true);
       setReportError(null);
       try {
-        const response = await fetch('http://localhost:5000/api/admin/data-report');
+        const response = await fetch(`${API_BASE}/api/admin/data-report`);
         if (!response.ok) {
           throw new Error('Failed to fetch report data');
         }
@@ -392,7 +473,7 @@ const AdminDashboard: React.FC = () => {
               };
               return {
                 name: p.passType,
-                value: parseInt(p.percentage),
+                value: Number.parseFloat(p.percentage),
                 fill: passMap[p.passType] || '#9ca3af'
               };
             })
@@ -410,6 +491,62 @@ const AdminDashboard: React.FC = () => {
 
     fetchReportData();
   }, []);
+
+  useEffect(() => {
+    const fetchDataReportDetails = async () => {
+      setDataReportLoading(true);
+      setDataReportError(null);
+      try {
+        const response = await fetch(`${API_BASE}/api/admin/data-report/details`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch detailed reports');
+        }
+        const data = await response.json();
+        if (data.success && data.data) {
+          setDataReportDetails(data.data as ApiDataReportDetails);
+        }
+      } catch (error) {
+        console.error('Error fetching detailed reports:', error);
+        setDataReportError(error instanceof Error ? error.message : 'Failed to load detailed reports');
+      } finally {
+        setDataReportLoading(false);
+      }
+    };
+
+    fetchDataReportDetails();
+  }, []);
+
+  const handleExportDataReport = async (reportType: CsvReportKey) => {
+    setExportingReport(reportType);
+    try {
+      const response = await fetch(`${API_BASE}/api/admin/data-report/export.csv?report=${reportType}`);
+      if (!response.ok) {
+        throw new Error('Failed to export CSV report');
+      }
+
+      const csvText = await response.text();
+      const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8;' });
+      const reportFileMap: Record<CsvReportKey, string> = {
+        users: 'users-queue-history-report.csv',
+        services: 'service-queue-activity-report.csv',
+        'queue-usage': 'queue-usage-statistics-report.csv',
+      };
+
+      const link = document.createElement('a');
+      const blobUrl = window.URL.createObjectURL(blob);
+      link.href = blobUrl;
+      link.download = reportFileMap[reportType];
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error('CSV export failed:', error);
+      window.alert('Failed to export report. Please try again.');
+    } finally {
+      setExportingReport(null);
+    }
+  };
 
   const handleAddEvent = async () => {
     const artistTrim = newEvent.artist.trim();
@@ -720,10 +857,16 @@ const AdminDashboard: React.FC = () => {
             <MdPeople /> User Management
           </button>
           <button 
-            className={`nav-btn ${activeSection === 'reports' ? 'active' : ''}`}
-            onClick={() => setActiveSection('reports')}
+            className={`nav-btn ${activeSection === 'analytics' ? 'active' : ''}`}
+            onClick={() => setActiveSection('analytics')}
           >
-            <MdAnalytics /> Data Reports
+            <MdAnalytics /> Analytics
+          </button>
+          <button 
+            className={`nav-btn ${activeSection === 'dataReports' ? 'active' : ''}`}
+            onClick={() => setActiveSection('dataReports')}
+          >
+            <MdTableChart /> Data Reports
           </button>
         </div>
 
@@ -1374,10 +1517,10 @@ const AdminDashboard: React.FC = () => {
           </section>
         )}
 
-        {/* Data Reports Section */}
-        {activeSection === 'reports' && (
+        {/* Analytics Section */}
+        {activeSection === 'analytics' && (
           <section className="reports-section">
-            <h3>Data Reports & Analytics</h3>
+            <h3>Analytics Overview</h3>
             
             {reportLoading && (
               <div className="loading-state">
@@ -1521,6 +1664,219 @@ const AdminDashboard: React.FC = () => {
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
+                </div>
+              </>
+            )}
+          </section>
+        )}
+
+        {/* Data Reports Section */}
+        {activeSection === 'dataReports' && (
+          <section className="reports-section data-reports-section">
+            <div className="section-header section-header--reports">
+              <h3>Data Reports</h3>
+              <p className="reports-subtitle">
+                Generate operational reports for user queue participation, service activity, and queue usage statistics.
+              </p>
+            </div>
+
+            {dataReportLoading && (
+              <div className="loading-state">
+                <p>Loading detailed report data...</p>
+              </div>
+            )}
+
+            {dataReportError && (
+              <div className="error-state">
+                <p>Error: {dataReportError}</p>
+              </div>
+            )}
+
+            {dataReportDetails && (
+              <>
+                <div className="report-export-actions">
+                  <button
+                    type="button"
+                    className="add-btn"
+                    onClick={() => void handleExportDataReport('users')}
+                    disabled={exportingReport !== null}
+                  >
+                    <MdDownload />
+                    {exportingReport === 'users' ? 'Exporting...' : 'Export Users Report (CSV)'}
+                  </button>
+                  <button
+                    type="button"
+                    className="add-btn"
+                    onClick={() => void handleExportDataReport('services')}
+                    disabled={exportingReport !== null}
+                  >
+                    <MdDownload />
+                    {exportingReport === 'services' ? 'Exporting...' : 'Export Services Report (CSV)'}
+                  </button>
+                  <button
+                    type="button"
+                    className="add-btn"
+                    onClick={() => void handleExportDataReport('queue-usage')}
+                    disabled={exportingReport !== null}
+                  >
+                    <MdDownload />
+                    {exportingReport === 'queue-usage' ? 'Exporting...' : 'Export Queue Stats (CSV)'}
+                  </button>
+                </div>
+
+                <div className="report-block">
+                  <h4>Users Data Report</h4>
+                  <div className="admin-users-table-wrap">
+                    <table className="admin-users-table">
+                      <thead>
+                        <tr>
+                          <th>Customer</th>
+                          <th>Email</th>
+                          <th>Total Queues</th>
+                          <th>Completed</th>
+                          <th>Cancelled</th>
+                          <th>Active</th>
+                          <th>Avg Wait (Min)</th>
+                          <th>Last Queue</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {dataReportDetails.usersQueueHistory.slice(0, 25).map((userRow) => (
+                          <tr key={userRow.userID} className="admin-users-table-row">
+                            <td className="admin-users-table-strong">{userRow.customerName}</td>
+                            <td>{userRow.email}</td>
+                            <td>{userRow.totalQueues}</td>
+                            <td>{userRow.completedQueues}</td>
+                            <td>{userRow.cancelledQueues}</td>
+                            <td>{userRow.activeQueues}</td>
+                            <td>{userRow.averageWaitTimeMinutes.toFixed(2)}</td>
+                            <td>
+                              {userRow.lastQueuedAt
+                                ? new Date(userRow.lastQueuedAt).toLocaleString()
+                                : 'N/A'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="report-note">
+                    Showing first 25 users. Export CSV for full participation history.
+                  </p>
+                </div>
+
+                <div className="report-block">
+                  <h4>Concert Queue Data Report</h4>
+                  <div className="admin-users-table-wrap">
+                    <table className="admin-users-table">
+                      <thead>
+                        <tr>
+                          <th>Service/Event</th>
+                          <th>Genre</th>
+                          <th>Venue</th>
+                          <th>Queue Entries</th>
+                          <th>Users Served</th>
+                          <th>Active</th>
+                          <th>Cancelled</th>
+                          <th>Avg Wait (Min)</th>
+                          <th>Revenue</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {dataReportDetails.serviceQueueActivity.slice(0, 25).map((serviceRow) => (
+                          <tr key={serviceRow.serviceID} className="admin-users-table-row">
+                            <td className="admin-users-table-strong">{serviceRow.serviceName}</td>
+                            <td>{serviceRow.genre}</td>
+                            <td>{serviceRow.venue}</td>
+                            <td>{serviceRow.totalQueueEntries}</td>
+                            <td>{serviceRow.usersServed}</td>
+                            <td>{serviceRow.activeQueueEntries}</td>
+                            <td>{serviceRow.cancelledEntries}</td>
+                            <td>{serviceRow.averageWaitTimeMinutes.toFixed(2)}</td>
+                            <td>${serviceRow.revenueFromCompleted.toLocaleString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="report-block">
+                  <h4>Queue Usage Statistics Data Report</h4>
+                  <div className="metrics-grid">
+                    <div className="metric-card">
+                      <div className="metric-icon">
+                        <MdPeople />
+                      </div>
+                      <div className="metric-info">
+                        <h4>{dataReportDetails.queueUsageStatistics.usersServed.toLocaleString()}</h4>
+                        <p>Users Served</p>
+                      </div>
+                    </div>
+                    <div className="metric-card">
+                      <div className="metric-icon">
+                        <MdVisibility />
+                      </div>
+                      <div className="metric-info">
+                        <h4>{dataReportDetails.queueUsageStatistics.averageWaitTimeMinutes.toFixed(2)} min</h4>
+                        <p>Average Wait Time</p>
+                      </div>
+                    </div>
+                    <div className="metric-card">
+                      <div className="metric-icon">
+                        <MdAnalytics />
+                      </div>
+                      <div className="metric-info">
+                        <h4>{dataReportDetails.queueUsageStatistics.completionRatePercent.toFixed(2)}%</h4>
+                        <p>Completion Rate</p>
+                      </div>
+                    </div>
+                    <div className="metric-card">
+                      <div className="metric-icon">
+                        <MdEvent />
+                      </div>
+                      <div className="metric-info">
+                        <h4>{dataReportDetails.queueUsageStatistics.totalQueueEntries.toLocaleString()}</h4>
+                        <p>Total Queue Entries</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="admin-users-table-wrap">
+                    <table className="admin-users-table">
+                      <thead>
+                        <tr>
+                          <th>History ID</th>
+                          <th>Customer</th>
+                          <th>Event</th>
+                          <th>Status</th>
+                          <th>In-Line</th>
+                          <th>Tickets</th>
+                          <th>Wait (Min)</th>
+                          <th>Total Cost</th>
+                          <th>Queued At</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {dataReportDetails.allQueueHistory.slice(0, 60).map((queueRow) => (
+                          <tr key={queueRow.historyID} className="admin-users-table-row">
+                            <td>{queueRow.historyID}</td>
+                            <td className="admin-users-table-strong">{queueRow.customerName}</td>
+                            <td>{queueRow.concertName}</td>
+                            <td>{queueRow.status}</td>
+                            <td>{queueRow.inLineStatus}</td>
+                            <td>{queueRow.ticketCount}</td>
+                            <td>{queueRow.waitTimeMinutes}</td>
+                            <td>${queueRow.totalCost.toLocaleString()}</td>
+                            <td>{queueRow.queuedAt ? new Date(queueRow.queuedAt).toLocaleString() : 'N/A'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="report-note">
+                    Showing first 60 queue entries. Export Queue Stats (CSV) now includes all queue usage rows.
+                  </p>
                 </div>
               </>
             )}

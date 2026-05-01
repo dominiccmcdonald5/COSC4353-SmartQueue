@@ -738,6 +738,50 @@
   text-align: center;
 }
 
+.section-header.section-header--reports {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.reports-subtitle {
+  margin: 0;
+  color: #4b5563;
+  font-size: 0.95rem;
+}
+
+.report-export-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.report-export-actions .add-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.report-block {
+  margin-bottom: 2rem;
+}
+
+.report-block:last-child {
+  margin-bottom: 0;
+}
+
+.report-block h4 {
+  margin: 0 0 0.9rem;
+  color: #1f2937;
+  font-size: 1.1rem;
+}
+
+.report-note {
+  margin: 0.75rem 0 0;
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
 /* Edit form styles within cards */
 .event-card .edit-form,
 .user-card .edit-form {
@@ -1226,6 +1270,10 @@
     flex-direction: column;
     gap: 1rem;
     text-align: center;
+  }
+
+  .section-header.section-header--reports {
+    text-align: left;
   }
 
   .form-grid {
