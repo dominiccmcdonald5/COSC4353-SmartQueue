@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { FaBolt, FaBullseye, FaClock, FaCheck } from 'react-icons/fa';
 import '../styling/PurchasePassPage.css';
+import { chargeForPassSelection, GOLD_PASS_PRICE, SILVER_PASS_PRICE } from '../utils/passPricing';
 
 interface PassPlan {
   id: string;
@@ -13,52 +14,43 @@ interface PassPlan {
   recommended?: boolean;
 }
 
+const ALL_PASS_PLANS: PassPlan[] = [
+  {
+    id: 'silver',
+    name: 'Silver Pass',
+    price: 29.99,
+    duration: 'year',
+    features: ['Skip the line until 25% venue capacity is filled'],
+  },
+  {
+    id: 'gold',
+    name: 'Gold Pass',
+    price: 49.99,
+    duration: 'year',
+    recommended: true,
+    features: ['Skip the line until 50% venue capacity is filled'],
+  },
+];
+
 const PurchasePassPage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
-  const [processing] = useState(false);
 
-  const passPlan: PassPlan[] = [
-    {
-      id: 'silver',
-      name: 'Silver Pass',
-      price: 29.99,
-      duration: 'year',
-      features: [
-        'Skip the line until 25% venue capacity is filled',
-      ],
-    },
-    {
-      id: 'gold',
-      name: 'Gold Pass',
-      price: 49.99,
-      duration: 'year',
-      recommended: true,
-      features: [
-        'Skip the line until 50% venue capacity is filled',
-      ],
-    }
-  ];
+  const visiblePlans = useMemo(() => {
+    if (!user || user.passStatus === 'None') return ALL_PASS_PLANS;
+    if (user.passStatus === 'Gold') return [];
+    if (user.passStatus === 'Silver') return ALL_PASS_PLANS.filter((p) => p.id === 'gold');
+    return ALL_PASS_PLANS;
+  }, [user]);
 
-  const handleSelectPlan = (planId: string) => {
-    setSelectedPlan(planId);
-  };
-
-  const handlePurchase = async () => {
-    if (!selectedPlan) return;
-
-    // Navigate to dedicated pass purchase page
-    navigate('/purchase-pass/checkout', { 
-      state: { 
-        selectedPlan: getSelectedPlan(),
-        planType: 'premium-pass'
-      }
+  const goToCheckout = (plan: PassPlan) => {
+    const chargePrice = chargeForPassSelection(plan.id as 'gold' | 'silver', user?.passStatus ?? 'None');
+    navigate('/purchase-pass/checkout', {
+      state: {
+        selectedPlan: { ...plan, chargePrice },
+        planType: 'premium-pass',
+      },
     });
-  };
-
-  const getSelectedPlan = () => {
-    return passPlan.find(plan => plan.id === selectedPlan);
   };
 
   return (
@@ -91,93 +83,96 @@ const PurchasePassPage: React.FC = () => {
           </div>
         </section>
 
-        <section className="plans-section">
-          <h3>Choose Your Pass</h3>
-          <div className="plans-grid">
-            {passPlan.map((plan) => (
-              <div 
-                key={plan.id} 
-                className={`plan-card ${plan.recommended ? 'recommended' : ''} ${selectedPlan === plan.id ? 'selected' : ''}`}
-                onClick={() => handleSelectPlan(plan.id)}
-              >
-                {plan.recommended && (
-                  <div className="recommended-badge">Most Popular</div>
-                )}
-                
-                <div className="plan-header">
-                  <h4>{plan.name}</h4>
-                  <div className="plan-price">
-                    <span className="price">${plan.price}</span>
-                    <span className="duration">/{plan.duration}</span>
-                  </div>
-                </div>
-
-                <div className="plan-features">
-                  <ul>
-                    {plan.features.map((feature, index) => (
-                      <li key={index}>
-                        <span className="checkmark"><FaCheck /></span>
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
-                  
-                  <div className="capacity-explanation">
-                    <p className="capacity-text">
-                      {plan.id === 'silver' 
-                        ? 'You’ll skip the entire line until 25% of tickets are sold, then the pass stops working.'
-                        : 'You’ll skip the entire line until 50% of tickets are sold, then the pass stops working.'
-                      }
-                    </p>
-                  </div>
-                </div>
-
-                <button 
-                  className={`select-plan-btn ${selectedPlan === plan.id ? 'selected' : ''}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleSelectPlan(plan.id);
-                  }}
-                >
-                  {selectedPlan === plan.id ? 'Selected' : 'Select Plan'}
-                </button>
-              </div>
-            ))}
-          </div>
-          
-          <div className="priority-note">
-            <p className="note-text">
-              <em>Both Silver and Gold Passes hold the same priority level - Gold simply works until 50% venue capacity is reached, while Silver stops at 25% capacity.</em>
+        {user?.passStatus === 'Gold' && (
+          <section className="plans-section">
+            <p>
+              You already have a Gold pass (our highest tier). Passes stay on your account until they expire—they
+              can&apos;t be removed after purchase.
             </p>
-          </div>
-        </section>
+            <Link to="/home" className="back-link">
+              ← Back to Home
+            </Link>
+          </section>
+        )}
 
-        {selectedPlan && (
-          <section className="checkout-section">
-            <div className="checkout-container">
-              <div className="checkout-summary">
-                <h3>Order Summary</h3>
-                <div className="user-info">
-                  <p>Account: {user?.name} ({user?.email})</p>
-                </div>
-                <div className="selected-plan-info">
-                  <h4>{getSelectedPlan()?.name} / {getSelectedPlan()?.duration}</h4>
-                  <div className="total-price">
-                    <span>Total: ${getSelectedPlan()?.price}</span>
+        {user?.passStatus !== 'Gold' && (
+          <section className="plans-section">
+            <h3>{user?.passStatus === 'Silver' ? 'Upgrade to Gold' : 'Choose Your Pass'}</h3>
+            <div className="plans-grid">
+              {visiblePlans.map((plan) => {
+                const isSilverUpgrade = user?.passStatus === 'Silver' && plan.id === 'gold';
+                const displayPrice = chargeForPassSelection(plan.id as 'gold' | 'silver', user?.passStatus ?? 'None');
+                return (
+                  <div
+                    key={plan.id}
+                    className={`plan-card ${plan.recommended ? 'recommended' : ''}`}
+                  >
+                    {plan.recommended && <div className="recommended-badge">Most Popular</div>}
+
+                    <div className="plan-header">
+                      <h4>{plan.name}</h4>
+                      <div className="plan-price">
+                        {isSilverUpgrade ? (
+                          <>
+                            <span className="price">${displayPrice}</span>
+                            <span className="duration"> upgrade</span>
+                            <p className="upgrade-price-note">
+                              Upgrade from Silver: pay <strong>${displayPrice.toFixed(2)}</strong> (${GOLD_PASS_PRICE} Gold −{' '}
+                              {SILVER_PASS_PRICE} Silver).
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <span className="price">${plan.price}</span>
+                            <span className="duration">/{plan.duration}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="plan-features">
+                      <ul>
+                        {plan.features.map((feature, index) => (
+                          <li key={index}>
+                            <span className="checkmark">
+                              <FaCheck />
+                            </span>
+                            {feature}
+                          </li>
+                        ))}
+                      </ul>
+
+                      <div className="capacity-explanation">
+                        <p className="capacity-text">
+                          {plan.id === 'silver'
+                            ? 'You’ll skip the entire line until 25% of tickets are sold, then the pass stops working.'
+                            : 'You’ll skip the entire line until 50% of tickets are sold, then the pass stops working.'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="select-plan-btn purchase-this-pass-btn"
+                      onClick={() => goToCheckout(plan)}
+                    >
+                      Purchase this pass
+                    </button>
                   </div>
-                </div>
-              </div>
-
-              <div className="checkout-actions">
-                <button 
-                  onClick={handlePurchase}
-                  disabled={processing}
-                  className="purchase-btn"
-                >
-                  {processing ? 'Processing...' : `Purchase ${getSelectedPlan()?.name}`}
-                </button>
-              </div>
+                );
+              })}
             </div>
+
+            {visiblePlans.length > 1 && (
+              <div className="priority-note">
+                <p className="note-text">
+                  <em>
+                    Both Silver and Gold Passes hold the same priority level - Gold simply works until 50% venue
+                    capacity is reached, while Silver stops at 25% capacity.
+                  </em>
+                </p>
+              </div>
+            )}
           </section>
         )}
 

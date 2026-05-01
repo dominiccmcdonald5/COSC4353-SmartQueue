@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { formatLocalDateFromApi, parseLocalDateFromApi } from '../utils/apiDate';
+import { formatLocalDateFromApi, formatPassExpiresForDisplay, parseLocalDateFromApi } from '../utils/apiDate';
 import '../styling/HomePage.css';
 
 const API_BASE = 'https://cosc-4353-smart-queue-6ixj.vercel.app';
@@ -268,11 +268,43 @@ const HomePage: React.FC = () => {
               </Link>
             )}
             
-            {/* Show Premium Pass link for regular users */}
-            {isUser && (
+            {/* Pass: no pass → purchase; with pass → show tier + expiry on hover; Silver → upgrade link */}
+            {isUser && user?.passStatus === 'None' && (
               <Link to="/purchase-pass" className="pass-link">
                 ⭐ Get Premium Pass
               </Link>
+            )}
+            {isUser && user?.passStatus === 'Silver' && (
+              <div className="pass-dropdown">
+                <span className="pass-dropdown-trigger pass-link pass-status-static" tabIndex={0}>
+                  🥈 Silver Pass
+                  <span className="pass-dropdown-caret" aria-hidden>
+                    ▾
+                  </span>
+                </span>
+                <div className="pass-dropdown-panel" role="menu">
+                  <p className="pass-dropdown-expiry">
+                    {user.passExpiresAt
+                      ? `Expires ${formatPassExpiresForDisplay(user.passExpiresAt)}`
+                      : 'Active Silver membership'}
+                  </p>
+                  <Link to="/purchase-pass" className="pass-dropdown-upgrade" role="menuitem">
+                    Upgrade to Gold
+                  </Link>
+                </div>
+              </div>
+            )}
+            {isUser && user?.passStatus === 'Gold' && (
+              <span
+                className="pass-link pass-status-static styled-tooltip"
+                data-tooltip={
+                  user.passExpiresAt
+                    ? `Expires ${formatPassExpiresForDisplay(user.passExpiresAt)}`
+                    : 'Gold pass — active membership'
+                }
+              >
+                🥇 Gold Pass
+              </span>
             )}
             
             <button onClick={handleLogout} className="logout-btn">
@@ -293,12 +325,6 @@ const HomePage: React.FC = () => {
           {isAdmin && (
             <div className="role-badge admin-badge">
               ⚡ Administrator Access - Full System Control
-            </div>
-          )}
-          
-          {isUser && user?.passStatus !== 'None' && (
-            <div className="role-badge premium-badge">
-              ⭐ Premium Member - Priority Queue Access
             </div>
           )}
           

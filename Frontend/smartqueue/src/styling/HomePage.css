@@ -77,6 +77,80 @@
   box-shadow: 0 4px 12px rgba(128, 147, 241, 0.3);
 }
 
+.pass-link.pass-status-static {
+  cursor: help;
+}
+
+/* Silver pass: hover / keyboard dropdown (expiry + upgrade) */
+.pass-dropdown {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  z-index: 30;
+}
+
+.pass-dropdown .pass-dropdown-trigger {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  user-select: none;
+}
+
+.pass-dropdown-caret {
+  font-size: 0.65rem;
+  opacity: 0.75;
+  line-height: 1;
+}
+
+.pass-dropdown-panel {
+  display: none;
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  min-width: 12rem;
+  padding: 0.75rem 1rem;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  text-align: left;
+}
+
+.pass-dropdown:hover .pass-dropdown-panel,
+.pass-dropdown:focus-within .pass-dropdown-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.pass-dropdown-expiry {
+  margin: 0 0 0.65rem;
+  font-size: 0.82rem;
+  color: #4b5563;
+  line-height: 1.35;
+  text-align: left;
+  width: 100%;
+  align-self: stretch;
+}
+
+.pass-dropdown-upgrade {
+  display: inline-block;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #8093f1;
+  text-decoration: none;
+  border-radius: 8px;
+  padding: 0.35rem 0;
+  transition: color 0.2s ease;
+}
+
+.pass-dropdown-upgrade:hover {
+  color: #c96de8;
+  text-decoration: underline;
+}
+
 .dashboard-link, .admin-link, .pass-link, .logout-btn {
   flex-shrink: 0;
   white-space: nowrap;
@@ -721,6 +795,11 @@
     flex-wrap: wrap;
     border-radius: 30px;
     display: flex;
+  }
+
+  .pass-dropdown-panel {
+    text-align: left;
+    align-items: flex-start;
   }
   
   .dashboard-link, .admin-link, .pass-link, .logout-btn {
