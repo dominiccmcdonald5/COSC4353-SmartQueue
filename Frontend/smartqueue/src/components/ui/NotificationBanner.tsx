@@ -3,9 +3,9 @@ import { useNotification } from '../../context/NotificationContext';
 import './NotificationBanner.css';
 
 export const NotificationBanner: React.FC = () => {
-  const { isNextInLine } = useNotification();
+  const { isNextInLine, canProceedToPurchase, proceedConcertName } = useNotification();
 
-  if (!isNextInLine) {
+  if (!isNextInLine && !canProceedToPurchase) {
     return null;
   }
 
@@ -14,8 +14,19 @@ export const NotificationBanner: React.FC = () => {
       <div className="notification-content">
         <span className="notification-icon">🎉</span>
         <div className="notification-text">
-          <h2>You're Almost There!</h2>
-          <p>You are 6th in line. Prepare your payment method to quickly get your tickets!</p>
+          {canProceedToPurchase ? (
+            <>
+              <h2>You Can Proceed!</h2>
+              <p>
+                You can now purchase a ticket for {proceedConcertName || 'this concert'}. Grab it while it lasts.
+              </p>
+            </>
+          ) : (
+            <>
+              <h2>You're Almost There!</h2>
+              <p>You are 6th in line. Prepare your payment method to quickly get your tickets!</p>
+            </>
+          )}
         </div>
       </div>
     </div>

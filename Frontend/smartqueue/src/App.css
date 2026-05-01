@@ -122,18 +122,28 @@ button:disabled {
   cursor: not-allowed;
 }
 
-.primary-btn, .join-queue-btn, .proceed-btn, .purchase-btn {
+.primary-btn, .join-queue-btn, .purchase-btn {
   background-color: #6366f1;
   color: white;
 }
 
 .primary-btn:hover:not(:disabled),
 .join-queue-btn:hover:not(:disabled),
-.proceed-btn:hover:not(:disabled),
 .purchase-btn:hover:not(:disabled) {
   background-color: #5b21b6;
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+}
+
+.proceed-btn {
+  background-color: #10b981;
+  color: white;
+}
+
+.proceed-btn:hover:not(:disabled) {
+  background-color: #059669;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);
 }
 
 .secondary-btn {
