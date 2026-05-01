@@ -14,6 +14,10 @@ interface NotificationContextType {
   removeNotification: (id: string) => void;
   isNextInLine: boolean;
   setIsNextInLine: (isNext: boolean) => void;
+  canProceedToPurchase: boolean;
+  setCanProceedToPurchase: (canProceed: boolean) => void;
+  proceedConcertName: string | null;
+  setProceedConcertName: (name: string | null) => void;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
@@ -21,6 +25,8 @@ const NotificationContext = createContext<NotificationContextType | undefined>(u
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isNextInLine, setIsNextInLine] = useState(false);
+  const [canProceedToPurchase, setCanProceedToPurchase] = useState(false);
+  const [proceedConcertName, setProceedConcertName] = useState<string | null>(null);
 
   const addNotification = useCallback((notification: Omit<Notification, 'id'>) => {
     const id = Date.now().toString();
@@ -45,6 +51,10 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         removeNotification,
         isNextInLine,
         setIsNextInLine,
+        canProceedToPurchase,
+        setCanProceedToPurchase,
+        proceedConcertName,
+        setProceedConcertName,
       }}
     >
       {children}
