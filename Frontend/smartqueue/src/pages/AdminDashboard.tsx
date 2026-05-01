@@ -21,6 +21,7 @@ import { CONCERT_ARTIST_MAX_LEN, type ConcertEvent } from '../types/concertEvent
 import ConcertEventEditForm from '../components/admin/ConcertEventEditForm';
 import EventEditModal from '../components/admin/EventEditModal';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
+import { formatLocalDateFromApi } from '../utils/apiDate';
 import {
   VENUE_MAX_LEN,
   VENUE_OTHER,
@@ -68,7 +69,43 @@ function parseSpentForSave(s: string): number | null {
 }
 
 const DEFAULT_CONCERT_IMAGE = '/concert1.jpg';
-const API_BASE = 'http://localhost:5000';
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'https://cosc-4353-smart-queue-6ixj.vercel.app').replace(/\/$/, '');
+const LOCAL_API_BASE = 'http://localhost:5000';
+const REPORT_API_FALLBACK_BASE = API_BASE === LOCAL_API_BASE ? null : LOCAL_API_BASE;
+/** Matches backend admin user API minimum password length. */
+const ADMIN_USER_PASSWORD_MIN_LEN = 4;
+
+async function fetchJsonWithOptionalFallback(path: string): Promise<unknown> {
+  const primary = await fetch(`${API_BASE}${path}`);
+  if (primary.ok) {
+    return primary.json();
+  }
+
+  if (primary.status === 404 && REPORT_API_FALLBACK_BASE) {
+    const fallback = await fetch(`${REPORT_API_FALLBACK_BASE}${path}`);
+    if (fallback.ok) {
+      return fallback.json();
+    }
+  }
+
+  throw new Error(`Request failed (${primary.status})`);
+}
+
+async function fetchTextWithOptionalFallback(path: string): Promise<string> {
+  const primary = await fetch(`${API_BASE}${path}`);
+  if (primary.ok) {
+    return primary.text();
+  }
+
+  if (primary.status === 404 && REPORT_API_FALLBACK_BASE) {
+    const fallback = await fetch(`${REPORT_API_FALLBACK_BASE}${path}`);
+    if (fallback.ok) {
+      return fallback.text();
+    }
+  }
+
+  throw new Error(`Request failed (${primary.status})`);
+}
 
 type PendingDelete =
   | { kind: 'concert'; id: string; title: string }
@@ -197,6 +234,8 @@ function getFallbackConcertEvents(): ConcertEvent[] {
 interface User {
   id: string;
   name: string;
+  firstName: string;
+  lastName: string;
   email: string;
   joinDate: string;
   passType: 'none' | 'silver' | 'gold';
@@ -204,10 +243,29 @@ interface User {
   status: 'active' | 'suspended' | 'banned';
 }
 
+/** Add-user form only; API stores first_name / last_name separately */
+type AdminNewUserDraft = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  passType: User['passType'];
+  status: User['status'];
+};
+
+const initialAdminNewUser: AdminNewUserDraft = {
+  firstName: '',
+  lastName: '',
+  email: '',
+  passType: 'none',
+  status: 'active',
+};
+
 const DEMO_ADMIN_USERS: User[] = [
   {
     id: '1',
     name: 'John Doe',
+    firstName: 'John',
+    lastName: 'Doe',
     email: 'john.doe@email.com',
     joinDate: '2025-12-01',
     passType: 'gold',
@@ -217,6 +275,8 @@ const DEMO_ADMIN_USERS: User[] = [
   {
     id: '2',
     name: 'Jane Smith',
+    firstName: 'Jane',
+    lastName: 'Smith',
     email: 'jane.smith@email.com',
     joinDate: '2026-01-15',
     passType: 'silver',
@@ -226,6 +286,8 @@ const DEMO_ADMIN_USERS: User[] = [
   {
     id: '3',
     name: 'Mike Johnson',
+    firstName: 'Mike',
+    lastName: 'Johnson',
     email: 'mike.j@email.com',
     joinDate: '2026-01-20',
     passType: 'none',
@@ -236,16 +298,29 @@ const DEMO_ADMIN_USERS: User[] = [
 
 function mapApiUserRow(u: {
   id: string;
-  name: string;
+  name?: string;
+  firstName?: string;
+  lastName?: string;
   email: string;
   joinDate: string;
   passType: string;
   totalSpent: number;
   status: string;
 }): User {
+  let first = typeof u.firstName === 'string' ? u.firstName : '';
+  let last = typeof u.lastName === 'string' ? u.lastName : '';
+  if (!first && !last && typeof u.name === 'string' && u.name.trim()) {
+    const parts = u.name.trim().split(/\s+/);
+    first = parts[0] || '';
+    last = parts.slice(1).join(' ') || '';
+  }
+  const combined = `${first} ${last}`.trim();
+  const name = combined || (typeof u.name === 'string' && u.name.trim() ? u.name.trim() : 'Unknown');
   return {
     id: String(u.id),
-    name: u.name,
+    name,
+    firstName: first,
+    lastName: last,
     email: u.email,
     joinDate: u.joinDate,
     passType: (['none', 'silver', 'gold'].includes(u.passType) ? u.passType : 'none') as User['passType'],
@@ -393,17 +468,18 @@ const AdminDashboard: React.FC = () => {
   });
 
   // Form data for new users
-  const [newUser, setNewUser] = useState<Omit<User, 'id' | 'joinDate' | 'totalSpent'>>({
-    name: '',
-    email: '',
-    passType: 'none',
-    status: 'active'
-  });
-  const [addUserEmptyName, setAddUserEmptyName] = useState(false);
+  const [newUser, setNewUser] = useState<AdminNewUserDraft>(initialAdminNewUser);
+  const [addUserEmptyFirstName, setAddUserEmptyFirstName] = useState(false);
   const [addUserEmptyEmail, setAddUserEmptyEmail] = useState(false);
+  const [newUserPassword, setNewUserPassword] = useState('');
+  const [newUserPasswordConfirm, setNewUserPasswordConfirm] = useState('');
+  const [addUserPasswordError, setAddUserPasswordError] = useState<string | null>(null);
   const [userEditSpentStr, setUserEditSpentStr] = useState('');
-  const [editUserEmptyName, setEditUserEmptyName] = useState(false);
+  const [editUserEmptyFirstName, setEditUserEmptyFirstName] = useState(false);
   const [editUserEmptySpent, setEditUserEmptySpent] = useState(false);
+  const [editUserPassword, setEditUserPassword] = useState('');
+  const [editUserPasswordConfirm, setEditUserPasswordConfirm] = useState('');
+  const [editUserPasswordError, setEditUserPasswordError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch(`${API_BASE}/api/admin/users`)
@@ -430,17 +506,20 @@ const AdminDashboard: React.FC = () => {
       .catch(() => setEvents(getFallbackConcertEvents()));
   }, []);
 
-  // Fetch admin report data from API
+  // Fetch analytics report data for the Analytics section.
   useEffect(() => {
+    let cancelled = false;
     const fetchReportData = async () => {
       setReportLoading(true);
       setReportError(null);
       try {
         const response = await fetch(`${API_BASE}/api/admin/data-report`);
-        if (!response.ok) {
-          throw new Error('Failed to fetch report data');
-        }
         const data = await response.json();
+        if (!response.ok) {
+          throw new Error(
+            typeof data?.error === 'string' ? data.error : `Report request failed (${response.status})`
+          );
+        }
         
         if (data.success && data.data) {
           const apiData = data.data as ApiReportData;
@@ -483,9 +562,12 @@ const AdminDashboard: React.FC = () => {
         }
       } catch (error) {
         console.error('Error fetching report data:', error);
-        setReportError(error instanceof Error ? error.message : 'Failed to load report data');
+        if (!cancelled) {
+          setReportError(error instanceof Error ? error.message : 'Failed to load report data');
+          setReportData(null);
+        }
       } finally {
-        setReportLoading(false);
+        if (!cancelled) setReportLoading(false);
       }
     };
 
@@ -497,13 +579,14 @@ const AdminDashboard: React.FC = () => {
       setDataReportLoading(true);
       setDataReportError(null);
       try {
-        const response = await fetch(`${API_BASE}/api/admin/data-report/details`);
-        if (!response.ok) {
-          throw new Error('Failed to fetch detailed reports');
-        }
-        const data = await response.json();
+        const data = (await fetchJsonWithOptionalFallback('/api/admin/data-report/details')) as {
+          success?: boolean;
+          data?: ApiDataReportDetails;
+        };
         if (data.success && data.data) {
-          setDataReportDetails(data.data as ApiDataReportDetails);
+          setDataReportDetails(data.data);
+        } else {
+          throw new Error('Failed to fetch detailed reports');
         }
       } catch (error) {
         console.error('Error fetching detailed reports:', error);
@@ -519,12 +602,9 @@ const AdminDashboard: React.FC = () => {
   const handleExportDataReport = async (reportType: CsvReportKey) => {
     setExportingReport(reportType);
     try {
-      const response = await fetch(`${API_BASE}/api/admin/data-report/export.csv?report=${reportType}`);
-      if (!response.ok) {
-        throw new Error('Failed to export CSV report');
-      }
-
-      const csvText = await response.text();
+      const csvText = await fetchTextWithOptionalFallback(
+        `/api/admin/data-report/export.csv?report=${reportType}`,
+      );
       const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8;' });
       const reportFileMap: Record<CsvReportKey, string> = {
         users: 'users-queue-history-report.csv',
@@ -689,23 +769,47 @@ const AdminDashboard: React.FC = () => {
 
   // User Management Functions
   const handleAddUser = async () => {
-    const nameTrim = newUser.name.trim();
+    const firstTrim = newUser.firstName.trim();
+    const lastTrim = newUser.lastName.trim();
     const emailTrim = newUser.email.trim();
-    const nameBad = !nameTrim;
+    const firstBad = !firstTrim;
     const emailBad = !emailTrim;
-    setAddUserEmptyName(nameBad);
+    setAddUserEmptyFirstName(firstBad);
     setAddUserEmptyEmail(emailBad);
-    if (nameBad || emailBad) return;
+    setAddUserPasswordError(null);
+    if (firstBad || emailBad) return;
+
+    const pw = newUserPassword;
+    const pw2 = newUserPasswordConfirm;
+    if (!pw || !pw2) {
+      setAddUserPasswordError('Password and confirmation are required.');
+      return;
+    }
+    if (pw.length < ADMIN_USER_PASSWORD_MIN_LEN) {
+      setAddUserPasswordError(
+        `Password must be at least ${ADMIN_USER_PASSWORD_MIN_LEN} characters.`
+      );
+      return;
+    }
+    if (pw !== pw2) {
+      setAddUserPasswordError('Passwords do not match.');
+      return;
+    }
+
+    const body: Record<string, unknown> = {
+      firstName: sanitizeUserNameInput(firstTrim),
+      lastName: sanitizeUserNameInput(lastTrim),
+      email: emailTrim,
+      passType: newUser.passType,
+      status: newUser.status,
+      password: pw,
+    };
+
     try {
       const res = await fetch(`${API_BASE}/api/admin/users`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: nameTrim,
-          email: emailTrim,
-          passType: newUser.passType,
-          status: newUser.status,
-        }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (data.success && data.user) {
@@ -718,13 +822,11 @@ const AdminDashboard: React.FC = () => {
       window.alert('Failed to connect to server. User not created.');
       return;
     }
-    setNewUser({
-      name: '',
-      email: '',
-      passType: 'none',
-      status: 'active',
-    });
-    setAddUserEmptyName(false);
+    setNewUser(initialAdminNewUser);
+    setNewUserPassword('');
+    setNewUserPasswordConfirm('');
+    setAddUserPasswordError(null);
+    setAddUserEmptyFirstName(false);
     setAddUserEmptyEmail(false);
     setShowAddUserForm(false);
   };
@@ -732,31 +834,57 @@ const AdminDashboard: React.FC = () => {
   const handleEditUser = (user: User) => {
     setEditingUser({ ...user });
     setUserEditSpentStr(String(user.totalSpent));
-    setEditUserEmptyName(false);
+    setEditUserEmptyFirstName(false);
     setEditUserEmptySpent(false);
+    setEditUserPassword('');
+    setEditUserPasswordConfirm('');
+    setEditUserPasswordError(null);
   };
 
   const handleSaveUser = async () => {
     if (!editingUser) return;
-    const nameTrim = editingUser.name.trim();
+    const firstTrim = sanitizeUserNameInput(editingUser.firstName.trim());
+    const lastTrim = sanitizeUserNameInput(editingUser.lastName.trim());
     const spentNum = parseSpentForSave(userEditSpentStr);
-    const nameBad = !nameTrim;
+    const firstBad = !firstTrim;
     const spentBad = spentNum === null;
-    setEditUserEmptyName(nameBad);
+    setEditUserEmptyFirstName(firstBad);
     setEditUserEmptySpent(spentBad);
-    if (nameBad || spentBad) return;
+    setEditUserPasswordError(null);
+    if (firstBad || spentBad) return;
+
+    const pw = editUserPassword;
+    const pw2 = editUserPasswordConfirm;
+    if (pw || pw2) {
+      if (pw.length < ADMIN_USER_PASSWORD_MIN_LEN) {
+        setEditUserPasswordError(
+          `Password must be at least ${ADMIN_USER_PASSWORD_MIN_LEN} characters, or leave both fields blank to keep the current password.`
+        );
+        return;
+      }
+      if (pw !== pw2) {
+        setEditUserPasswordError('Passwords do not match.');
+        return;
+      }
+    }
+
+    const body: Record<string, unknown> = {
+      firstName: firstTrim,
+      lastName: lastTrim,
+      email: editingUser.email.trim(),
+      passType: editingUser.passType,
+      status: editingUser.status,
+      totalSpent: spentNum,
+    };
+    if (pw.length >= ADMIN_USER_PASSWORD_MIN_LEN && pw === pw2) {
+      body.password = pw;
+    }
 
     try {
       const res = await fetch(`${API_BASE}/api/admin/users/${editingUser.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: nameTrim,
-          email: editingUser.email.trim(),
-          passType: editingUser.passType,
-          status: editingUser.status,
-          totalSpent: spentNum,
-        }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (data.success && data.user) {
@@ -772,6 +900,9 @@ const AdminDashboard: React.FC = () => {
     }
     setEditingUser(null);
     setUserEditSpentStr('');
+    setEditUserPassword('');
+    setEditUserPasswordConfirm('');
+    setEditUserPasswordError(null);
   };
 
   const requestDeleteUser = (id: string) => {
@@ -1200,7 +1331,7 @@ const AdminDashboard: React.FC = () => {
                       </div>
                       <div className="event-detail-row">
                         <dt>Date</dt>
-                        <dd>{new Date(event.date).toLocaleDateString(undefined, { dateStyle: 'long' })}</dd>
+                        <dd>{formatLocalDateFromApi(event.date, { dateStyle: 'long' })}</dd>
                       </div>
                       <div className="event-detail-row">
                         <dt>Venue</dt>
@@ -1254,8 +1385,12 @@ const AdminDashboard: React.FC = () => {
               <button
                 className="add-btn"
                 onClick={() => {
-                  setAddUserEmptyName(false);
+                  setNewUser(initialAdminNewUser);
+                  setAddUserEmptyFirstName(false);
                   setAddUserEmptyEmail(false);
+                  setNewUserPassword('');
+                  setNewUserPasswordConfirm('');
+                  setAddUserPasswordError(null);
                   setShowAddUserForm(true);
                 }}
               >
@@ -1290,23 +1425,37 @@ const AdminDashboard: React.FC = () => {
                   <div className="form-field-stacked">
                     <input
                       type="text"
-                      placeholder="Full Name (letters only)"
-                      autoComplete="name"
-                      className={addUserEmptyName ? 'is-invalid' : undefined}
-                      value={newUser.name}
+                      placeholder="First name"
+                      autoComplete="given-name"
+                      className={addUserEmptyFirstName ? 'is-invalid' : undefined}
+                      value={newUser.firstName}
                       onChange={(e) => {
-                        setAddUserEmptyName(false);
+                        setAddUserEmptyFirstName(false);
                         setNewUser({
                           ...newUser,
-                          name: sanitizeUserNameInput(e.target.value),
+                          firstName: sanitizeUserNameInput(e.target.value),
                         });
                       }}
                     />
-                    {addUserEmptyName && (
+                    {addUserEmptyFirstName && (
                       <span className="field-inline-error" role="alert">
                         Need to fill
                       </span>
                     )}
+                  </div>
+                  <div className="form-field-stacked">
+                    <input
+                      type="text"
+                      placeholder="Last name"
+                      autoComplete="family-name"
+                      value={newUser.lastName}
+                      onChange={(e) =>
+                        setNewUser({
+                          ...newUser,
+                          lastName: sanitizeUserNameInput(e.target.value),
+                        })
+                      }
+                    />
                   </div>
                   <div className="form-field-stacked">
                     <input
@@ -1322,6 +1471,37 @@ const AdminDashboard: React.FC = () => {
                     {addUserEmptyEmail && (
                       <span className="field-inline-error" role="alert">
                         Need to fill
+                      </span>
+                    )}
+                  </div>
+                  <div className="form-field-stacked form-field-stacked--full-row">
+                    <input
+                      type="password"
+                      autoComplete="new-password"
+                      placeholder={`Login password (required, min ${ADMIN_USER_PASSWORD_MIN_LEN} chars)`}
+                      className={addUserPasswordError ? 'is-invalid' : undefined}
+                      value={newUserPassword}
+                      onChange={(e) => {
+                        setAddUserPasswordError(null);
+                        setNewUserPassword(e.target.value);
+                      }}
+                    />
+                  </div>
+                  <div className="form-field-stacked form-field-stacked--full-row">
+                    <input
+                      type="password"
+                      autoComplete="new-password"
+                      placeholder="Confirm password (required)"
+                      className={addUserPasswordError ? 'is-invalid' : undefined}
+                      value={newUserPasswordConfirm}
+                      onChange={(e) => {
+                        setAddUserPasswordError(null);
+                        setNewUserPasswordConfirm(e.target.value);
+                      }}
+                    />
+                    {addUserPasswordError && (
+                      <span className="field-inline-error" role="alert">
+                        {addUserPasswordError}
                       </span>
                     )}
                   </div>
@@ -1349,8 +1529,12 @@ const AdminDashboard: React.FC = () => {
                   <button
                     className="cancel-btn"
                     onClick={() => {
-                      setAddUserEmptyName(false);
+                      setNewUser(initialAdminNewUser);
+                      setAddUserEmptyFirstName(false);
                       setAddUserEmptyEmail(false);
+                      setNewUserPassword('');
+                      setNewUserPasswordConfirm('');
+                      setAddUserPasswordError(null);
                       setShowAddUserForm(false);
                     }}
                   >
@@ -1362,127 +1546,199 @@ const AdminDashboard: React.FC = () => {
 
             <div className="users-table-wrap">
               <table className="admin-users-table">
-                <thead>
-                  <tr>
-                    <th scope="col">Name</th>
-                    <th scope="col">Email</th>
-                    <th scope="col">Joined</th>
-                    <th scope="col">Pass</th>
-                    <th scope="col">Spent</th>
-                    <th scope="col">Status</th>
-                    <th scope="col" className="admin-users-table-actions">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
+                {!editingUser && (
+                  <thead>
+                    <tr>
+                      <th scope="col">Name</th>
+                      <th scope="col">Email</th>
+                      <th scope="col">Joined</th>
+                      <th scope="col">Pass</th>
+                      <th scope="col">Spent</th>
+                      <th scope="col">Status</th>
+                      <th scope="col" className="admin-users-table-actions">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                )}
                 <tbody>
                   {filteredUsers.map((user) =>
                     editingUser?.id === user.id ? (
                       <tr key={user.id} className="admin-users-table-row is-editing">
-                        <td>
-                          <div className="admin-users-cell-stack">
-                            <input
-                              type="text"
-                              aria-label="Name"
-                              placeholder="Letters only"
-                              className={editUserEmptyName ? 'is-invalid' : undefined}
-                              value={editingUser.name}
-                              onChange={(e) => {
-                                setEditUserEmptyName(false);
-                                setEditingUser({
-                                  ...editingUser,
-                                  name: sanitizeUserNameInput(e.target.value),
-                                });
-                              }}
-                            />
-                            {editUserEmptyName && (
-                              <span className="field-inline-error" role="alert">
-                                Need to fill
-                              </span>
-                            )}
+                        <td colSpan={7}>
+                          <div className="admin-users-edit-panel">
+                            <div className="admin-users-edit-panel-grid admin-users-edit-panel-grid--names">
+                              <div className="admin-users-edit-field">
+                                <label htmlFor={`edit-user-first-${editingUser.id}`}>First name</label>
+                                <input
+                                  id={`edit-user-first-${editingUser.id}`}
+                                  type="text"
+                                  autoComplete="given-name"
+                                  placeholder="First name"
+                                  className={editUserEmptyFirstName ? 'is-invalid' : undefined}
+                                  value={editingUser.firstName}
+                                  onChange={(e) => {
+                                    setEditUserEmptyFirstName(false);
+                                    const v = sanitizeUserNameInput(e.target.value);
+                                    setEditingUser({
+                                      ...editingUser,
+                                      firstName: v,
+                                      name: `${v} ${editingUser.lastName}`.trim(),
+                                    });
+                                  }}
+                                />
+                                {editUserEmptyFirstName && (
+                                  <span className="field-inline-error" role="alert">
+                                    Need to fill
+                                  </span>
+                                )}
+                              </div>
+                              <div className="admin-users-edit-field">
+                                <label htmlFor={`edit-user-last-${editingUser.id}`}>Last name</label>
+                                <input
+                                  id={`edit-user-last-${editingUser.id}`}
+                                  type="text"
+                                  autoComplete="family-name"
+                                  placeholder="Last name"
+                                  value={editingUser.lastName}
+                                  onChange={(e) => {
+                                    const v = sanitizeUserNameInput(e.target.value);
+                                    setEditingUser({
+                                      ...editingUser,
+                                      lastName: v,
+                                      name: `${editingUser.firstName} ${v}`.trim(),
+                                    });
+                                  }}
+                                />
+                              </div>
+                              <div className="admin-users-edit-field admin-users-edit-field--grow">
+                                <label htmlFor={`edit-user-email-${editingUser.id}`}>Email</label>
+                                <input
+                                  id={`edit-user-email-${editingUser.id}`}
+                                  type="email"
+                                  autoComplete="email"
+                                  placeholder="Email"
+                                  value={editingUser.email}
+                                  onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
+                                />
+                              </div>
+                            </div>
+                            <div className="admin-users-edit-panel-grid admin-users-edit-panel-grid--meta">
+                              <div className="admin-users-edit-field">
+                                <span className="admin-users-edit-readonly-label">Joined</span>
+                                <span className="admin-users-edit-readonly-value">
+                                  {formatLocalDateFromApi(editingUser.joinDate, { dateStyle: 'medium' })}
+                                </span>
+                              </div>
+                              <div className="admin-users-edit-field">
+                                <label htmlFor={`edit-user-pass-${editingUser.id}`}>Pass</label>
+                                <select
+                                  id={`edit-user-pass-${editingUser.id}`}
+                                  value={editingUser.passType}
+                                  onChange={(e) =>
+                                    setEditingUser({
+                                      ...editingUser,
+                                      passType: e.target.value as User['passType'],
+                                    })
+                                  }
+                                >
+                                  <option value="none">None</option>
+                                  <option value="silver">Silver</option>
+                                  <option value="gold">Gold</option>
+                                </select>
+                              </div>
+                              <div className="admin-users-edit-field">
+                                <label htmlFor={`edit-user-spent-${editingUser.id}`}>Total spent</label>
+                                <input
+                                  id={`edit-user-spent-${editingUser.id}`}
+                                  type="text"
+                                  inputMode="decimal"
+                                  autoComplete="off"
+                                  placeholder="0.00"
+                                  className={`admin-users-spent-input${editUserEmptySpent ? ' is-invalid' : ''}`}
+                                  value={userEditSpentStr}
+                                  onChange={(e) => {
+                                    setEditUserEmptySpent(false);
+                                    setUserEditSpentStr(sanitizeSpentInput(e.target.value));
+                                  }}
+                                />
+                                {editUserEmptySpent && (
+                                  <span className="field-inline-error" role="alert">
+                                    Need to fill
+                                  </span>
+                                )}
+                              </div>
+                              <div className="admin-users-edit-field">
+                                <label htmlFor={`edit-user-status-${editingUser.id}`}>Status</label>
+                                <select
+                                  id={`edit-user-status-${editingUser.id}`}
+                                  value={editingUser.status}
+                                  onChange={(e) =>
+                                    setEditingUser({
+                                      ...editingUser,
+                                      status: e.target.value as User['status'],
+                                    })
+                                  }
+                                >
+                                  <option value="active">Active</option>
+                                  <option value="suspended">Suspended</option>
+                                  <option value="banned">Banned</option>
+                                </select>
+                              </div>
+                            </div>
+                            <div className="admin-users-edit-password-block">
+                              <span className="admin-user-password-label">New login password</span>
+                              <div className="admin-user-password-fields">
+                                <input
+                                  type="password"
+                                  autoComplete="new-password"
+                                  aria-label="New password"
+                                  placeholder={`Min ${ADMIN_USER_PASSWORD_MIN_LEN} characters`}
+                                  value={editUserPassword}
+                                  onChange={(e) => {
+                                    setEditUserPasswordError(null);
+                                    setEditUserPassword(e.target.value);
+                                  }}
+                                />
+                                <input
+                                  type="password"
+                                  autoComplete="new-password"
+                                  aria-label="Confirm new password"
+                                  placeholder="Confirm password"
+                                  value={editUserPasswordConfirm}
+                                  onChange={(e) => {
+                                    setEditUserPasswordError(null);
+                                    setEditUserPasswordConfirm(e.target.value);
+                                  }}
+                                />
+                              </div>
+                              {editUserPasswordError && (
+                                <span className="field-inline-error" role="alert">
+                                  {editUserPasswordError}
+                                </span>
+                              )}
+                            </div>
+                            <div className="admin-users-edit-actions">
+                              <button type="button" className="save-btn" onClick={() => void handleSaveUser()}>
+                                <MdSave /> Save changes
+                              </button>
+                              <button
+                                type="button"
+                                className="cancel-btn"
+                                onClick={() => {
+                                  setEditingUser(null);
+                                  setUserEditSpentStr('');
+                                  setEditUserEmptyFirstName(false);
+                                  setEditUserEmptySpent(false);
+                                  setEditUserPassword('');
+                                  setEditUserPasswordConfirm('');
+                                  setEditUserPasswordError(null);
+                                }}
+                              >
+                                <MdCancel /> Cancel
+                              </button>
+                            </div>
                           </div>
-                        </td>
-                        <td>
-                          <input
-                            type="email"
-                            aria-label="Email"
-                            value={editingUser.email}
-                            onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
-                          />
-                        </td>
-                        <td className="admin-users-table-muted">
-                          {new Date(editingUser.joinDate).toLocaleDateString()}
-                        </td>
-                        <td>
-                          <select
-                            aria-label="Pass type"
-                            value={editingUser.passType}
-                            onChange={(e) =>
-                              setEditingUser({
-                                ...editingUser,
-                                passType: e.target.value as User['passType'],
-                              })
-                            }
-                          >
-                            <option value="none">None</option>
-                            <option value="silver">Silver</option>
-                            <option value="gold">Gold</option>
-                          </select>
-                        </td>
-                        <td>
-                          <div className="admin-users-cell-stack">
-                            <input
-                              type="text"
-                              inputMode="decimal"
-                              autoComplete="off"
-                              aria-label="Total spent"
-                              placeholder="0.00"
-                              className={`admin-users-spent-input${editUserEmptySpent ? ' is-invalid' : ''}`}
-                              value={userEditSpentStr}
-                              onChange={(e) => {
-                                setEditUserEmptySpent(false);
-                                setUserEditSpentStr(sanitizeSpentInput(e.target.value));
-                              }}
-                            />
-                            {editUserEmptySpent && (
-                              <span className="field-inline-error" role="alert">
-                                Need to fill
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td>
-                          <select
-                            aria-label="Account status"
-                            value={editingUser.status}
-                            onChange={(e) =>
-                              setEditingUser({
-                                ...editingUser,
-                                status: e.target.value as User['status'],
-                              })
-                            }
-                          >
-                            <option value="active">Active</option>
-                            <option value="suspended">Suspended</option>
-                            <option value="banned">Banned</option>
-                          </select>
-                        </td>
-                        <td className="admin-users-table-actions">
-                          <button type="button" className="save-btn save-btn--compact" onClick={() => void handleSaveUser()}>
-                            <MdSave /> Save
-                          </button>
-                          <button
-                            type="button"
-                            className="cancel-btn cancel-btn--compact"
-                            onClick={() => {
-                              setEditingUser(null);
-                              setUserEditSpentStr('');
-                              setEditUserEmptyName(false);
-                              setEditUserEmptySpent(false);
-                            }}
-                          >
-                            <MdCancel /> Cancel
-                          </button>
                         </td>
                       </tr>
                     ) : (
@@ -1654,7 +1910,10 @@ const AdminDashboard: React.FC = () => {
                           cy="50%"
                           outerRadius={80}
                           dataKey="value"
-                          label={({ name, value }) => `${name}: ${value}%`}
+                          nameKey="name"
+                          label={({ name, percent }) =>
+                            `${name}: ${((percent ?? 0) * 100).toFixed(0)}%`
+                          }
                         >
                           {reportData.passDistribution.map((entry, index) => (
                             <Cell key={`cell-${index}`} fill={entry.fill} />

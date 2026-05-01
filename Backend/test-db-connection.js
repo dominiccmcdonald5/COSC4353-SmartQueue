@@ -1,16 +1,23 @@
+/**
+ * Quick check that .env DB settings work (from main branch script).
+ */
 require('dotenv').config();
+const { promisePool } = require('./database');
 
-const pool = require('./database');
-
-pool.query('SELECT 1 AS ok', (err, results) => {
-  if (err) {
-    console.error('DB connection test failed.');
-    console.error(err.message);
-    pool.end(() => process.exit(1));
-    return;
+async function main() {
+  try {
+    const [rows] = await promisePool.query('SELECT 1 AS ok');
+    const ok = Array.isArray(rows) && rows[0] && rows[0].ok === 1;
+    if (!ok) {
+      console.error('Unexpected result:', rows);
+      process.exit(1);
+    }
+    console.log('Database connection OK');
+    process.exit(0);
+  } catch (e) {
+    console.error('Database connection failed:', e.message || e);
+    process.exit(1);
   }
+}
 
-  const ok = Array.isArray(results) && results.length > 0 ? results[0].ok : null;
-  console.log('DB connection test passed:', ok === 1 ? 'SELECT 1 returned 1' : results);
-  pool.end(() => process.exit(0));
-});
+main();

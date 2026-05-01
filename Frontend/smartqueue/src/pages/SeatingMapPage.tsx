@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
+import { formatLocalDateFromApi } from '../utils/apiDate';
 import '../styling/SeatingMapPage.css';
+
+const API_BASE = 'https://cosc-4353-smart-queue-6ixj.vercel.app';
 
 interface Seat {
   id: string;
@@ -96,7 +99,13 @@ const SeatingMapPage: React.FC = () => {
     const fetchConcertInfo = async () => {
       setConcertLoading(true);
       try {
-        const response = await fetch(`/api/concerts/${concertId}`);
+        const response = await fetch(`${API_BASE}/api/concerts/${concertId}`);
+        const contentType = response.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+          setConcertInfo(null);
+          return;
+        }
+
         const payload = (await response.json()) as ApiConcertResponse;
 
         if (!mounted) return;
@@ -277,7 +286,7 @@ const SeatingMapPage: React.FC = () => {
         {concertInfo && (
           <div className="concert-info">
             <h2>{concertInfo.name}</h2>
-            <p>{concertInfo.artist} • {concertInfo.venue} • {new Date(concertInfo.date).toLocaleDateString()}</p>
+            <p>{concertInfo.artist} • {concertInfo.venue} • {formatLocalDateFromApi(concertInfo.date)}</p>
             <p>
               Seats Available:{' '}
               {concertInfo.availableTickets != null && concertInfo.totalTickets != null

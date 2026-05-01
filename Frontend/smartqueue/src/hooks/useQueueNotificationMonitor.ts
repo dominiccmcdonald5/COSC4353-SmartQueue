@@ -16,21 +16,41 @@ export const useQueueNotificationMonitor = () => {
       return;
     }
 
+    const getConcertIds = async (): Promise<number[]> => {
+      try {
+        const response = await fetch('https://cosc-4353-smart-queue-6ixj.vercel.app/api/admin/concerts');
+        const payload = (await response.json()) as {
+          success: boolean;
+          concerts?: Array<{ concert_id?: number; concertID?: number }>;
+        };
+
+        if (!response.ok || !payload.success || !Array.isArray(payload.concerts)) {
+          return [];
+        }
+
+        return payload.concerts
+          .map((concert) => Number(concert.concert_id ?? concert.concertID ?? 0))
+          .filter((id) => Number.isInteger(id) && id > 0);
+      } catch {
+        return [];
+      }
+    };
+
     // Check queue status to detect if user is next in line
     const checkQueueStatus = async () => {
       try {
-        // Check all concerts to see if user is next in line (position 6) in any queue
-        for (let concertId = 1; concertId <= 180; concertId++) {
+        const concertIds = await getConcertIds();
+        for (const concertId of concertIds) {
           try {
             const response = await fetch(
-              `http://localhost:5000/api/queue/${concertId}?userId=${encodeURIComponent(user.id)}`
+              `https://cosc-4353-smart-queue-6ixj.vercel.app/api/queue/${concertId}?userId=${encodeURIComponent(user.id)}`
             );
             const payload = (await response.json()) as {
               success: boolean;
-              data?: { isNextInLine: boolean };
+              data?: { isNextInLine: boolean; isInQueue: boolean };
             };
 
-            if (payload.success && payload.data?.isNextInLine === true) {
+            if (payload.success && payload.data?.isInQueue && payload.data?.isNextInLine === true) {
               // User is next in line in at least one concert
               if (!isNextInLine) {
                 setIsNextInLine(true);

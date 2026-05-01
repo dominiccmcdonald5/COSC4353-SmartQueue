@@ -1,6 +1,33 @@
-const { allMockData, persistMockData } = require('../mockData');
+const {
+  listConcertsForAdmin,
+  getConcertById,
+  insertConcert,
+  updateConcert,
+  deleteConcert,
+} = require('../db/concertsDb');
 
 const CONCERT_STATUSES = new Set(['open', 'sold_out']);
+
+/**
+ * HTML date inputs send YYYY-MM-DD. `new Date('YYYY-MM-DD')` is UTC midnight and can
+ * shift the calendar day when written to MySQL or read back. Use local calendar date.
+ */
+function parseClientDateForDb(value) {
+  if (value == null) return null;
+  const s = String(value).trim();
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (m) {
+    const y = Number(m[1]);
+    const mo = Number(m[2]);
+    const d = Number(m[3]);
+    if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+    const dt = new Date(y, mo - 1, d, 12, 0, 0, 0);
+    if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return null;
+    return dt;
+  }
+  const dt = new Date(s);
+  return Number.isNaN(dt.getTime()) ? null : dt;
+}
 
 function sendJson(res, statusCode, payload) {
   res.writeHead(statusCode, { 'Content-Type': 'application/json' });
@@ -28,14 +55,18 @@ function readJsonBody(req) {
   });
 }
 
-/** GET — list every concert (mock / JSON store). */
-function getAllConcerts(req, res) {
-  const concerts = [...allMockData.CONCERT].sort((a, b) => a.concertID - b.concertID);
-  sendJson(res, 200, {
-    success: true,
-    count: concerts.length,
-    concerts,
-  });
+async function getAllConcerts(req, res) {
+  try {
+    const concerts = await listConcertsForAdmin();
+    sendJson(res, 200, {
+      success: true,
+      count: concerts.length,
+      concerts,
+    });
+  } catch (err) {
+    console.error('getAllConcerts:', err);
+    sendJson(res, 500, { success: false, message: err.message || 'Failed to load concerts' });
+  }
 }
 
 const EDITABLE_FIELDS = [
@@ -96,8 +127,7 @@ function validateEditPayload(payload) {
   }
 
   if (Object.prototype.hasOwnProperty.call(payload, 'date')) {
-    const d = new Date(payload.date);
-    if (Number.isNaN(d.getTime())) {
+    if (!parseClientDateForDb(payload.date)) {
       errors.push('date must be a valid date (ISO string recommended)');
     }
   }
@@ -133,7 +163,39 @@ function validateEditPayload(payload) {
   return errors;
 }
 
-/** POST — create a new concert; persists to mockDataStore.json. */
+function apiPatchToDbColumns(payload) {
+  const patch = {};
+  if (Object.prototype.hasOwnProperty.call(payload, 'concertName')) {
+    patch.concert_name = payload.concertName.trim();
+  }
+  if (Object.prototype.hasOwnProperty.call(payload, 'artistName')) {
+    patch.artist_name = payload.artistName.trim();
+  }
+  if (Object.prototype.hasOwnProperty.call(payload, 'genre')) {
+    patch.genre = payload.genre.trim();
+  }
+  if (Object.prototype.hasOwnProperty.call(payload, 'venue')) {
+    patch.venue = payload.venue.trim();
+  }
+  if (Object.prototype.hasOwnProperty.call(payload, 'date')) {
+    const dt = parseClientDateForDb(payload.date);
+    if (dt) patch.event_date = dt;
+  }
+  if (Object.prototype.hasOwnProperty.call(payload, 'capacity')) {
+    patch.capacity = payload.capacity;
+  }
+  if (Object.prototype.hasOwnProperty.call(payload, 'ticketPrice')) {
+    patch.ticket_price = Number(Number(payload.ticketPrice).toFixed(2));
+  }
+  if (Object.prototype.hasOwnProperty.call(payload, 'concertImage')) {
+    patch.concert_image = payload.concertImage.trim();
+  }
+  if (Object.prototype.hasOwnProperty.call(payload, 'concertStatus')) {
+    patch.concert_status = String(payload.concertStatus).toLowerCase();
+  }
+  return patch;
+}
+
 async function createConcert(req, res) {
   try {
     const payload = await readJsonBody(req);
@@ -153,7 +215,7 @@ async function createConcert(req, res) {
     if (!payload.venue || typeof payload.venue !== 'string' || !payload.venue.trim()) {
       errors.push('venue is required');
     }
-    if (!payload.date || Number.isNaN(new Date(payload.date).getTime())) {
+    if (!parseClientDateForDb(payload.date)) {
       errors.push('date must be a valid date');
     }
     if (!Number.isInteger(Number(payload.capacity)) || Number(payload.capacity) < 1) {
@@ -169,24 +231,21 @@ async function createConcert(req, res) {
       return;
     }
 
-    const maxID = allMockData.CONCERT.reduce((max, c) => Math.max(max, c.concertID), 0);
-    const newConcert = {
-      concertID: maxID + 1,
+    const newId = await insertConcert({
       concertName: payload.concertName.trim(),
       artistName: payload.artistName.trim(),
       genre: payload.genre.trim(),
-      date: new Date(payload.date).toISOString(),
+      concertDate: parseClientDateForDb(payload.date),
       venue: payload.venue.trim(),
       capacity: Number(payload.capacity),
       ticketPrice: Number(price.toFixed(2)),
-      concertImage: (typeof payload.concertImage === 'string' && payload.concertImage.trim())
-        ? payload.concertImage.trim()
-        : `https://picsum.photos/seed/smartqueue-concert-${maxID + 1}/600/400`,
+      concertImage:
+        typeof payload.concertImage === 'string' && payload.concertImage.trim()
+          ? payload.concertImage.trim()
+          : `https://picsum.photos/seed/smartqueue-concert-${Date.now()}/600/400`,
       concertStatus: 'open',
-    };
-
-    allMockData.CONCERT.push(newConcert);
-    persistMockData(allMockData);
+    });
+    const newConcert = await getConcertById(newId);
 
     sendJson(res, 201, {
       success: true,
@@ -194,11 +253,11 @@ async function createConcert(req, res) {
       concert: newConcert,
     });
   } catch (error) {
+    console.error('createConcert:', error);
     sendJson(res, 400, { success: false, message: error.message || 'Unable to create concert' });
   }
 }
 
-/** PUT — partial update by concertID; persists to mockDataStore.json. */
 async function editConcert(req, res, rawId) {
   const concertID = Number(rawId);
   if (!Number.isInteger(concertID) || concertID <= 0) {
@@ -206,13 +265,13 @@ async function editConcert(req, res, rawId) {
     return;
   }
 
-  const index = allMockData.CONCERT.findIndex((c) => c.concertID === concertID);
-  if (index === -1) {
-    sendJson(res, 404, { success: false, message: 'Concert not found' });
-    return;
-  }
-
   try {
+    const existing = await getConcertById(concertID);
+    if (!existing) {
+      sendJson(res, 404, { success: false, message: 'Concert not found' });
+      return;
+    }
+
     const payload = await readJsonBody(req);
     const errors = validateEditPayload(payload);
     if (errors.length > 0) {
@@ -220,46 +279,17 @@ async function editConcert(req, res, rawId) {
       return;
     }
 
-    const current = allMockData.CONCERT[index];
-    const updated = { ...current };
+    const dbPatch = apiPatchToDbColumns(payload);
+    await updateConcert(concertID, dbPatch);
 
-    if (Object.prototype.hasOwnProperty.call(payload, 'concertName')) {
-      updated.concertName = payload.concertName.trim();
-    }
-    if (Object.prototype.hasOwnProperty.call(payload, 'artistName')) {
-      updated.artistName = payload.artistName.trim();
-    }
-    if (Object.prototype.hasOwnProperty.call(payload, 'genre')) {
-      updated.genre = payload.genre.trim();
-    }
-    if (Object.prototype.hasOwnProperty.call(payload, 'venue')) {
-      updated.venue = payload.venue.trim();
-    }
-    if (Object.prototype.hasOwnProperty.call(payload, 'date')) {
-      updated.date = new Date(payload.date).toISOString();
-    }
-    if (Object.prototype.hasOwnProperty.call(payload, 'capacity')) {
-      updated.capacity = payload.capacity;
-    }
-    if (Object.prototype.hasOwnProperty.call(payload, 'ticketPrice')) {
-      updated.ticketPrice = Number(Number(payload.ticketPrice).toFixed(2));
-    }
-    if (Object.prototype.hasOwnProperty.call(payload, 'concertImage')) {
-      updated.concertImage = payload.concertImage.trim();
-    }
-    if (Object.prototype.hasOwnProperty.call(payload, 'concertStatus')) {
-      updated.concertStatus = String(payload.concertStatus).toLowerCase();
-    }
-
-    allMockData.CONCERT[index] = updated;
-    persistMockData(allMockData);
-
+    const updated = await getConcertById(concertID);
     sendJson(res, 200, {
       success: true,
       message: 'Concert updated successfully',
       concert: updated,
     });
   } catch (error) {
+    console.error('editConcert:', error);
     sendJson(res, 400, {
       success: false,
       message: error.message || 'Unable to update concert',
@@ -267,37 +297,38 @@ async function editConcert(req, res, rawId) {
   }
 }
 
-/** DELETE — remove concert and related HISTORY rows; persists store. */
-function deleteConcert(req, res, rawId) {
+async function deleteConcertHandler(req, res, rawId) {
   const concertID = Number(rawId);
   if (!Number.isInteger(concertID) || concertID <= 0) {
     sendJson(res, 400, { success: false, message: 'concertID must be a positive integer' });
     return;
   }
 
-  const index = allMockData.CONCERT.findIndex((c) => c.concertID === concertID);
-  if (index === -1) {
-    sendJson(res, 404, { success: false, message: 'Concert not found' });
-    return;
+  try {
+    const existing = await getConcertById(concertID);
+    if (!existing) {
+      sendJson(res, 404, { success: false, message: 'Concert not found' });
+      return;
+    }
+
+    await deleteConcert(concertID);
+
+    sendJson(res, 200, {
+      success: true,
+      message: 'Concert deleted successfully',
+      concertID,
+      removedConcert: existing,
+      historyEntriesRemoved: 0,
+    });
+  } catch (err) {
+    console.error('deleteConcert:', err);
+    sendJson(res, 500, { success: false, message: err.message || 'Unable to delete concert' });
   }
-
-  const [removed] = allMockData.CONCERT.splice(index, 1);
-  const historyBefore = allMockData.HISTORY.length;
-  allMockData.HISTORY = allMockData.HISTORY.filter((h) => h.concertID !== concertID);
-  persistMockData(allMockData);
-
-  sendJson(res, 200, {
-    success: true,
-    message: 'Concert deleted successfully',
-    concertID,
-    removedConcert: removed,
-    historyEntriesRemoved: historyBefore - allMockData.HISTORY.length,
-  });
 }
 
 module.exports = {
   getAllConcerts,
   createConcert,
   editConcert,
-  deleteConcert,
+  deleteConcert: deleteConcertHandler,
 };

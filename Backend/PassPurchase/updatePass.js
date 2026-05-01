@@ -1,4 +1,4 @@
-const { allMockData, persistMockData } = require('../mockData');
+const { promisePool } = require('../database');
 
 const VALID_PASS_STATUSES = ['Gold', 'Silver', 'None'];
 
@@ -41,24 +41,31 @@ const updateUserPassStatus = async (req, res) => {
         return;
       }
 
-      const user = allMockData.USER.find((item) => item.userID === userID);
+      // Check if user exists
+      const [userCheck] = await promisePool.query(
+        'SELECT user_id, pass_status FROM users WHERE user_id = ?',
+        [userID]
+      );
 
-      if (!user) {
+      if (userCheck.length === 0) {
         res.writeHead(404, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: false, message: 'User not found' }));
         return;
       }
 
-      user.passStatus = passStatus;
-      persistMockData(allMockData);
+      // Update user's pass status
+      await promisePool.query(
+        'UPDATE users SET pass_status = ? WHERE user_id = ?',
+        [passStatus, userID]
+      );
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(
         JSON.stringify({
           success: true,
           message: 'Pass status updated successfully',
-          userID: user.userID,
-          passStatus: user.passStatus,
+          userID,
+          passStatus,
         })
       );
     } catch (err) {

@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { formatLocalDateFromApi, parseLocalDateFromApi } from '../utils/apiDate';
 import '../styling/HomePage.css';
+
+const API_BASE = 'https://cosc-4353-smart-queue-6ixj.vercel.app';
 
 interface Concert {
   id: string;
@@ -57,7 +60,12 @@ const HomePage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/concerts');
+      const response = await fetch(`${API_BASE}/api/concerts`);
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        throw new Error('Backend returned non-JSON response');
+      }
+
       const data = await response.json();
       if (data.success) {
         setConcerts(data.concerts);
@@ -78,7 +86,8 @@ const HomePage: React.FC = () => {
 
   // Helper function to check if concert is coming soon
   const isComingSoon = (dateString: string) => {
-    const concertDate = new Date(dateString);
+    const concertDate = parseLocalDateFromApi(dateString);
+    if (!concertDate) return false;
     const now = new Date();
     const daysUntil = Math.ceil((concertDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
     return daysUntil > 30 && daysUntil <= 60;
@@ -97,7 +106,11 @@ const HomePage: React.FC = () => {
     // Apply sorting
     switch (sortBy) {
       case 'date':
-        return filtered.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        return filtered.sort((a, b) => {
+          const ta = parseLocalDateFromApi(a.date)?.getTime() ?? 0;
+          const tb = parseLocalDateFromApi(b.date)?.getTime() ?? 0;
+          return ta - tb;
+        });
       case 'name':
         return filtered.sort((a, b) => a.name.localeCompare(b.name));
       case 'price':
@@ -128,12 +141,12 @@ const HomePage: React.FC = () => {
   };
 
   const formatDate = (dateString: string) => {
-    const options: Intl.DateTimeFormatOptions = { 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
+    const options: Intl.DateTimeFormatOptions = {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
     };
-    return new Date(dateString).toLocaleDateString(undefined, options);
+    return formatLocalDateFromApi(dateString, options);
   };
 
   const getStatusBadgeClass = (status: string) => {

@@ -1,7 +1,22 @@
-const { allMockData, persistMockData } = require('../mockData');
+const bcrypt = require('bcrypt');
+const { promisePool } = require('../database');
+const { adminEmailTaken } = require('../db/adminsAuth');
 
 const PASS_TYPES = new Set(['none', 'silver', 'gold']);
 const ACCOUNT_STATUSES = new Set(['active', 'suspended', 'banned']);
+
+let usersColumnsCache = null;
+
+async function getUsersColumnSet() {
+  if (usersColumnsCache) return usersColumnsCache;
+  const [rows] = await promisePool.query(
+    `SELECT LOWER(COLUMN_NAME) AS name
+     FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'`
+  );
+  usersColumnsCache = new Set((rows || []).map((r) => String(r.name)));
+  return usersColumnsCache;
+}
 
 function sendJson(res, statusCode, payload) {
   res.writeHead(statusCode, { 'Content-Type': 'application/json' });
@@ -29,14 +44,6 @@ function readJsonBody(req) {
   });
 }
 
-function totalSpentFromHistory(userID) {
-  return allMockData.HISTORY.reduce(
-    (sum, h) => (h.userID === userID ? sum + Number(h.totalCost || 0) : sum),
-    0,
-  );
-}
-
-/** mockDataStore uses passStatus: "None" | "Silver" | "Gold"; optional passType: none|silver|gold */
 function derivePassType(row) {
   if (row.passType != null && PASS_TYPES.has(String(row.passType).toLowerCase())) {
     return String(row.passType).toLowerCase();
@@ -50,7 +57,6 @@ function derivePassType(row) {
   return 'none';
 }
 
-/** Keep login/signup expectations: Gold | Silver | None */
 function passTierToStorePassStatus(tier) {
   if (tier === 'gold') return 'Gold';
   if (tier === 'silver') return 'Silver';
@@ -61,20 +67,28 @@ function rowToAdminShape(row) {
   const firstName = typeof row.firstName === 'string' ? row.firstName : '';
   const lastName = typeof row.lastName === 'string' ? row.lastName : '';
   const name = `${firstName} ${lastName}`.trim() || 'Unknown';
+  const createdAt = row.createdAt;
   const joinDate =
-    typeof row.createdAt === 'string' && row.createdAt.length >= 10
-      ? row.createdAt.slice(0, 10)
-      : '';
+    createdAt instanceof Date
+      ? createdAt.toISOString().slice(0, 10)
+      : typeof createdAt === 'string' && createdAt.length >= 10
+        ? createdAt.slice(0, 10)
+        : '';
   const passType = derivePassType(row);
-  const status = ACCOUNT_STATUSES.has(row.accountStatus) ? row.accountStatus : 'active';
+  const rawStatus = row.accountStatus != null ? String(row.accountStatus).toLowerCase() : 'active';
+  const status = ACCOUNT_STATUSES.has(rawStatus) ? rawStatus : 'active';
   const totalSpent =
     typeof row.totalSpent === 'number' && Number.isFinite(row.totalSpent)
       ? row.totalSpent
-      : totalSpentFromHistory(row.userID);
+      : row.totalSpent != null
+        ? Number(row.totalSpent) || 0
+        : 0;
   return {
     userID: row.userID,
     id: String(row.userID),
     name,
+    firstName,
+    lastName,
     email: typeof row.email === 'string' ? row.email : '',
     joinDate,
     passType,
@@ -90,15 +104,37 @@ function splitName(nameStr) {
   return { firstName: parts[0], lastName: parts.slice(1).join(' ') };
 }
 
-function getAllUsers(req, res) {
-  const users = [...allMockData.USER]
-    .sort((a, b) => a.userID - b.userID)
-    .map(rowToAdminShape);
-  sendJson(res, 200, {
-    success: true,
-    count: users.length,
-    users,
-  });
+async function buildUserSelectSql() {
+  const cols = await getUsersColumnSet();
+  const parts = [
+    'user_id AS userID',
+    'email',
+    'first_name AS firstName',
+    'last_name AS lastName',
+    'pass_status AS passStatus',
+  ];
+  if (cols.has('created_at')) parts.push('created_at AS createdAt');
+  if (cols.has('account_status')) parts.push('account_status AS accountStatus');
+  if (cols.has('total_spent')) parts.push('total_spent AS totalSpent');
+  return `SELECT ${parts.join(', ')} FROM users
+          WHERE LOWER(TRIM(COALESCE(role, 'user'))) = 'user'
+          ORDER BY user_id ASC`;
+}
+
+async function getAllUsers(req, res) {
+  try {
+    const sql = await buildUserSelectSql();
+    const [rows] = await promisePool.query(sql);
+    const users = (rows || []).map(rowToAdminShape);
+    sendJson(res, 200, {
+      success: true,
+      count: users.length,
+      users,
+    });
+  } catch (e) {
+    console.error('getAllUsers:', e);
+    sendJson(res, 500, { success: false, message: e.message || 'Failed to load users' });
+  }
 }
 
 function validateEditPayload(payload, { requireFields } = { requireFields: false }) {
@@ -112,6 +148,9 @@ function validateEditPayload(payload, { requireFields } = { requireFields: false
     const ident = payload.name || payload.firstName;
     if (typeof ident !== 'string' || !ident.trim()) {
       errors.push('name (or firstName) is required');
+    }
+    if (typeof payload.password !== 'string' || payload.password.length < 4) {
+      errors.push('password is required and must be at least 4 characters');
     }
   } else if (keys.length === 0) {
     errors.push('At least one updatable field is required');
@@ -150,14 +189,15 @@ function validateEditPayload(payload, { requireFields } = { requireFields: false
   return errors;
 }
 
-function emailTaken(email, excludeUserID) {
+async function emailTakenByOtherUser(email, excludeUserID) {
   const e = email.trim().toLowerCase();
-  return allMockData.USER.some(
-    (u) =>
-      u.userID !== excludeUserID &&
-      typeof u.email === 'string' &&
-      u.email.trim().toLowerCase() === e,
+  const [rows] = await promisePool.execute(
+    `SELECT user_id FROM users
+     WHERE LOWER(TRIM(email)) = ? AND user_id <> ?
+     LIMIT 1`,
+    [e, excludeUserID]
   );
+  return Array.isArray(rows) && rows.length > 0;
 }
 
 async function createUser(req, res) {
@@ -168,7 +208,17 @@ async function createUser(req, res) {
       sendJson(res, 400, { success: false, errors });
       return;
     }
-    if (emailTaken(payload.email, -1)) {
+
+    const normalizedEmail = String(payload.email).trim().toLowerCase();
+    const [existing] = await promisePool.execute(
+      `SELECT 1 AS ok FROM users WHERE LOWER(TRIM(email)) = ? LIMIT 1`,
+      [normalizedEmail]
+    );
+    if (Array.isArray(existing) && existing.length > 0) {
+      sendJson(res, 409, { success: false, message: 'Email already in use' });
+      return;
+    }
+    if (await adminEmailTaken(normalizedEmail)) {
       sendJson(res, 409, { success: false, message: 'Email already in use' });
       return;
     }
@@ -182,44 +232,73 @@ async function createUser(req, res) {
       lastName = String(payload.lastName || '').trim();
     }
 
-    const nextID = allMockData.USER.reduce((m, u) => Math.max(m, u.userID), 0) + 1;
     const passType =
       payload.passType != null && PASS_TYPES.has(String(payload.passType).toLowerCase())
         ? String(payload.passType).toLowerCase()
         : 'none';
+    const passStatus = passTierToStorePassStatus(passType);
     const accountStatus =
       payload.status != null && ACCOUNT_STATUSES.has(String(payload.status).toLowerCase())
         ? String(payload.status).toLowerCase()
         : 'active';
-    const pwd =
-      typeof payload.password === 'string' && payload.password.length >= 4
-        ? payload.password
-        : `sqUser${String(nextID).padStart(4, '0')}!`;
+    const passwordHash = await bcrypt.hash(String(payload.password), 12);
 
-    const row = {
-      userID: nextID,
-      firstName,
-      lastName,
-      email: payload.email.trim(),
-      password: pwd,
-      passStatus: passTierToStorePassStatus(passType),
-      passType,
-      accountStatus,
-      totalSpent:
-        payload.totalSpent != null
-          ? Math.round(Number(payload.totalSpent) * 100) / 100
-          : 0,
-      createdAt: new Date().toISOString(),
-    };
-    allMockData.USER.push(row);
-    persistMockData(allMockData);
+    const cols = await getUsersColumnSet();
+    const insertCols = ['email', 'password_hash', 'role', 'first_name', 'last_name', 'pass_status'];
+    const insertVals = [normalizedEmail, passwordHash, 'user', firstName, lastName, passStatus];
+    if (cols.has('account_status')) {
+      insertCols.push('account_status');
+      insertVals.push(accountStatus);
+    }
+    if (cols.has('total_spent')) {
+      insertCols.push('total_spent');
+      insertVals.push(
+        payload.totalSpent != null ? Math.round(Number(payload.totalSpent) * 100) / 100 : 0
+      );
+    }
+    if (cols.has('created_at')) {
+      insertCols.push('created_at');
+      insertVals.push(new Date());
+    }
+    if (cols.has('updated_at')) {
+      insertCols.push('updated_at');
+      insertVals.push(new Date());
+    }
 
+    const placeholders = insertCols.map(() => '?').join(', ');
+    const colSql = insertCols.map((c) => `\`${c}\``).join(', ');
+    const [result] = await promisePool.execute(
+      `INSERT INTO users (${colSql}) VALUES (${placeholders})`,
+      insertVals
+    );
+
+    const newId = result.insertId;
+    const sel = [
+      'user_id AS userID',
+      'email',
+      'first_name AS firstName',
+      'last_name AS lastName',
+      'pass_status AS passStatus',
+    ];
+    if (cols.has('created_at')) sel.push('created_at AS createdAt');
+    if (cols.has('account_status')) sel.push('account_status AS accountStatus');
+    if (cols.has('total_spent')) sel.push('total_spent AS totalSpent');
+    const [userRows] = await promisePool.execute(
+      `SELECT ${sel.join(', ')} FROM users WHERE user_id = ? LIMIT 1`,
+      [newId]
+    );
+    const row = userRows[0];
     sendJson(res, 201, {
       success: true,
       message: 'User created',
       user: rowToAdminShape(row),
     });
   } catch (e) {
+    if (e && e.code === 'ER_DUP_ENTRY') {
+      sendJson(res, 409, { success: false, message: 'Email already in use' });
+      return;
+    }
+    console.error('createUser:', e);
     sendJson(res, 400, { success: false, message: e.message || 'Unable to create user' });
   }
 }
@@ -231,13 +310,16 @@ async function editUser(req, res, rawId) {
     return;
   }
 
-  const idx = allMockData.USER.findIndex((u) => u.userID === userID);
-  if (idx === -1) {
-    sendJson(res, 404, { success: false, message: 'User not found' });
-    return;
-  }
-
   try {
+    const [check] = await promisePool.execute(
+      `SELECT user_id FROM users WHERE user_id = ? AND LOWER(TRIM(COALESCE(role, 'user'))) = 'user' LIMIT 1`,
+      [userID]
+    );
+    if (!Array.isArray(check) || check.length === 0) {
+      sendJson(res, 404, { success: false, message: 'User not found' });
+      return;
+    }
+
     const payload = await readJsonBody(req);
     const errors = validateEditPayload(payload, { requireFields: false });
     if (errors.length) {
@@ -245,71 +327,142 @@ async function editUser(req, res, rawId) {
       return;
     }
 
-    if (payload.email != null && emailTaken(payload.email, userID)) {
-      sendJson(res, 409, { success: false, message: 'Email already in use' });
+    if (payload.email != null) {
+      const norm = String(payload.email).trim().toLowerCase();
+      if (await emailTakenByOtherUser(norm, userID)) {
+        sendJson(res, 409, { success: false, message: 'Email already in use' });
+        return;
+      }
+      if (await adminEmailTaken(norm)) {
+        sendJson(res, 409, { success: false, message: 'Email already in use' });
+        return;
+      }
+    }
+
+    const cols = await getUsersColumnSet();
+    const sets = [];
+    const vals = [];
+
+    const hasFirst = Object.prototype.hasOwnProperty.call(payload, 'firstName');
+    const hasLast = Object.prototype.hasOwnProperty.call(payload, 'lastName');
+    if (hasFirst || hasLast) {
+      if (hasFirst) {
+        sets.push('first_name = ?');
+        vals.push(String(payload.firstName ?? '').trim());
+      }
+      if (hasLast) {
+        sets.push('last_name = ?');
+        vals.push(String(payload.lastName ?? '').trim());
+      }
+    } else if (payload.name != null) {
+      const { firstName, lastName } = splitName(payload.name);
+      sets.push('first_name = ?', 'last_name = ?');
+      vals.push(firstName, lastName);
+    }
+    if (payload.email != null) {
+      sets.push('email = ?');
+      vals.push(String(payload.email).trim().toLowerCase());
+    }
+    if (
+      Object.prototype.hasOwnProperty.call(payload, 'password') &&
+      typeof payload.password === 'string' &&
+      payload.password.length >= 4
+    ) {
+      sets.push('password_hash = ?');
+      vals.push(await bcrypt.hash(payload.password, 12));
+    }
+    if (payload.passType != null) {
+      const pt = String(payload.passType).toLowerCase();
+      sets.push('pass_status = ?');
+      vals.push(passTierToStorePassStatus(pt));
+    }
+    if (payload.status != null && cols.has('account_status')) {
+      sets.push('account_status = ?');
+      vals.push(String(payload.status).toLowerCase());
+    }
+    if (payload.totalSpent != null && cols.has('total_spent')) {
+      sets.push('total_spent = ?');
+      vals.push(Math.round(Number(payload.totalSpent) * 100) / 100);
+    }
+    if (cols.has('updated_at')) {
+      sets.push('updated_at = ?');
+      vals.push(new Date());
+    }
+
+    if (sets.length === 0) {
+      sendJson(res, 400, { success: false, message: 'No updatable fields applied' });
       return;
     }
 
-    const row = { ...allMockData.USER[idx] };
+    vals.push(userID);
+    await promisePool.execute(
+      `UPDATE users SET ${sets.join(', ')} WHERE user_id = ? AND LOWER(TRIM(COALESCE(role, 'user'))) = 'user'`,
+      vals
+    );
 
-    if (payload.name != null) {
-      const { firstName, lastName } = splitName(payload.name);
-      row.firstName = firstName;
-      row.lastName = lastName;
-    }
-    if (payload.firstName != null) row.firstName = String(payload.firstName).trim();
-    if (payload.lastName != null) row.lastName = String(payload.lastName).trim();
-
-    if (payload.email != null) row.email = payload.email.trim();
-    if (payload.password != null) row.password = String(payload.password);
-    if (payload.passType != null) {
-      const pt = String(payload.passType).toLowerCase();
-      row.passType = pt;
-      row.passStatus = passTierToStorePassStatus(pt);
-    }
-    if (payload.status != null) row.accountStatus = String(payload.status).toLowerCase();
-    if (payload.totalSpent != null) {
-      row.totalSpent = Math.round(Number(payload.totalSpent) * 100) / 100;
-    }
-
-    allMockData.USER[idx] = row;
-    persistMockData(allMockData);
-
+    const sel2 = [
+      'user_id AS userID',
+      'email',
+      'first_name AS firstName',
+      'last_name AS lastName',
+      'pass_status AS passStatus',
+    ];
+    if (cols.has('created_at')) sel2.push('created_at AS createdAt');
+    if (cols.has('account_status')) sel2.push('account_status AS accountStatus');
+    if (cols.has('total_spent')) sel2.push('total_spent AS totalSpent');
+    const [userRows] = await promisePool.execute(
+      `SELECT ${sel2.join(', ')} FROM users WHERE user_id = ? LIMIT 1`,
+      [userID]
+    );
+    const row = userRows[0];
     sendJson(res, 200, {
       success: true,
       message: 'User updated successfully',
       user: rowToAdminShape(row),
     });
   } catch (e) {
+    if (e && e.code === 'ER_DUP_ENTRY') {
+      sendJson(res, 409, { success: false, message: 'Email already in use' });
+      return;
+    }
+    console.error('editUser:', e);
     sendJson(res, 400, { success: false, message: e.message || 'Unable to update user' });
   }
 }
 
-function deleteUser(req, res, rawId) {
+async function deleteUser(req, res, rawId) {
   const userID = Number(rawId);
   if (!Number.isInteger(userID) || userID <= 0) {
     sendJson(res, 400, { success: false, message: 'userID must be a positive integer' });
     return;
   }
 
-  const idx = allMockData.USER.findIndex((u) => u.userID === userID);
-  if (idx === -1) {
-    sendJson(res, 404, { success: false, message: 'User not found' });
-    return;
+  try {
+    const [before] = await promisePool.execute(
+      `SELECT email FROM users WHERE user_id = ? AND LOWER(TRIM(COALESCE(role, 'user'))) = 'user' LIMIT 1`,
+      [userID]
+    );
+    if (!Array.isArray(before) || before.length === 0) {
+      sendJson(res, 404, { success: false, message: 'User not found' });
+      return;
+    }
+
+    await promisePool.execute(
+      `DELETE FROM users WHERE user_id = ? AND LOWER(TRIM(COALESCE(role, 'user'))) = 'user'`,
+      [userID]
+    );
+
+    sendJson(res, 200, {
+      success: true,
+      message: 'User deleted successfully',
+      userID,
+      historyEntriesRemoved: 0,
+      removedEmail: before[0].email,
+    });
+  } catch (e) {
+    console.error('deleteUser:', e);
+    sendJson(res, 500, { success: false, message: e.message || 'Unable to delete user' });
   }
-
-  const [removed] = allMockData.USER.splice(idx, 1);
-  const before = allMockData.HISTORY.length;
-  allMockData.HISTORY = allMockData.HISTORY.filter((h) => h.userID !== userID);
-  persistMockData(allMockData);
-
-  sendJson(res, 200, {
-    success: true,
-    message: 'User deleted successfully',
-    userID,
-    historyEntriesRemoved: before - allMockData.HISTORY.length,
-    removedEmail: removed.email,
-  });
 }
 
 module.exports = {
