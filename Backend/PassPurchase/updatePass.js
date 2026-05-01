@@ -2,85 +2,140 @@ const { promisePool } = require('../database');
 
 const VALID_PASS_STATUSES = ['Gold', 'Silver', 'None'];
 
-const updateUserPassStatus = async (req, res) => {
-  let body = '';
+function sendJson(res, statusCode, payload) {
+  res.writeHead(statusCode, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify(payload));
+}
 
-  req.on('data', (chunk) => {
-    body += chunk.toString();
+function readJsonBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', (chunk) => {
+      body += chunk.toString();
+    });
+    req.on('end', () => {
+      if (!body) return resolve({});
+      try {
+        resolve(JSON.parse(body));
+      } catch {
+        reject(new Error('Invalid JSON body'));
+      }
+    });
+    req.on('error', () => reject(new Error('Failed to read request body')));
   });
+}
 
-  req.on('end', async () => {
-    try {
-      const parsedBody = body ? JSON.parse(body) : {};
-      const userID = Number(parsedBody.userID);
-      const rawPassStatus = String(parsedBody.passStatus || '').trim();
-      const normalizedPassStatus = rawPassStatus.toLowerCase();
-      const passStatus =
-        normalizedPassStatus === 'gold'
-          ? 'Gold'
-          : normalizedPassStatus === 'silver'
-            ? 'Silver'
-            : normalizedPassStatus === 'none'
-              ? 'None'
-              : rawPassStatus;
+function normalizePassStatus(raw) {
+  const rawStr = String(raw || '').trim();
+  const low = rawStr.toLowerCase();
+  if (low === 'gold') return 'Gold';
+  if (low === 'silver') return 'Silver';
+  if (low === 'none') return 'None';
+  return rawStr;
+}
 
-      if (!Number.isInteger(userID) || userID <= 0) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: false, message: 'Valid userID is required' }));
-        return;
-      }
+async function passStatusColumnExists() {
+  const [rows] = await promisePool.query(
+    `SELECT 1 AS ok
+     FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'users'
+       AND LOWER(COLUMN_NAME) = 'pass_status'
+     LIMIT 1`
+  );
+  return Array.isArray(rows) && rows.length > 0;
+}
 
-      if (!VALID_PASS_STATUSES.includes(passStatus)) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(
-          JSON.stringify({
-            success: false,
-            message: 'passStatus must be one of Gold, Silver, None',
-          })
-        );
-        return;
-      }
+async function passExpiresColumnExists() {
+  const [rows] = await promisePool.query(
+    `SELECT 1 AS ok
+     FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'users'
+       AND LOWER(COLUMN_NAME) = 'pass_expires_at'
+     LIMIT 1`
+  );
+  return Array.isArray(rows) && rows.length > 0;
+}
 
-      // Check if user exists
-      const [userCheck] = await promisePool.query(
-        'SELECT user_id, pass_status FROM users WHERE user_id = ?',
+const updateUserPassStatus = async (req, res) => {
+  try {
+    const payload = await readJsonBody(req);
+    const userID = Number(payload.userID);
+    const passStatus = normalizePassStatus(payload.passStatus);
+
+    if (!Number.isInteger(userID) || userID <= 0) {
+      sendJson(res, 400, { success: false, message: 'Valid userID is required' });
+      return;
+    }
+
+    if (!VALID_PASS_STATUSES.includes(passStatus)) {
+      sendJson(res, 400, { success: false, message: 'passStatus must be one of Gold, Silver, None' });
+      return;
+    }
+
+    if (!(await passStatusColumnExists())) {
+      sendJson(res, 500, { success: false, message: "Database missing users.pass_status column" });
+      return;
+    }
+    if (!(await passExpiresColumnExists())) {
+      sendJson(res, 500, { success: false, message: "Database missing users.pass_expires_at column" });
+      return;
+    }
+
+    let result;
+    if (passStatus === 'None') {
+      [result] = await promisePool.execute(
+        `UPDATE users
+         SET pass_status = 'None',
+             pass_expires_at = NULL
+         WHERE user_id = ?
+         LIMIT 1`,
         [userID]
       );
-
-      if (userCheck.length === 0) {
-        res.writeHead(404, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: false, message: 'User not found' }));
-        return;
-      }
-
-      // Update user's pass status
-      await promisePool.query(
-        'UPDATE users SET pass_status = ? WHERE user_id = ?',
+    } else {
+      // Extend from later of (now, current expiry)
+      [result] = await promisePool.execute(
+        `UPDATE users
+         SET pass_status = ?,
+             pass_expires_at = DATE_ADD(GREATEST(NOW(), COALESCE(pass_expires_at, NOW())), INTERVAL 1 YEAR)
+         WHERE user_id = ?
+         LIMIT 1`,
         [passStatus, userID]
       );
-
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(
-        JSON.stringify({
-          success: true,
-          message: 'Pass status updated successfully',
-          userID,
-          passStatus,
-        })
-      );
-    } catch (err) {
-      console.error('Error updating pass status:', err);
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(
-        JSON.stringify({
-          success: false,
-          message: err.message || 'Failed to update pass status',
-        })
-      );
     }
-  });
+
+    if (!result || result.affectedRows === 0) {
+      sendJson(res, 404, { success: false, message: 'User not found' });
+      return;
+    }
+
+    const [rows] = await promisePool.execute(
+      `SELECT pass_status, pass_expires_at
+       FROM users
+       WHERE user_id = ?
+       LIMIT 1`,
+      [userID]
+    );
+    const row = Array.isArray(rows) && rows[0] ? rows[0] : null;
+    const expires =
+      row && row.pass_expires_at instanceof Date
+        ? row.pass_expires_at.toISOString()
+        : row && row.pass_expires_at != null
+          ? String(row.pass_expires_at)
+          : null;
+
+    sendJson(res, 200, {
+      success: true,
+      message: 'Pass status updated successfully',
+      userID,
+      passStatus: row && row.pass_status ? String(row.pass_status) : passStatus,
+      passExpiresAt: expires,
+    });
+  } catch (err) {
+    console.error('Error updating pass status:', err);
+    sendJson(res, 500, { success: false, message: err.message || 'Failed to update pass status' });
+  }
 };
 
-module.exports = {
-  updateUserPassStatus,
-};
+module.exports = { updateUserPassStatus };

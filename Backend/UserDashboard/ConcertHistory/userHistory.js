@@ -1,98 +1,97 @@
-const { promisePool } = require('../../database');
+const { pool } = require('../../database');
+
+function sendJson(res, statusCode, payload) {
+  res.writeHead(statusCode, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify(payload));
+}
 
 const getConcertHistory = async (req, res) => {
-    let body = "";
+  let body = '';
 
-    req.on("data", (chunk) => {
-        body += chunk.toString();
-    });
+  req.on('data', (chunk) => {
+    body += chunk.toString();
+  });
 
-    req.on('end', async () => {
-        try {
-            const parsedBody = body ? JSON.parse(body) : {};
-            const userID = Number(parsedBody.userID);
+  req.on('end', async () => {
+    try {
+      const parsedBody = body ? JSON.parse(body) : {};
+      const userID = Number(parsedBody.userID);
 
-            if (!Number.isInteger(userID) || userID <= 0) {
-                res.writeHead(400, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({
-                    success: false,
-                    message: 'Valid userID is required',
-                }));
-                return;
-            }
+      if (!Number.isInteger(userID) || userID <= 0) {
+        sendJson(res, 400, { success: false, message: 'Valid userID is required' });
+        return;
+      }
 
-            // Check if user exists
-            const [userCheck] = await promisePool.query(
-                'SELECT user_id FROM users WHERE user_id = ?',
-                [userID]
-            );
+      const [userCheckRows] = await pool.promise().query(
+        'SELECT user_id FROM users WHERE user_id = ? LIMIT 1',
+        [userID]
+      );
+      if (!Array.isArray(userCheckRows) || userCheckRows.length === 0) {
+        sendJson(res, 404, { success: false, message: 'User not found' });
+        return;
+      }
 
-            if (userCheck.length === 0) {
-                res.writeHead(404, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({
-                    success: false,
-                    message: 'User not found',
-                }));
-                return;
-            }
+      const [rows] = await pool.promise().query(
+        `
+        SELECT
+          qh.history_id AS historyID,
+          qh.ticket_count AS ticketCount,
+          qh.total_cost AS totalCost,
+          qh.wait_time AS waitTime,
+          qh.status AS status,
+          qh.in_line_status AS inLineStatus,
+          qh.queued_at AS queuedAt,
+          c.concert_id AS concertID,
+          c.concert_name AS concertName,
+          c.artist_name AS artistName,
+          c.genre AS genre,
+          c.event_date AS date,
+          c.venue AS venue,
+          c.capacity AS capacity,
+          c.ticket_price AS ticketPrice,
+          c.concert_image AS concertImage,
+          c.concert_status AS concertStatus
+        FROM queue_history qh
+        INNER JOIN concerts c ON c.concert_id = qh.concert_id
+        WHERE qh.user_id = ?
+        ORDER BY qh.queued_at DESC, qh.history_id DESC
+        `,
+        [userID]
+      );
 
-            // Get user's history records with concert details
-            const [historyRecords] = await promisePool.query(
-                `SELECT h.history_id, h.user_id, h.concert_id, h.ticket_count, h.total_cost, 
-                        h.wait_time, h.status, h.in_line_status, h.queued_at,
-                        c.concert_id, c.concert_name, c.artist_name, c.genre, c.event_date, c.venue, 
-                        c.capacity, c.ticket_price, c.concert_image, c.concert_status
-                 FROM queue_history h
-                 JOIN concerts c ON h.concert_id = c.concert_id
-                 WHERE h.user_id = ?
-                 ORDER BY h.queued_at DESC`,
-                [userID]
-            );
+      const concerts = (rows || []).map((r) => ({
+        concertID: Number(r.concertID),
+        concertName: r.concertName,
+        artistName: r.artistName,
+        genre: r.genre,
+        date: r.date instanceof Date ? r.date.toISOString().slice(0, 10) : r.date,
+        venue: r.venue,
+        capacity: Number(r.capacity),
+        ticketPrice: Number(r.ticketPrice),
+        concertImage: r.concertImage,
+        concertStatus: r.concertStatus,
+        history: {
+          historyID: Number(r.historyID),
+          ticketCount: Number(r.ticketCount),
+          totalCost: Number(r.totalCost),
+          waitTime: Number(r.waitTime),
+          status: r.status,
+          inLineStatus: r.inLineStatus,
+          queuedAt: r.queuedAt instanceof Date ? r.queuedAt.toISOString() : r.queuedAt,
+        },
+      }));
 
-            const concerts = historyRecords.map((record) => {
-                return {
-                    concert_id: record.concert_id,
-                    concert_name: record.concert_name,
-                    artist_name: record.artist_name,
-                    genre: record.genre,
-                    event_date: record.event_date,
-                    venue: record.venue,
-                    capacity: record.capacity,
-                    ticket_price: record.ticket_price,
-                    concert_image: record.concert_image,
-                    concert_status: record.concert_status,
-                    history: {
-                        history_id: record.history_id,
-                        ticket_count: record.ticket_count,
-                        total_cost: record.total_cost,
-                        wait_time: record.wait_time,
-                        status: record.status,
-                        in_line_status: record.in_line_status,
-                        queued_at: record.queued_at,
-                    },
-                };
-            });
-
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({
-                success: true,
-                userID,
-                count: concerts.length,
-                concerts,
-            }));
-            return;
-        }
-        catch (err) {
-            console.error('Error while fetching user concert history:', err);
-            res.writeHead(500, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({
-                success: false,
-                message: err.message || 'Failed to fetch concert history',
-            }));
-        }
-    });
+      sendJson(res, 200, {
+        success: true,
+        userID,
+        count: concerts.length,
+        concerts,
+      });
+    } catch (err) {
+      console.error('Error while fetching user concert history:', err);
+      sendJson(res, 500, { success: false, message: err.message || 'Failed to fetch concert history' });
+    }
+  });
 };
 
-module.exports = {
-    getConcertHistory,
-}
+module.exports = { getConcertHistory };

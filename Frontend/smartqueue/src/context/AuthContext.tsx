@@ -6,6 +6,7 @@ interface User {
   email: string;
   name: string;
   passStatus: 'Gold' | 'Silver' | 'None';
+  passExpiresAt: string | null;
   accountType: 'user' | 'admin';
 }
 
@@ -15,6 +16,7 @@ interface AuthContextType {
   signup: (email: string, password: string, firstName: string, lastName: string) => Promise<void>;
   logout: () => void;
   updatePassStatus: (passStatus: 'Gold' | 'Silver' | 'None') => void;
+  updateMembership: (passStatus: 'Gold' | 'Silver' | 'None', passExpiresAt: string | null) => void;
   isLoading: boolean;
   isAuthenticated: boolean;
   isAdmin: boolean;
@@ -39,11 +41,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  const normalizeMembership = (u: User): User => {
+    if (u.accountType !== 'user') return { ...u, passStatus: 'None', passExpiresAt: null };
+    const exp = u.passExpiresAt ? Date.parse(u.passExpiresAt) : NaN;
+    const active = (u.passStatus === 'Gold' || u.passStatus === 'Silver') && Number.isFinite(exp) && exp > Date.now();
+    return active ? u : { ...u, passStatus: 'None' as const };
+  };
+
   useEffect(() => {
     // Check if user is already logged in (from localStorage)
     const savedUser = localStorage.getItem('smartqueue_user');
     if (savedUser) {
-      setUser(JSON.parse(savedUser));
+      setUser(normalizeMembership(JSON.parse(savedUser)));
     }
     setIsLoading(false);
   }, []);
@@ -69,11 +78,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         email: data.email ?? email,
         name: data.userName ?? email.split('@')[0],
         passStatus: data.passStatus === 'Gold' || data.passStatus === 'Silver' ? data.passStatus : 'None',
+        passExpiresAt: typeof data.passExpiresAt === 'string' ? data.passExpiresAt : null,
         accountType: data.accountType || (data.userId ? 'user' : 'admin'),
       };
       
-      setUser(userData);
-      localStorage.setItem('smartqueue_user', JSON.stringify(userData));
+      const normalizedUser = normalizeMembership(userData);
+      setUser(normalizedUser);
+      localStorage.setItem('smartqueue_user', JSON.stringify(normalizedUser));
     } catch (error: unknown) {
       if (error instanceof Error) {
         throw new Error(error.message);
@@ -107,6 +118,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         email: data.email,
         name: `${firstName} ${lastName}`,
         passStatus: 'None' as const,
+        passExpiresAt: null,
         accountType: 'user' as const,
       };
       
@@ -127,10 +139,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const updatePassStatus = (passStatus: 'Gold' | 'Silver' | 'None') => {
     if (user) {
-      const updatedUser = { ...user, passStatus };
+      const updatedUser = normalizeMembership({ ...user, passStatus });
       setUser(updatedUser);
       localStorage.setItem('smartqueue_user', JSON.stringify(updatedUser));
     }
+  };
+
+  const updateMembership = (passStatus: 'Gold' | 'Silver' | 'None', passExpiresAt: string | null) => {
+    if (!user) return;
+    const updatedUser = normalizeMembership({ ...user, passStatus, passExpiresAt });
+    setUser(updatedUser);
+    localStorage.setItem('smartqueue_user', JSON.stringify(updatedUser));
   };
 
   const isAdmin = user?.accountType === 'admin';
@@ -142,6 +161,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     signup,
     logout,
     updatePassStatus,
+    updateMembership,
     isLoading,
     isAuthenticated: !!user,
     isAdmin,

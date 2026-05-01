@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import '../styling/PassPurchasePage.css';
 
 const PassPurchasePage: React.FC = () => {
-  const { user, updatePassStatus } = useAuth();
+  const { user, updateMembership } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [processing, setProcessing] = useState(false);
@@ -65,8 +65,11 @@ const PassPurchasePage: React.FC = () => {
         throw new Error(result.message || 'Failed to update pass status');
       }
 
-      // Update the user's pass status in the auth context
-      updatePassStatus(capitalizedPassStatus);
+      // Update membership in the auth context
+      updateMembership(
+        capitalizedPassStatus,
+        typeof result.passExpiresAt === 'string' ? result.passExpiresAt : null
+      );
 
       // Clear form data after successful purchase
       setFormData({
@@ -82,7 +85,7 @@ const PassPurchasePage: React.FC = () => {
       // Navigate back to home with success message
       navigate('/home', { 
         state: { 
-          message: `${selectedPlan.name} purchased successfully! You now have priority access to queues.` 
+          message: `${selectedPlan.name} purchased successfully!` 
         }
       });
     } catch (error) {
