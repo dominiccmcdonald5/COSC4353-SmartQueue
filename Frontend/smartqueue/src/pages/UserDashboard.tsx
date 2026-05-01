@@ -124,7 +124,7 @@ const UserDashboard: React.FC = () => {
         setHistoryLoading(true);
         setHistoryError('');
 
-        const response = await fetch('http://localhost:5000/api/user/history', {
+        const response = await fetch('https://cosc-4353-smart-queue-6ixj.vercel.app/api/user/history', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -138,18 +138,24 @@ const UserDashboard: React.FC = () => {
         }
 
         const mappedHistory: QueueHistory[] = (data.concerts || []).map((concert: any) => {
-          const historyStatus = concert.history?.status || 'queued';
+          const history = concert.history || {};
+          const historyStatus = history.status || 'queued';
+          const imageUrl =
+            concert.concertImage ||
+            concert.concert_image ||
+            '/concert1.jpg';
+
           return {
-            id: String(concert.history?.historyID ?? concert.concertID),
-            concertID: Number(concert.concertID),
-            concertName: concert.concertName,
-            artist: concert.artistName,
+            id: String(history.historyID ?? history.history_id ?? concert.concertID ?? concert.concert_id),
+            concertID: Number(concert.concertID ?? concert.concert_id),
+            concertName: concert.concertName ?? concert.concert_name,
+            artist: concert.artistName ?? concert.artist_name,
             genre: concert.genre,
-            date: concert.date,
+            date: concert.date ?? concert.event_date,
             status: historyStatus === 'completed' ? 'completed' : historyStatus === 'cancelled' ? 'cancelled' : 'in-progress',
-            waitTime: `${concert.history?.waitTime ?? 0} seconds`,
-            ticketsPurchased: concert.history?.ticketCount,
-            imageUrl: concert.concertImage,
+            waitTime: `${history.waitTime ?? history.wait_time ?? 0} seconds`,
+            ticketsPurchased: history.ticketCount ?? history.ticket_count,
+            imageUrl,
             queueStatus: historyStatus === 'completed' ? 'secured' : historyStatus === 'cancelled' ? 'sold-out' : 'pending',
           };
         });
@@ -179,7 +185,7 @@ const UserDashboard: React.FC = () => {
         setStatsLoading(true);
         setStatsError('');
 
-        const response = await fetch('http://localhost:5000/api/user/stats', {
+        const response = await fetch('https://cosc-4353-smart-queue-6ixj.vercel.app/api/user/stats', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -250,7 +256,7 @@ const UserDashboard: React.FC = () => {
     try {
       setIsRemovingPass(true);
 
-      const response = await fetch('http://localhost:5000/api/user/pass/update', {
+      const response = await fetch('https://cosc-4353-smart-queue-6ixj.vercel.app/api/user/pass/update', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -347,7 +353,13 @@ const UserDashboard: React.FC = () => {
               {queueHistory.map((item) => (
                 <div key={item.id} className="history-item">
                   <div className="concert-image">
-                    <img src={item.imageUrl} alt={item.concertName} />
+                    <img
+                      src={item.imageUrl}
+                      alt={item.concertName}
+                      onError={(e) => {
+                        e.currentTarget.src = '/concert1.jpg';
+                      }}
+                    />
                   </div>
                   <div className="concert-details">
                     <div className="concert-main-info">
