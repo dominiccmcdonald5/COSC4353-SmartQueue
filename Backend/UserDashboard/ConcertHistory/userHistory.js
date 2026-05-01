@@ -1,81 +1,97 @@
-const { allMockData } = require('../../mockData');
+const { pool } = require('../../database');
+
+function sendJson(res, statusCode, payload) {
+  res.writeHead(statusCode, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify(payload));
+}
 
 const getConcertHistory = async (req, res) => {
-    let body = "";
+  let body = '';
 
-    req.on("data", (chunk) => {
-        body += chunk.toString();
-    });
+  req.on('data', (chunk) => {
+    body += chunk.toString();
+  });
 
-    req.on('end', async () => {
-        try {
-            const parsedBody = body ? JSON.parse(body) : {};
-            const userID = Number(parsedBody.userID);
+  req.on('end', async () => {
+    try {
+      const parsedBody = body ? JSON.parse(body) : {};
+      const userID = Number(parsedBody.userID);
 
-            if (!Number.isInteger(userID) || userID <= 0) {
-                res.writeHead(400, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({
-                    success: false,
-                    message: 'Valid userID is required',
-                }));
-                return;
-            }
+      if (!Number.isInteger(userID) || userID <= 0) {
+        sendJson(res, 400, { success: false, message: 'Valid userID is required' });
+        return;
+      }
 
-            const userCheck = allMockData.USER.find((item) => item.userID === userID);
+      const [userCheckRows] = await pool.promise().query(
+        'SELECT user_id FROM users WHERE user_id = ? LIMIT 1',
+        [userID]
+      );
+      if (!Array.isArray(userCheckRows) || userCheckRows.length === 0) {
+        sendJson(res, 404, { success: false, message: 'User not found' });
+        return;
+      }
 
-            if (!userCheck) {
-                res.writeHead(404, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({
-                    success: false,
-                    message: 'User not found',
-                }));
-                return;
-            }
+      const [rows] = await pool.promise().query(
+        `
+        SELECT
+          qh.history_id AS historyID,
+          qh.ticket_count AS ticketCount,
+          qh.total_cost AS totalCost,
+          qh.wait_time AS waitTime,
+          qh.status AS status,
+          qh.in_line_status AS inLineStatus,
+          qh.queued_at AS queuedAt,
+          c.concert_id AS concertID,
+          c.concert_name AS concertName,
+          c.artist_name AS artistName,
+          c.genre AS genre,
+          c.event_date AS date,
+          c.venue AS venue,
+          c.capacity AS capacity,
+          c.ticket_price AS ticketPrice,
+          c.concert_image AS concertImage,
+          c.concert_status AS concertStatus
+        FROM queue_history qh
+        INNER JOIN concerts c ON c.concert_id = qh.concert_id
+        WHERE qh.user_id = ?
+        ORDER BY qh.queued_at DESC, qh.history_id DESC
+        `,
+        [userID]
+      );
 
-            const historyRecords = allMockData.HISTORY.filter((record) => record.userID === userID);
+      const concerts = (rows || []).map((r) => ({
+        concertID: Number(r.concertID),
+        concertName: r.concertName,
+        artistName: r.artistName,
+        genre: r.genre,
+        date: r.date instanceof Date ? r.date.toISOString().slice(0, 10) : r.date,
+        venue: r.venue,
+        capacity: Number(r.capacity),
+        ticketPrice: Number(r.ticketPrice),
+        concertImage: r.concertImage,
+        concertStatus: r.concertStatus,
+        history: {
+          historyID: Number(r.historyID),
+          ticketCount: Number(r.ticketCount),
+          totalCost: Number(r.totalCost),
+          waitTime: Number(r.waitTime),
+          status: r.status,
+          inLineStatus: r.inLineStatus,
+          queuedAt: r.queuedAt instanceof Date ? r.queuedAt.toISOString() : r.queuedAt,
+        },
+      }));
 
-            const concerts = historyRecords
-                .map((record) => {
-                    const concert = allMockData.CONCERT.find((item) => item.concertID === record.concertID);
-                    if (!concert) {
-                        return null;
-                    }
-
-                    return {
-                        ...concert,
-                        history: {
-                            historyID: record.historyID,
-                            ticketCount: record.ticketCount,
-                            totalCost: record.totalCost,
-                            waitTime: record.waitTime,
-                            status: record.status,
-                            inLineStatus: record.inLineStatus,
-                            queuedAt: record.queuedAt,
-                        },
-                    };
-                })
-                .filter(Boolean);
-
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({
-                success: true,
-                userID,
-                count: concerts.length,
-                concerts,
-            }));
-            return;
-        }
-        catch (err) {
-            console.error('Error while fetching user concert history:', err);
-            res.writeHead(500, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({
-                success: false,
-                message: err.message || 'Failed to fetch concert history',
-            }));
-        }
-    });
+      sendJson(res, 200, {
+        success: true,
+        userID,
+        count: concerts.length,
+        concerts,
+      });
+    } catch (err) {
+      console.error('Error while fetching user concert history:', err);
+      sendJson(res, 500, { success: false, message: err.message || 'Failed to fetch concert history' });
+    }
+  });
 };
 
-module.exports = {
-    getConcertHistory,
-}
+module.exports = { getConcertHistory };

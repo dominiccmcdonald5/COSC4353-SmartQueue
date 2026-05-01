@@ -23,8 +23,8 @@ const PurchasePassPage: React.FC = () => {
     {
       id: 'silver',
       name: 'Silver Pass',
-      price: 9.99,
-      duration: 'month',
+      price: 29.99,
+      duration: 'year',
       features: [
         'Skip the line until 25% venue capacity is filled',
       ],
@@ -32,8 +32,8 @@ const PurchasePassPage: React.FC = () => {
     {
       id: 'gold',
       name: 'Gold Pass',
-      price: 19.99,
-      duration: 'month',
+      price: 49.99,
+      duration: 'year',
       recommended: true,
       features: [
         'Skip the line until 50% venue capacity is filled',
@@ -125,8 +125,8 @@ const PurchasePassPage: React.FC = () => {
                   <div className="capacity-explanation">
                     <p className="capacity-text">
                       {plan.id === 'silver' 
-                        ? 'You\'ll skip the entire line until 25% of tickets are sold, then the pass stops working.'
-                        : 'You\'ll skip the entire line until 50% of tickets are sold, then the pass stops working.'
+                        ? 'You’ll skip the entire line until 25% of tickets are sold, then the pass stops working.'
+                        : 'You’ll skip the entire line until 50% of tickets are sold, then the pass stops working.'
                       }
                     </p>
                   </div>

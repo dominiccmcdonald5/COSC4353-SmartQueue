@@ -28,7 +28,7 @@ const handleLogin = async (req, res) => {
       const plain = String(password);
 
       const [userRows] = await promisePool.execute(
-        `SELECT user_id, email, password_hash, role, first_name, last_name, pass_status
+        `SELECT user_id, email, password_hash, role, first_name, last_name, pass_status, pass_expires_at
          FROM users
          WHERE LOWER(TRIM(email)) = ?
          LIMIT 1`,
@@ -52,10 +52,16 @@ const handleLogin = async (req, res) => {
 
         const role = String(user.role || 'user').toLowerCase();
         const accountType = role === 'admin' ? 'admin' : 'user';
-        const passStatus =
-          user.pass_status === 'Gold' || user.pass_status === 'Silver' || user.pass_status === 'None'
-            ? user.pass_status
-            : 'None';
+        const rawStatus = user.pass_status;
+        const storedStatus =
+          rawStatus === 'Gold' || rawStatus === 'Silver' || rawStatus === 'None' ? rawStatus : 'None';
+
+        const exp = user.pass_expires_at;
+        const expMs = exp instanceof Date ? exp.getTime() : exp != null ? new Date(exp).getTime() : NaN;
+        const isActive = storedStatus !== 'None' && Number.isFinite(expMs) && expMs > Date.now();
+        const passStatus = isActive ? storedStatus : 'None';
+        const passExpiresAt =
+          Number.isFinite(expMs) ? new Date(expMs).toISOString() : null;
 
         sendJson(res, 200, {
           success: true,
@@ -65,6 +71,7 @@ const handleLogin = async (req, res) => {
           email: user.email,
           role: accountType === 'admin' ? 'Administrator' : 'User',
           passStatus,
+          passExpiresAt,
           accountType,
           message: accountType === 'admin' ? 'Admin Account' : 'User Account',
         });
