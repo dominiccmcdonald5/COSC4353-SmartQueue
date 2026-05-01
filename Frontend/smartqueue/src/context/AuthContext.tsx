@@ -60,7 +60,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      const response = await fetch('http://localhost:5000/api/login', {
+      const response = await fetch('https://cosc-4353-smart-queue-6ixj.vercel.app/api/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -100,7 +100,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setIsLoading(true);
     try {
       // Replace with your actual signup API call
-      const response = await fetch('http://localhost:5000/api/signup', {
+      const response = await fetch('https://cosc-4353-smart-queue-6ixj.vercel.app/api/signup', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

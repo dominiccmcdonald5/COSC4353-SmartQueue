@@ -547,6 +547,35 @@ async function leaveQueue(req, res) {
       [entryToLeave.history_id]
     );
 
+    // Check if someone is now in 6th position and send them a notification
+    const [usersSixthPosition] = await pool.promise().query(
+      `
+      SELECT qh.user_id, c.concert_name
+      FROM queue_history qh
+      LEFT JOIN concerts c ON c.concert_id = qh.concert_id
+      WHERE qh.concert_id = ?
+        AND qh.status = 'queued'
+        AND qh.in_line_status = 'in_line'
+      ORDER BY qh.queued_at ASC, qh.history_id ASC
+      LIMIT 6, 1
+      `,
+      [concertID]
+    );
+
+    if (usersSixthPosition.length > 0) {
+      const sixthPositionUserID = toNumber(usersSixthPosition[0].user_id);
+      const concertName = usersSixthPosition[0].concert_name || 'the concert';
+      const notificationMessage = `You're coming up next! You're currently 6th in line for ${concertName}.`;
+
+      await pool.promise().query(
+        `
+        INSERT INTO notifications (user_id, message, status)
+        VALUES (?, ?, 'sent')
+        `,
+        [sixthPositionUserID, notificationMessage]
+      );
+    }
+
     sendJson(res, 200, {
       success: true,
       message: 'Left queue successfully',
@@ -672,6 +701,71 @@ async function completePayment(req, res) {
   }
 }
 
+async function getNotifications(req, res) {
+  try {
+    const payload = await readJsonBody(req);
+    const userID = Number(payload.userId);
+
+    if (!Number.isInteger(userID) || userID <= 0) {
+      sendJson(res, 400, { success: false, message: 'Valid userId is required' });
+      return;
+    }
+
+    const [notifications] = await pool.promise().query(
+      `
+      SELECT notification_id, user_id, message, timestamp, status
+      FROM notifications
+      WHERE user_id = ?
+      ORDER BY timestamp DESC
+      `,
+      [userID]
+    );
+
+    sendJson(res, 200, {
+      success: true,
+      count: notifications.length,
+      notifications: notifications.map((notif) => ({
+        notificationId: toNumber(notif.notification_id),
+        userId: toNumber(notif.user_id),
+        message: notif.message,
+        timestamp: notif.timestamp,
+        status: notif.status,
+      })),
+    });
+  } catch (error) {
+    sendJson(res, 500, { success: false, message: error.message || 'Database error' });
+  }
+}
+
+async function markNotificationAsViewed(req, res) {
+  try {
+    const payload = await readJsonBody(req);
+    const notificationID = Number(payload.notificationId);
+
+    if (!Number.isInteger(notificationID) || notificationID <= 0) {
+      sendJson(res, 400, { success: false, message: 'Valid notificationId is required' });
+      return;
+    }
+
+    await pool.promise().query(
+      `
+      UPDATE notifications
+      SET status = 'viewed'
+      WHERE notification_id = ?
+      `,
+      [notificationID]
+    );
+
+    sendJson(res, 200, {
+      success: true,
+      message: 'Notification marked as viewed',
+      notificationId: notificationID,
+    });
+  } catch (error) {
+    sendJson(res, 400, { success: false, message: error.message || 'Bad request' });
+  }
+}
+
 module.exports = {
   getQueue,
   getQueueStatusByConcert,
@@ -679,4 +773,6 @@ module.exports = {
   joinQueue,
   leaveQueue,
   completePayment,
+  getNotifications,
+  markNotificationAsViewed,
 };

@@ -67,7 +67,7 @@ function parseSpentForSave(s: string): number | null {
 }
 
 const DEFAULT_CONCERT_IMAGE = '/concert1.jpg';
-const API_BASE = 'http://localhost:5000';
+const API_BASE = 'https://cosc-4353-smart-queue-6ixj.vercel.app';
 /** Matches backend admin user API minimum password length. */
 const ADMIN_USER_PASSWORD_MIN_LEN = 4;
 
