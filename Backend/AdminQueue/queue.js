@@ -1,12 +1,20 @@
-const { pool } = require('../database');
+const { pool, promisePool, queryWithRetry } = require('../database');
 
 const PRIORITY = {
   NONE: 0,
   PASS: 1,
 };
 
+const ENABLE_STALE_QUEUE_EXPIRY = false;
+const STALE_QUEUE_MINUTES = 120;
+
 function sendJson(res, statusCode, payload) {
-  res.writeHead(statusCode, { 'Content-Type': 'application/json' });
+  res.writeHead(statusCode, {
+    'Content-Type': 'application/json',
+    'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+    Pragma: 'no-cache',
+    Expires: '0',
+  });
   res.end(JSON.stringify(payload));
 }
 
@@ -36,11 +44,71 @@ function toNumber(value, fallback = 0) {
   return Number.isFinite(num) ? num : fallback;
 }
 
+function elapsedMinutesFrom(dateLike) {
+  const timestamp = new Date(dateLike).getTime();
+  if (!Number.isFinite(timestamp)) return null;
+  return Math.round(Math.abs(Date.now() - timestamp) / 60000);
+}
+
+function toTitleWord(word) {
+  if (!word) return '';
+  const lower = String(word).toLowerCase();
+  return lower.charAt(0).toUpperCase() + lower.slice(1);
+}
+
+function displayNameFromEmail(email) {
+  if (!email || typeof email !== 'string') return '';
+  const local = email.split('@')[0] || '';
+  if (!local) return '';
+
+  const pieces = local
+    .replace(/[._-]+/g, ' ')
+    .split(' ')
+    .map((part) => part.replace(/\d+/g, '').trim())
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(toTitleWord);
+
+  return pieces.join(' ');
+}
+
 function passStatusToLabel(passStatus) {
   const s = String(passStatus || 'None');
   if (s === 'Gold') return 'gold';
   if (s === 'Silver') return 'silver';
   return null;
+}
+
+async function expireStaleQueueEntries(filters = {}) {
+  if (!ENABLE_STALE_QUEUE_EXPIRY) return 0;
+
+  const where = [
+    `status = 'queued'`,
+    `in_line_status = 'in_line'`,
+    `queued_at < DATE_SUB(NOW(), INTERVAL ${STALE_QUEUE_MINUTES} MINUTE)`,
+  ];
+  const params = [];
+
+  if (Number.isInteger(filters.concertID) && filters.concertID > 0) {
+    where.push('concert_id = ?');
+    params.push(filters.concertID);
+  }
+
+  if (Number.isInteger(filters.userID) && filters.userID > 0) {
+    where.push('user_id = ?');
+    params.push(filters.userID);
+  }
+
+  const [result] = await pool.promise().query(
+    `
+    UPDATE queue_history
+    SET status = 'cancelled', in_line_status = 'left'
+    WHERE ${where.join(' AND ')}
+    `,
+    params
+  );
+
+  return toNumber(result?.affectedRows);
 }
 
 async function getCompletedPurchaseCountForConcert(concertID) {
@@ -114,12 +182,15 @@ async function fetchCompletedPurchaseCountsGrouped() {
 }
 
 async function fetchQueuedRowsForConcertFair(concertID) {
+  await expireStaleQueueEntries({ concertID });
+
   const [rows] = await pool.promise().query(
     `
     SELECT
       qh.history_id,
       qh.user_id AS userId,
       qh.queued_at AS joinedAt,
+      qh.wait_time AS waitTimeSeconds,
       qh.priority_level,
       u.pass_status AS passStatus,
       c.concert_name AS concertName
@@ -153,6 +224,8 @@ function buildFairOrderedActiveQueueResponse(rawRows, completedByConcert) {
   return flattened.map((row, index) => ({
     position: index + 1,
     queueEntryId: toNumber(row.history_id),
+    concertId: toNumber(row.concertId),
+    userId: toNumber(row.userId),
     label: `User #${toNumber(row.userId)} - ${row.concertName || 'Queue Entry'}`,
     joinedAt: row.joinedAt,
     priorityLevel:
@@ -255,17 +328,21 @@ async function getServeSlotForConcert(concertID) {
 
 async function getQueue(req, res) {
   try {
+    await expireStaleQueueEntries();
+
     const [rows] = await pool.promise().query(
       `
       SELECT
         qh.history_id,
         qh.concert_id AS concertId,
         qh.queued_at AS joinedAt,
+        qh.wait_time AS waitTimeSeconds,
         qh.user_id AS userId,
         qh.priority_level,
         u.pass_status AS passStatus,
         u.first_name AS firstName,
         u.last_name AS lastName,
+        u.email AS email,
         c.concert_name AS concertName
       FROM queue_history qh
       LEFT JOIN users u ON u.user_id = qh.user_id
@@ -275,13 +352,71 @@ async function getQueue(req, res) {
       `
     );
 
+    // Use upstream fair-ordering logic
     const completedByConcert = await fetchCompletedPurchaseCountsGrouped();
     const queue = buildFairOrderedActiveQueueResponse(rows, completedByConcert);
 
+    // Build lookup map and duplicate counts for enrichment.
+    // Duplicate means same user_id appears multiple times in the same concert queue.
+    const rowById = new Map(rows.map((r) => [toNumber(r.history_id), r]));
+    const userInConcertCounts = {};
+    rows.forEach((r) => {
+      const uid = toNumber(r.userId);
+      const cid = toNumber(r.concertId);
+      const key = `${cid}:${uid}`;
+      userInConcertCounts[key] = (userInConcertCounts[key] || 0) + 1;
+    });
+
+    // Bot detection: count recent queue joins per user in the last 30 minutes
+    const uniqueUserIds = [...new Set(rows.map((r) => toNumber(r.userId)))];
+    const suspectedBotIds = new Set();
+    if (uniqueUserIds.length > 0) {
+      const [recentJoins] = await pool.promise().query(
+        `SELECT user_id, COUNT(*) AS join_count
+         FROM queue_history
+         WHERE user_id IN (?)
+           AND queued_at >= DATE_SUB(NOW(), INTERVAL 30 MINUTE)
+         GROUP BY user_id
+         HAVING join_count >= 3`,
+        [uniqueUserIds]
+      );
+      for (const row of recentJoins) {
+        suspectedBotIds.add(toNumber(row.user_id));
+      }
+    }
+
+    const enrichedQueue = queue.map((entry) => {
+      const raw = rowById.get(toNumber(entry.queueEntryId));
+      if (!raw) return entry;
+      const firstName = raw.firstName || '';
+      const lastName = raw.lastName || '';
+      const fallbackName = displayNameFromEmail(raw.email);
+      const displayName = `${firstName} ${lastName}`.trim() || fallbackName;
+      const accumulatedMinutes = Math.max(0, Math.floor(toNumber(raw.waitTimeSeconds) / 60));
+      const currentSegmentMinutes = raw.joinedAt ? elapsedMinutesFrom(raw.joinedAt) : null;
+      const waitMinutes = currentSegmentMinutes == null ? null : accumulatedMinutes + currentSegmentMinutes;
+      const uid = toNumber(raw.userId);
+      const cid = toNumber(raw.concertId);
+      const duplicateKey = `${cid}:${uid}`;
+      return {
+        ...entry,
+        concertId: cid,
+        firstName: firstName || (displayName ? displayName.split(' ')[0] : ''),
+        lastName: lastName || (displayName.includes(' ') ? displayName.split(' ').slice(1).join(' ') : ''),
+        passStatus: raw.passStatus || 'none',
+        concertName: raw.concertName || 'Unknown Concert',
+        label: displayName || `User #${uid}`,
+        joinedAt: raw.joinedAt,
+        waitMinutes,
+        isDuplicate: userInConcertCounts[duplicateKey] > 1,
+        isSuspectedBot: suspectedBotIds.has(uid),
+      };
+    });
+
     sendJson(res, 200, {
       success: true,
-      count: queue.length,
-      queue,
+      count: enrichedQueue.length,
+      queue: enrichedQueue,
     });
   } catch (error) {
     sendJson(res, 500, { success: false, message: error.message || 'Database error' });
@@ -290,6 +425,8 @@ async function getQueue(req, res) {
 
 async function serveNext(req, res) {
   try {
+    await expireStaleQueueEntries();
+
     const [nextConcertRows] = await pool.promise().query(
       `
       SELECT concert_id AS concertId
@@ -384,7 +521,9 @@ async function serveNext(req, res) {
     await pool.promise().query(
       `
       UPDATE queue_history
-      SET status = 'completed', in_line_status = 'entered', wait_time = ?
+      SET status = 'completed',
+          in_line_status = 'entered',
+          wait_time = COALESCE(wait_time, 0) + ?
       WHERE history_id = ?
       `,
       [waitSeconds, served.queueEntryId]
@@ -452,6 +591,8 @@ async function getQueueStatusByConcert(req, res, rawConcertId, userIdQuery) {
       return;
     }
 
+    await expireStaleQueueEntries({ concertID });
+
     const queuedRows = await fetchQueuedRowsForConcertFair(concertID);
     const completedCount = await getCompletedPurchaseCountForConcert(concertID);
     const orderedFair = buildFairQueueOrder(queuedRows, completedCount);
@@ -465,13 +606,21 @@ async function getQueueStatusByConcert(req, res, rawConcertId, userIdQuery) {
     const defaultPosition = totalInQueue > 0 ? totalInQueue + 1 : 1;
     const position = userRowIndex >= 0 ? userRowIndex + 1 : defaultPosition;
     const peopleAhead = userRowIndex >= 0 ? Math.max(0, position - 1) : 0;
-    const estimatedWaitMinutes = peopleAhead * 5;
+    const estimatedRemainingWaitMinutes = peopleAhead * 5;
+
+    const userQueueRow = userRowIndex >= 0 ? orderedFair[userRowIndex] : null;
+    const joinedMs = userQueueRow?.joinedAt ? new Date(userQueueRow.joinedAt).getTime() : NaN;
+    const elapsedFromJoinedMinutes = Number.isFinite(joinedMs)
+      ? Math.max(0, Math.floor((Date.now() - joinedMs) / 60000))
+      : 0;
+    const accumulatedMinutes = Math.max(0, Math.floor(toNumber(userQueueRow?.waitTimeSeconds) / 60));
+    const elapsedWaitMinutes = userRowIndex >= 0 ? elapsedFromJoinedMinutes + accumulatedMinutes : 0;
 
     const canProceedToSeatSelection = userRowIndex >= 0 && position <= 5;
     const estimatedWaitTime = canProceedToSeatSelection
-      ? '0 minutes — You can proceed to seat selection now'
+      ? `0 minutes remaining — You can proceed now (waited ${elapsedWaitMinutes} min)`
       : userRowIndex >= 0
-        ? `${estimatedWaitMinutes} minutes`
+        ? `${estimatedRemainingWaitMinutes} minutes remaining (waited ${elapsedWaitMinutes} min)`
         : '0 minutes';
 
     if (canProceedToSeatSelection && Number.isInteger(userID) && userID > 0) {
@@ -491,6 +640,8 @@ async function getQueueStatusByConcert(req, res, rawConcertId, userIdQuery) {
         totalInQueue,
         position,
         estimatedWaitTime,
+        elapsedWaitMinutes,
+        estimatedRemainingWaitMinutes,
         isInQueue: userRowIndex >= 0,
         canProceedToSeatSelection,
         isNextInLine: userRowIndex >= 0 && position === 6,
@@ -526,6 +677,8 @@ async function joinQueue(req, res) {
       return;
     }
 
+    const expiredEntries = await expireStaleQueueEntries({ userID });
+
     const [activeQueueEntries] = await pool.promise().query(
       `
       SELECT history_id, concert_id
@@ -555,14 +708,28 @@ async function joinQueue(req, res) {
     const priorityLevel = await fetchEffectiveUserPriority(userID, concertID);
     const passStatusLabel = priorityLevel > 0 ? passStatusToLabel(userRows[0]?.pass_status) : null;
 
-    const [insertResult] = await pool.promise().query(
-      `
-      INSERT INTO queue_history (
-        user_id, concert_id, priority_level, ticket_count, total_cost, wait_time, status, in_line_status, queued_at
-      ) VALUES (?, ?, ?, ?, ?, ?, 'queued', 'in_line', NOW())
-      `,
-      [userID, concertID, priorityLevel, 1, 0, 0]
-    );
+    let insertResult;
+    try {
+      [insertResult] = await pool.promise().query(
+        `
+        INSERT INTO queue_history (
+          user_id, concert_id, priority_level, ticket_count, total_cost, wait_time, status, in_line_status, queued_at
+        ) VALUES (?, ?, ?, ?, ?, ?, 'queued', 'in_line', NOW())
+        `,
+        [userID, concertID, priorityLevel, 1, 0, 0]
+      );
+    } catch (dbError) {
+      // MySQL error 1062 = duplicate key (UNIQUE constraint violation)
+      if (dbError?.code === 'ER_DUP_ENTRY' || (dbError?.errno === 1062)) {
+        sendJson(res, 409, {
+          success: false,
+          message: 'User is already in queue for this concert',
+          code: 'ALREADY_QUEUED',
+        });
+        return;
+      }
+      throw dbError;
+    }
 
     const newHistoryID = toNumber(insertResult.insertId);
 
@@ -587,7 +754,7 @@ async function joinQueue(req, res) {
 
     sendJson(res, 201, {
       success: true,
-      message: 'Joined queue',
+      message: expiredEntries > 0 ? 'Previous queue session expired. User rejoined queue.' : 'Joined queue',
       entry: {
         historyID: newHistoryID,
         concertID,
@@ -613,6 +780,8 @@ async function leaveQueue(req, res) {
       sendJson(res, 400, { success: false, message: 'Valid concertId and userId are required' });
       return;
     }
+
+    await expireStaleQueueEntries({ concertID, userID });
 
     const [activeRows] = await pool.promise().query(
       `
@@ -703,6 +872,8 @@ async function completePayment(req, res) {
       return;
     }
 
+    await expireStaleQueueEntries({ concertID, userID });
+
     const [activeRows] = await pool.promise().query(
       `
       SELECT history_id, user_id, concert_id, queued_at, wait_time
@@ -734,7 +905,7 @@ async function completePayment(req, res) {
             in_line_status = 'entered',
             ticket_count = ?,
             total_cost = ?,
-            wait_time = ?
+            wait_time = COALESCE(wait_time, 0) + ?
         WHERE history_id = ?
         `,
         [ticketCount, roundedCost, waitSeconds, row.history_id]
@@ -854,6 +1025,171 @@ async function markNotificationAsViewed(req, res) {
   }
 }
 
+async function reorderQueueEntry(req, res) {
+  try {
+    const payload = await readJsonBody(req);
+    const historyID = Number(payload.historyId);
+    const direction = String(payload.direction || '').toLowerCase();
+    const hasTarget = Number.isInteger(Number(payload.targetPosition));
+    const targetPosition = hasTarget ? Number(payload.targetPosition) : null;
+
+    if (!Number.isInteger(historyID) || historyID <= 0) {
+      sendJson(res, 400, { success: false, message: 'historyId must be a positive integer' });
+      return;
+    }
+
+    if (!['up', 'down'].includes(direction) && targetPosition === null) {
+      sendJson(res, 400, {
+        success: false,
+        message: 'Provide direction (up/down) or targetPosition',
+      });
+      return;
+    }
+
+    const [entryRows] = await pool.promise().query(
+      `
+      SELECT history_id, concert_id
+      FROM queue_history
+      WHERE history_id = ?
+        AND status = 'queued'
+        AND in_line_status = 'in_line'
+      LIMIT 1
+      `,
+      [historyID]
+    );
+
+    if (!Array.isArray(entryRows) || entryRows.length === 0) {
+      sendJson(res, 404, { success: false, message: 'Active queue entry not found' });
+      return;
+    }
+
+    const concertID = toNumber(entryRows[0].concert_id);
+    const queuedRows = await fetchQueuedRowsForConcertFair(concertID);
+    // Admin override mode: move users by exact visible queue order.
+    const fairOrdered = sortQueueRowsFifo(queuedRows);
+
+    const currentIndex = fairOrdered.findIndex((r) => toNumber(r.history_id) === historyID);
+    if (currentIndex < 0) {
+      sendJson(res, 404, { success: false, message: 'Queue entry not found in active order' });
+      return;
+    }
+
+    let nextIndex = currentIndex;
+    if (targetPosition !== null) {
+      nextIndex = Math.max(0, Math.min(fairOrdered.length - 1, targetPosition - 1));
+    } else if (direction === 'up') {
+      nextIndex = Math.max(0, currentIndex - 1);
+    } else if (direction === 'down') {
+      nextIndex = Math.min(fairOrdered.length - 1, currentIndex + 1);
+    }
+
+    if (nextIndex === currentIndex) {
+      sendJson(res, 200, {
+        success: true,
+        message: 'Entry already at requested position',
+        previousPosition: currentIndex + 1,
+        newPosition: nextIndex + 1,
+      });
+      return;
+    }
+
+    const reordered = [...fairOrdered];
+    const [moved] = reordered.splice(currentIndex, 1);
+    reordered.splice(nextIndex, 0, moved);
+
+    const conn = await pool.promise().getConnection();
+    try {
+      await conn.beginTransaction();
+      const baseMs = Date.now() - reordered.length * 1000;
+      for (let i = 0; i < reordered.length; i += 1) {
+        const ts = new Date(baseMs + i * 1000);
+        await conn.query(
+          `
+          UPDATE queue_history
+          SET wait_time = COALESCE(wait_time, 0) + GREATEST(TIMESTAMPDIFF(SECOND, queued_at, NOW()), 0),
+              queued_at = ?
+          WHERE history_id = ?
+            AND status = 'queued'
+            AND in_line_status = 'in_line'
+          `,
+          [ts, toNumber(reordered[i].history_id)]
+        );
+      }
+      await conn.commit();
+    } catch (txErr) {
+      await conn.rollback();
+      throw txErr;
+    } finally {
+      conn.release();
+    }
+
+    // Recompute after persistence so API returns the position users will actually see.
+    const refreshedQueuedRows = await fetchQueuedRowsForConcertFair(concertID);
+    const refreshedFair = sortQueueRowsFifo(refreshedQueuedRows);
+    const appliedIndex = refreshedFair.findIndex((r) => toNumber(r.history_id) === historyID);
+    const appliedPosition = appliedIndex >= 0 ? appliedIndex + 1 : null;
+    const requestedPosition = targetPosition ?? nextIndex + 1;
+
+    sendJson(res, 200, {
+      success: true,
+      message:
+        appliedPosition != null && requestedPosition !== appliedPosition
+          ? `Queue reordered. Requested #${requestedPosition}, applied #${appliedPosition}.`
+          : 'Queue entry reordered successfully',
+      previousPosition: currentIndex + 1,
+      requestedPosition,
+      newPosition: appliedPosition ?? (nextIndex + 1),
+      concertID,
+    });
+  } catch (error) {
+    sendJson(res, 400, { success: false, message: error.message || 'Bad request' });
+  }
+}
+
+async function removeFromQueue(req, res, rawHistoryId) {
+  try {
+    const historyID = Number(rawHistoryId);
+    if (!Number.isInteger(historyID) || historyID <= 0) {
+      sendJson(res, 400, { success: false, message: 'historyId must be a positive integer' });
+      return;
+    }
+
+    const [rows] = await pool.promise().query(
+      `SELECT history_id, user_id, concert_id
+       FROM queue_history
+       WHERE history_id = ?
+         AND status = 'queued'
+         AND in_line_status = 'in_line'
+       LIMIT 1`,
+      [historyID]
+    );
+
+    if (rows.length === 0) {
+      sendJson(res, 404, { success: false, message: 'No active queue entry found for this id' });
+      return;
+    }
+
+    const entry = rows[0];
+
+    await pool.promise().query(
+      `UPDATE queue_history SET status = 'cancelled', in_line_status = 'left' WHERE history_id = ?`,
+      [historyID]
+    );
+
+    sendJson(res, 200, {
+      success: true,
+      message: 'User removed from queue by admin.',
+      entry: {
+        historyID: toNumber(entry.history_id),
+        userID: toNumber(entry.user_id),
+        concertID: toNumber(entry.concert_id),
+      },
+    });
+  } catch (error) {
+    sendJson(res, 500, { success: false, message: error.message || 'Database error' });
+  }
+}
+
 module.exports = {
   getQueue,
   getQueueStatusByConcert,
@@ -861,6 +1197,8 @@ module.exports = {
   joinQueue,
   leaveQueue,
   completePayment,
+  removeFromQueue,
+  reorderQueueEntry,
   getNotifications,
   markNotificationAsViewed,
 };

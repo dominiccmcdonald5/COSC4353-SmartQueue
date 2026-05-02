@@ -1,4 +1,4 @@
-const { promisePool } = require('../database');
+const { promisePool, queryWithRetry } = require('../database');
 
 /** YYYY-MM-DD for API; avoids UTC shift from toISOString() on <input type="date"> round-trips */
 function formatEventDateForApi(d) {

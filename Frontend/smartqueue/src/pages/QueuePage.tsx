@@ -1,14 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useNotification } from '../context/NotificationContext';
 import { formatLocalDateFromApi } from '../utils/apiDate';
 import '../components/ui/ConfirmDialog.css';
 import '../styling/QueuePage.css';
+
+const API_BASE = 'https://cosc-4353-smart-queue-6ixj.vercel.app';
 
 interface QueueStatus {
   position: number;
   totalInQueue: number;
   estimatedWaitTime: string;
+  elapsedWaitMinutes?: number;
+  estimatedRemainingWaitMinutes?: number;
   concertName: string;
   artist: string;
   date: string;
@@ -21,6 +26,8 @@ interface QueueStatusResponse {
     position: number;
     totalInQueue: number;
     estimatedWaitTime: string;
+    elapsedWaitMinutes?: number;
+    estimatedRemainingWaitMinutes?: number;
     concertName: string;
     artist: string;
     date: string;
@@ -33,6 +40,7 @@ interface QueueStatusResponse {
 const QueuePage: React.FC = () => {
   const { concertId } = useParams<{ concertId: string }>();
   const { user } = useAuth();
+  const { addNotification } = useNotification();
   const navigate = useNavigate();
   const [queueStatus, setQueueStatus] = useState<QueueStatus | null>(null);
   const [isInQueue, setIsInQueue] = useState(false);
@@ -55,63 +63,63 @@ const QueuePage: React.FC = () => {
     return () => window.removeEventListener('keydown', onKey);
   }, [activeQueueDialog.open, queueSwitchBusy]);
 
-  useEffect(() => {
+  const fetchQueueStatus = useCallback(async () => {
     if (!concertId) {
       setLoading(false);
       setError('Missing concert id.');
       return;
     }
 
-    let mounted = true;
+    try {
+      const userIdParam = user?.id ? `?userId=${encodeURIComponent(user.id)}` : '';
+      const response = await fetch(`${API_BASE}/api/queue/${concertId}${userIdParam}`, {
+        cache: 'no-store',
+      });
+      const payload = (await response.json()) as QueueStatusResponse;
 
-    const fetchQueueStatus = async () => {
-      try {
-        const userIdParam = user?.id ? `?userId=${encodeURIComponent(user.id)}` : '';
-        const response = await fetch(`https://cosc-4353-smart-queue-6ixj.vercel.app/api/queue/${concertId}${userIdParam}`);
-        const payload = (await response.json()) as QueueStatusResponse;
-
-        if (!mounted) return;
-
-        if (!response.ok || !payload.success || !payload.data) {
-          setError(payload.message || 'Unable to load queue status.');
-          setLoading(false);
-          return;
-        }
-
-        setQueueStatus({
-          position: payload.data.position,
-          totalInQueue: payload.data.totalInQueue,
-          estimatedWaitTime: payload.data.estimatedWaitTime,
-          concertName: payload.data.concertName,
-          artist: payload.data.artist,
-          date: payload.data.date,
-          venue: payload.data.venue,
-        });
-        setIsInQueue(payload.data.isInQueue);
-        setError(null);
+      if (!response.ok || !payload.success || !payload.data) {
+        setError(payload.message || 'Unable to load queue status.');
         setLoading(false);
-      } catch {
-        if (!mounted) return;
-        setError('Unable to connect to server.');
-        setLoading(false);
+        return;
       }
-    };
 
-    fetchQueueStatus();
-    const interval = setInterval(fetchQueueStatus, 5000);
+      setQueueStatus({
+        position: payload.data.position,
+        totalInQueue: payload.data.totalInQueue,
+        estimatedWaitTime: payload.data.estimatedWaitTime,
+        elapsedWaitMinutes: payload.data.elapsedWaitMinutes,
+        estimatedRemainingWaitMinutes: payload.data.estimatedRemainingWaitMinutes,
+        concertName: payload.data.concertName,
+        artist: payload.data.artist,
+        date: payload.data.date,
+        venue: payload.data.venue,
+      });
+      setIsInQueue(payload.data.isInQueue);
+      setError(null);
+      setLoading(false);
+    } catch {
+      setError('Unable to connect to server.');
+      setLoading(false);
+    }
+  }, [concertId, user?.id]);
+
+  useEffect(() => {
+    void fetchQueueStatus();
+    const interval = setInterval(() => {
+      void fetchQueueStatus();
+    }, 5000);
 
     return () => {
-      mounted = false;
       clearInterval(interval);
     };
-  }, [concertId, user?.id]);
+  }, [fetchQueueStatus]);
 
   const handleJoinQueue = async () => {
     if (!concertId || !user?.id) {
       return;
     }
     try {
-      const res = await fetch('https://cosc-4353-smart-queue-6ixj.vercel.app/api/queue/join', {
+      const res = await fetch(`${API_BASE}/api/queue/join`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ concertId, userId: user.id }),
@@ -126,7 +134,15 @@ const QueuePage: React.FC = () => {
         return;
       }
       setIsInQueue(true);
-      // Queue status is re-polled every 5 seconds by useEffect.
+      if (payload.message) {
+        addNotification({
+          title: payload.message.includes('expired') ? 'Queue Rejoined' : 'Queue Joined',
+          message: payload.message,
+          type: payload.message.includes('expired') ? 'info' : 'success',
+          duration: 5000,
+        });
+      }
+      await fetchQueueStatus();
     } catch {
       window.alert('Unable to connect to server.');
     }
@@ -142,7 +158,7 @@ const QueuePage: React.FC = () => {
     if (!concertId || !user?.id || otherId == null) return;
     setQueueSwitchBusy(true);
     try {
-      const leaveRes = await fetch('https://cosc-4353-smart-queue-6ixj.vercel.app/api/queue/leave', {
+      const leaveRes = await fetch(`${API_BASE}/api/queue/leave`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ concertId: otherId, userId: user.id }),
@@ -152,7 +168,7 @@ const QueuePage: React.FC = () => {
         window.alert(leavePayload.message || 'Could not leave the other queue.');
         return;
       }
-      const joinRes = await fetch('https://cosc-4353-smart-queue-6ixj.vercel.app/api/queue/join', {
+      const joinRes = await fetch(`${API_BASE}/api/queue/join`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ concertId, userId: user.id }),
@@ -168,6 +184,15 @@ const QueuePage: React.FC = () => {
       }
       setActiveQueueDialog({ open: false, otherConcertId: null });
       setIsInQueue(true);
+      if (joinPayload.message) {
+        addNotification({
+          title: joinPayload.message.includes('expired') ? 'Queue Rejoined' : 'Queue Joined',
+          message: joinPayload.message,
+          type: joinPayload.message.includes('expired') ? 'info' : 'success',
+          duration: 5000,
+        });
+      }
+      await fetchQueueStatus();
     } catch {
       window.alert('Unable to connect to server.');
     } finally {
@@ -183,7 +208,7 @@ const QueuePage: React.FC = () => {
     }
 
     try {
-      const res = await fetch('https://cosc-4353-smart-queue-6ixj.vercel.app/api/queue/leave', {
+      const res = await fetch(`${API_BASE}/api/queue/leave`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ concertId, userId: user.id }),
@@ -311,8 +336,15 @@ const QueuePage: React.FC = () => {
               </div>
               
               <div className="wait-time">
-                <h3>Estimated Wait Time</h3>
-                <p className="time">{queueStatus.estimatedWaitTime}</p>
+                <h3>Wait Time</h3>
+                <p className="time">
+                  {queueStatus.elapsedWaitMinutes != null
+                    ? `Waited: ${queueStatus.elapsedWaitMinutes} min`
+                    : queueStatus.estimatedWaitTime}
+                </p>
+                {queueStatus.estimatedRemainingWaitMinutes != null && (
+                  <p className="time">Remaining: {queueStatus.estimatedRemainingWaitMinutes} min</p>
+                )}
               </div>
             </div>
 
@@ -320,7 +352,9 @@ const QueuePage: React.FC = () => {
               <div 
                 className="progress" 
                 style={{ 
-                  width: `${((queueStatus.totalInQueue - queueStatus.position) / queueStatus.totalInQueue) * 100}%` 
+                  width: `${queueStatus.totalInQueue > 0
+                    ? ((queueStatus.totalInQueue - queueStatus.position) / queueStatus.totalInQueue) * 100
+                    : 0}%` 
                 }}
               ></div>
             </div>
