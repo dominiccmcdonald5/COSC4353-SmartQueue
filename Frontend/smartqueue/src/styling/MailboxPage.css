@@ -194,6 +194,32 @@
   white-space: pre-wrap;
 }
 
+.mailbox-queue-action {
+  margin-top: 1.25rem;
+}
+
+.mailbox-queue-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.55rem 1.25rem;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  background: linear-gradient(135deg, #8093f1, #c96de8);
+  color: white;
+  box-shadow: 0 4px 12px rgba(128, 147, 241, 0.35);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.mailbox-queue-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(128, 147, 241, 0.45);
+}
+
 .mailbox-guest-msg {
   text-align: center;
   padding: 2rem;

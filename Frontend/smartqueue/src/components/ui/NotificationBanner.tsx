@@ -1,34 +1,68 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { MdClose } from 'react-icons/md';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useAuth } from '../../context/AuthContext';
 import { useNotification } from '../../context/NotificationContext';
 import './NotificationBanner.css';
 
-export const NotificationBanner: React.FC = () => {
-  const { isNextInLine, canProceedToPurchase, proceedConcertName } = useNotification();
-  const [dismissed, setDismissed] = useState(false);
-  const prevNl = useRef<boolean | null>(null);
-  const prevCp = useRef<boolean | null>(null);
-
-  useEffect(() => {
-    if (
-      prevNl.current !== null &&
-      (prevNl.current !== isNextInLine || prevCp.current !== canProceedToPurchase)
-    ) {
-      setDismissed(false);
+function clearQueueBannerSessionForUser(userId: string) {
+  const prefix = `sq_qb_${userId}_`;
+  for (let i = sessionStorage.length - 1; i >= 0; i--) {
+    const k = sessionStorage.key(i);
+    if (k?.startsWith(prefix)) {
+      sessionStorage.removeItem(k);
     }
-    prevNl.current = isNextInLine;
-    prevCp.current = canProceedToPurchase;
-  }, [isNextInLine, canProceedToPurchase]);
+  }
+}
+
+export const NotificationBanner: React.FC = () => {
+  const { user } = useAuth();
+  const {
+    isNextInLine,
+    canProceedToPurchase,
+    proceedConcertName,
+    queueBannerConcertId,
+  } = useNotification();
+
+  const [suppressTick, setSuppressTick] = useState(0);
 
   const active = isNextInLine || canProceedToPurchase;
-  const show = active && !dismissed;
+  const mode = canProceedToPurchase ? 'proceed' : 'next';
+  const cid = queueBannerConcertId ?? 0;
+  const suppressKey =
+    user?.id && active ? `sq_qb_${user.id}_${cid}_${mode}` : '';
+
+  const suppressed = useMemo(() => {
+    if (!suppressKey || typeof sessionStorage === 'undefined') return false;
+    return sessionStorage.getItem(suppressKey) === '1';
+  }, [suppressKey, suppressTick]);
+
+  const show = Boolean(user?.id) && active && !suppressed;
+
+  const suppressNow = useCallback(() => {
+    if (!suppressKey) return;
+    sessionStorage.setItem(suppressKey, '1');
+    setSuppressTick((n) => n + 1);
+  }, [suppressKey]);
+
+  useEffect(() => {
+    if (!active && user?.id) {
+      clearQueueBannerSessionForUser(user.id);
+    }
+  }, [active, user?.id]);
+
+  const handleAnimationEnd = useCallback(
+    (e: React.AnimationEvent<HTMLDivElement>) => {
+      if (e.animationName !== 'slideUp') return;
+      suppressNow();
+    },
+    [suppressNow]
+  );
 
   if (!show) {
     return null;
   }
 
   return (
-    <div className="position-6-notification">
+    <div className="position-6-notification" onAnimationEnd={handleAnimationEnd}>
       <div className="notification-content">
         <span className="notification-icon">🎉</span>
         <div className="notification-text">
@@ -50,9 +84,11 @@ export const NotificationBanner: React.FC = () => {
           type="button"
           className="notification-close"
           aria-label="Dismiss notification"
-          onClick={() => setDismissed(true)}
+          onClick={suppressNow}
         >
-          <MdClose size={22} aria-hidden />
+          <span className="notification-close-x" aria-hidden>
+            ×
+          </span>
         </button>
       </div>
     </div>

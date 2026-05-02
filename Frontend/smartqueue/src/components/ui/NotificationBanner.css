@@ -77,6 +77,14 @@
   transition: background 0.3s ease;
 }
 
+.notification-close-x {
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1;
+  display: block;
+  margin-top: -2px;
+}
+
 .notification-close:hover {
   background: rgba(255, 255, 255, 0.3);
 }

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { MdRefresh } from 'react-icons/md';
 import { useAuth } from '../context/AuthContext';
@@ -30,6 +30,7 @@ const MailboxPage: React.FC = () => {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [concerts, setConcerts] = useState<ConcertLite[]>([]);
 
   const uid =
     user?.id && /^\d+$/.test(user.id) ? Number(user.id) : null;
@@ -77,6 +78,31 @@ const MailboxPage: React.FC = () => {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/concerts`);
+        const data = (await res.json()) as {
+          success?: boolean;
+          concerts?: Array<{ id?: string; name?: string }>;
+        };
+        if (cancelled || !res.ok || !data.success || !Array.isArray(data.concerts)) return;
+        setConcerts(
+          data.concerts.map((c) => ({
+            id: String(c.id ?? ''),
+            name: String(c.name ?? ''),
+          })).filter((c) => c.id && c.name)
+        );
+      } catch {
+        /* queue links optional */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const markAsViewed = useCallback(async (r: Row) => {
     if (String(r.status).toLowerCase() === 'viewed') return;
     try {
@@ -104,6 +130,14 @@ const MailboxPage: React.FC = () => {
   };
 
   const selected = rows.find((r) => r.notificationId === selectedId) ?? null;
+
+  const queuePathForSelected = useMemo(() => {
+    if (!selected?.message) return null;
+    const hint = extractQueueConcertHint(selected.message);
+    if (!hint) return null;
+    const id = findConcertIdForHint(hint, concerts);
+    return id ? `/queue/${id}` : null;
+  }, [selected, concerts]);
 
   if (!user) {
     return (
@@ -204,6 +238,13 @@ const MailboxPage: React.FC = () => {
                   <>
                     <div className="mailbox-detail-time">{formatTime(selected.timestamp)}</div>
                     <p className="mailbox-detail-text">{selected.message}</p>
+                    {queuePathForSelected && (
+                      <div className="mailbox-queue-action">
+                        <Link className="mailbox-queue-btn" to={queuePathForSelected}>
+                          Go to queue
+                        </Link>
+                      </div>
+                    )}
                   </>
                 ) : (
                   <p className="mailbox-detail-placeholder">Select a message to read.</p>
