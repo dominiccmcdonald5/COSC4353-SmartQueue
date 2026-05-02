@@ -27,6 +27,55 @@
   width: 100%;
 }
 
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* Mailbox — top-right cluster, white tile */
+.mailbox-top-icon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.45rem 0.55rem;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  color: #8093f1;
+  flex-shrink: 0;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  overflow: visible;
+}
+
+.mailbox-unread-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 1.125rem;
+  height: 1.125rem;
+  padding: 0 0.28rem;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  pointer-events: none;
+}
+
+.mailbox-top-icon:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(128, 147, 241, 0.25);
+  color: #6366f1;
+}
+
 .home-header h1 {
   color: white;
   font-size: 2rem;
@@ -75,6 +124,80 @@
   color: white;
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(128, 147, 241, 0.3);
+}
+
+.pass-link.pass-status-static {
+  cursor: help;
+}
+
+/* Silver pass: hover / keyboard dropdown (expiry + upgrade) */
+.pass-dropdown {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  z-index: 30;
+}
+
+.pass-dropdown .pass-dropdown-trigger {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  user-select: none;
+}
+
+.pass-dropdown-caret {
+  font-size: 0.65rem;
+  opacity: 0.75;
+  line-height: 1;
+}
+
+.pass-dropdown-panel {
+  display: none;
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  min-width: 12rem;
+  padding: 0.75rem 1rem;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  text-align: left;
+}
+
+.pass-dropdown:hover .pass-dropdown-panel,
+.pass-dropdown:focus-within .pass-dropdown-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.pass-dropdown-expiry {
+  margin: 0 0 0.65rem;
+  font-size: 0.82rem;
+  color: #4b5563;
+  line-height: 1.35;
+  text-align: left;
+  width: 100%;
+  align-self: stretch;
+}
+
+.pass-dropdown-upgrade {
+  display: inline-block;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #8093f1;
+  text-decoration: none;
+  border-radius: 8px;
+  padding: 0.35rem 0;
+  transition: color 0.2s ease;
+}
+
+.pass-dropdown-upgrade:hover {
+  color: #c96de8;
+  text-decoration: underline;
 }
 
 .dashboard-link, .admin-link, .pass-link, .logout-btn {
@@ -721,6 +844,11 @@
     flex-wrap: wrap;
     border-radius: 30px;
     display: flex;
+  }
+
+  .pass-dropdown-panel {
+    text-align: left;
+    align-items: flex-start;
   }
   
   .dashboard-link, .admin-link, .pass-link, .logout-btn {

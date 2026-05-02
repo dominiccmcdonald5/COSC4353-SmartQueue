@@ -257,3 +257,10 @@
     margin-bottom: 1rem;
   }
 }
+
+.upgrade-price-note {
+  font-size: 0.85rem;
+  color: #6b7280;
+  margin: 0.35rem 0 0;
+  line-height: 1.35;
+}

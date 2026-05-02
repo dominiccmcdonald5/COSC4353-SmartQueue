@@ -2,8 +2,7 @@ const { pool } = require('../database');
 
 const PRIORITY = {
   NONE: 0,
-  SILVER: 1,
-  GOLD: 2,
+  PASS: 1,
 };
 
 function sendJson(res, statusCode, payload) {
@@ -37,10 +36,144 @@ function toNumber(value, fallback = 0) {
   return Number.isFinite(num) ? num : fallback;
 }
 
-function priorityToLabel(level) {
-  if (level === PRIORITY.GOLD) return 'gold';
-  if (level === PRIORITY.SILVER) return 'silver';
+function passStatusToLabel(passStatus) {
+  const s = String(passStatus || 'None');
+  if (s === 'Gold') return 'gold';
+  if (s === 'Silver') return 'silver';
   return null;
+}
+
+async function getCompletedPurchaseCountForConcert(concertID) {
+  const [rows] = await pool
+    .promise()
+    .query(
+      `SELECT COUNT(*) AS c
+       FROM queue_history
+       WHERE concert_id = ?
+         AND status = 'completed'`,
+      [concertID]
+    );
+  return toNumber(rows?.[0]?.c);
+}
+
+function sortQueueRowsFifo(rows) {
+  return [...(rows || [])].sort((a, b) => {
+    const aTs = a.queued_at ?? a.joinedAt;
+    const bTs = b.queued_at ?? b.joinedAt;
+    const ta = aTs instanceof Date ? aTs.getTime() : new Date(aTs).getTime();
+    const tb = bTs instanceof Date ? bTs.getTime() : new Date(bTs).getTime();
+    if (ta !== tb) return ta - tb;
+    return toNumber(a.history_id) - toNumber(b.history_id);
+  });
+}
+
+/**
+ * Fair display/serve order for a concert: 2 "pass" slots then 1 "regular" slot, repeating,
+ * matching `serveNext` + `getServeSlotForConcert` (based on completed purchases as a starting phase).
+ */
+function buildFairQueueOrder(queuedRows, completedCount) {
+  const passWaiting = sortQueueRowsFifo((queuedRows || []).filter((r) => toNumber(r.priority_level) > 0));
+  const regularWaiting = sortQueueRowsFifo((queuedRows || []).filter((r) => toNumber(r.priority_level) === 0));
+
+  const passQ = [...passWaiting];
+  const regQ = [...regularWaiting];
+  const out = [];
+
+  const takeNext = (preferredPass) => {
+    const preferredQ = preferredPass ? passQ : regQ;
+    const fallbackQ = preferredPass ? regQ : passQ;
+    if (preferredQ.length > 0) out.push(preferredQ.shift());
+    else if (fallbackQ.length > 0) out.push(fallbackQ.shift());
+  };
+
+  let servedSoFar = 0;
+  while (passQ.length > 0 || regQ.length > 0) {
+    const slotIsRegular = (toNumber(completedCount) + servedSoFar) % 3 === 2;
+    takeNext(!slotIsRegular);
+    servedSoFar += 1;
+  }
+
+  return out;
+}
+
+async function fetchCompletedPurchaseCountsGrouped() {
+  const [rows] = await pool.promise().query(
+    `
+    SELECT concert_id AS concertId, COUNT(*) AS c
+    FROM queue_history
+    WHERE status = 'completed'
+    GROUP BY concert_id
+    `
+  );
+
+  const map = new Map();
+  for (const r of rows || []) {
+    map.set(toNumber(r.concertId), toNumber(r.c));
+  }
+  return map;
+}
+
+async function fetchQueuedRowsForConcertFair(concertID) {
+  const [rows] = await pool.promise().query(
+    `
+    SELECT
+      qh.history_id,
+      qh.user_id AS userId,
+      qh.queued_at AS joinedAt,
+      qh.priority_level,
+      u.pass_status AS passStatus,
+      c.concert_name AS concertName
+    FROM queue_history qh
+    LEFT JOIN users u ON u.user_id = qh.user_id
+    LEFT JOIN concerts c ON c.concert_id = qh.concert_id
+    WHERE qh.concert_id = ?
+      AND qh.status = 'queued'
+      AND qh.in_line_status = 'in_line'
+    `,
+    [concertID]
+  );
+  return Array.isArray(rows) ? rows : [];
+}
+
+function buildFairOrderedActiveQueueResponse(rawRows, completedByConcert) {
+  const byConcert = new Map();
+  for (const r of rawRows || []) {
+    const cid = toNumber(r.concertId);
+    if (!byConcert.has(cid)) byConcert.set(cid, []);
+    byConcert.get(cid).push(r);
+  }
+
+  const flattened = [];
+  for (const [cid, group] of byConcert.entries()) {
+    const completed = completedByConcert.get(cid) || 0;
+    const ordered = buildFairQueueOrder(group, completed);
+    for (const row of ordered) flattened.push(row);
+  }
+
+  return flattened.map((row, index) => ({
+    position: index + 1,
+    queueEntryId: toNumber(row.history_id),
+    label: `User #${toNumber(row.userId)} - ${row.concertName || 'Queue Entry'}`,
+    joinedAt: row.joinedAt,
+    priorityLevel:
+      toNumber(row.priority_level) > 0 ? passStatusToLabel(row.passStatus) : null,
+  }));
+}
+
+async function maybeInsertNotification({ userID, message }) {
+  try {
+    const [existingRows] = await pool
+      .promise()
+      .query(`SELECT 1 AS ok FROM notifications WHERE user_id = ? AND message = ? LIMIT 1`, [userID, message]);
+
+    if (Array.isArray(existingRows) && existingRows.length > 0) return;
+
+    await pool
+      .promise()
+      .query(`INSERT INTO notifications (user_id, message, status) VALUES (?, ?, 'sent')`, [userID, message]);
+  } catch {
+    // Notifications should never break queue operations if the table is missing/misconfigured.
+  }
 }
 
 async function priorityColumnExists() {
@@ -97,8 +230,9 @@ async function fetchEffectiveUserPriority(userID, concertID) {
   const sold = Math.max(0, toNumber(soldRows?.[0]?.sold));
   const soldPct = sold / capacity;
 
-  if (status === 'Gold' && soldPct < 0.5) return PRIORITY.GOLD;
-  if (status === 'Silver' && soldPct < 0.25) return PRIORITY.SILVER;
+  // Gold/Silver share the same queue priority when eligible; cutoff percentages differ.
+  if (status === 'Gold' && soldPct < 0.5) return PRIORITY.PASS;
+  if (status === 'Silver' && soldPct < 0.25) return PRIORITY.PASS;
   return PRIORITY.NONE;
 }
 
@@ -119,61 +253,17 @@ async function getServeSlotForConcert(concertID) {
   return mod === 2 ? 'regular' : 'priority';
 }
 
-function estimateServesUntilUser({ userPriorityLevel, aheadRows, completedCount }) {
-  // Fairness pattern: 2 priority serves then 1 regular serve, repeating.
-  // We estimate how many "serve" actions must happen before this user is served,
-  // assuming all ahead entries remain and are served by the same rules.
-  const isUserPriority = toNumber(userPriorityLevel) > 0;
-  let priorityAhead = 0;
-  let regularAhead = 0;
-  for (const r of aheadRows || []) {
-    if (toNumber(r.priority_level) > 0) priorityAhead += 1;
-    else regularAhead += 1;
-  }
-
-  let servedSoFar = 0;
-  while (priorityAhead > 0 || regularAhead > 0) {
-    const slot = (toNumber(completedCount) + servedSoFar) % 3 === 2 ? 'regular' : 'priority';
-    if (slot === 'priority') {
-      if (priorityAhead > 0) priorityAhead -= 1;
-      else if (regularAhead > 0) regularAhead -= 1;
-      else break;
-    } else {
-      if (regularAhead > 0) regularAhead -= 1;
-      else if (priorityAhead > 0) priorityAhead -= 1;
-      else break;
-    }
-    servedSoFar += 1;
-  }
-
-  // Next serve will be for the user (no one ahead). This returns total serves including the user's serve.
-  // If the user's group is "not preferred", they'd still be served next because the preferred group is empty.
-  // (That's exactly what serveNext() does.)
-  return servedSoFar + 1;
-}
-
-async function getCompletedCountForConcert(concertID) {
-  const [rows] = await pool
-    .promise()
-    .query(
-      `SELECT COUNT(*) AS c
-       FROM queue_history
-       WHERE concert_id = ?
-         AND status = 'completed'`,
-      [concertID]
-    );
-  return toNumber(rows?.[0]?.c);
-}
-
 async function getQueue(req, res) {
   try {
     const [rows] = await pool.promise().query(
       `
       SELECT
-        qh.history_id AS queueEntryId,
+        qh.history_id,
+        qh.concert_id AS concertId,
         qh.queued_at AS joinedAt,
         qh.user_id AS userId,
-        qh.priority_level AS priorityLevel,
+        qh.priority_level,
+        u.pass_status AS passStatus,
         u.first_name AS firstName,
         u.last_name AS lastName,
         c.concert_name AS concertName
@@ -182,20 +272,16 @@ async function getQueue(req, res) {
       LEFT JOIN concerts c ON c.concert_id = qh.concert_id
       WHERE qh.status = 'queued'
         AND qh.in_line_status = 'in_line'
-      ORDER BY COALESCE(qh.priority_level, 0) DESC, qh.queued_at ASC, qh.history_id ASC
       `
     );
 
+    const completedByConcert = await fetchCompletedPurchaseCountsGrouped();
+    const queue = buildFairOrderedActiveQueueResponse(rows, completedByConcert);
+
     sendJson(res, 200, {
       success: true,
-      count: rows.length,
-      queue: rows.map((row, index) => ({
-        position: index + 1,
-        queueEntryId: toNumber(row.queueEntryId),
-        label: `User #${toNumber(row.userId)} - ${row.concertName || 'Queue Entry'}`,
-        joinedAt: row.joinedAt,
-        priorityLevel: priorityToLabel(toNumber(row.priorityLevel)),
-      })),
+      count: queue.length,
+      queue,
     });
   } catch (error) {
     sendJson(res, 500, { success: false, message: error.message || 'Database error' });
@@ -232,13 +318,20 @@ async function serveNext(req, res) {
 
     const [rows] = await pool.promise().query(
       `
-      SELECT history_id AS queueEntryId, user_id AS userId, concert_id AS concertId, queued_at AS joinedAt, priority_level AS priorityLevel
-      FROM queue_history
-      WHERE concert_id = ?
-        AND status = 'queued'
-        AND in_line_status = 'in_line'
+      SELECT
+        qh.history_id AS queueEntryId,
+        qh.user_id AS userId,
+        qh.concert_id AS concertId,
+        qh.queued_at AS joinedAt,
+        qh.priority_level,
+        u.pass_status AS passStatus
+      FROM queue_history qh
+      LEFT JOIN users u ON u.user_id = qh.user_id
+      WHERE qh.concert_id = ?
+        AND qh.status = 'queued'
+        AND qh.in_line_status = 'in_line'
         AND (${preferredWhere})
-      ORDER BY COALESCE(priority_level, 0) DESC, queued_at ASC, history_id ASC
+      ORDER BY COALESCE(qh.priority_level, 0) DESC, qh.queued_at ASC, qh.history_id ASC
       LIMIT 1
       `,
       [concertID]
@@ -251,13 +344,20 @@ async function serveNext(req, res) {
         slot === 'priority' ? `COALESCE(priority_level, 0) = 0` : `COALESCE(priority_level, 0) > 0`;
       const [fallbackRows] = await pool.promise().query(
         `
-        SELECT history_id AS queueEntryId, user_id AS userId, concert_id AS concertId, queued_at AS joinedAt, priority_level AS priorityLevel
-        FROM queue_history
-        WHERE concert_id = ?
-          AND status = 'queued'
-          AND in_line_status = 'in_line'
+        SELECT
+          qh.history_id AS queueEntryId,
+          qh.user_id AS userId,
+          qh.concert_id AS concertId,
+          qh.queued_at AS joinedAt,
+          qh.priority_level,
+          u.pass_status AS passStatus
+        FROM queue_history qh
+        LEFT JOIN users u ON u.user_id = qh.user_id
+        WHERE qh.concert_id = ?
+          AND qh.status = 'queued'
+          AND qh.in_line_status = 'in_line'
           AND (${fallbackWhere})
-        ORDER BY COALESCE(priority_level, 0) DESC, queued_at ASC, history_id ASC
+        ORDER BY COALESCE(qh.priority_level, 0) DESC, qh.queued_at ASC, qh.history_id ASC
         LIMIT 1
         `,
         [concertID]
@@ -293,18 +393,23 @@ async function serveNext(req, res) {
     const [remainingRows] = await pool.promise().query(
       `
       SELECT
-        qh.history_id AS queueEntryId,
+        qh.history_id,
+        qh.concert_id AS concertId,
         qh.queued_at AS joinedAt,
         qh.user_id AS userId,
-        qh.priority_level AS priorityLevel,
+        qh.priority_level,
+        u.pass_status AS passStatus,
         c.concert_name AS concertName
       FROM queue_history qh
+      LEFT JOIN users u ON u.user_id = qh.user_id
       LEFT JOIN concerts c ON c.concert_id = qh.concert_id
       WHERE qh.status = 'queued'
         AND qh.in_line_status = 'in_line'
-      ORDER BY COALESCE(qh.priority_level, 0) DESC, qh.queued_at ASC, qh.history_id ASC
       `
     );
+
+    const completedByConcert = await fetchCompletedPurchaseCountsGrouped();
+    const queue = buildFairOrderedActiveQueueResponse(remainingRows, completedByConcert);
 
     sendJson(res, 200, {
       success: true,
@@ -313,16 +418,11 @@ async function serveNext(req, res) {
         queueEntryId: toNumber(served.queueEntryId),
         label: `User #${toNumber(served.userId)} - Concert #${toNumber(served.concertId)}`,
         joinedAt: served.joinedAt,
-        priorityLevel: priorityToLabel(toNumber(served.priorityLevel)),
+        priorityLevel:
+          toNumber(served.priority_level) > 0 ? passStatusToLabel(served.passStatus) : null,
       },
-      queue: remainingRows.map((row, index) => ({
-        position: index + 1,
-        queueEntryId: toNumber(row.queueEntryId),
-        label: `User #${toNumber(row.userId)} - ${row.concertName || 'Queue Entry'}`,
-        joinedAt: row.joinedAt,
-        priorityLevel: priorityToLabel(toNumber(row.priorityLevel)),
-      })),
-      remainingCount: remainingRows.length,
+      queue,
+      remainingCount: queue.length,
     });
   } catch (error) {
     sendJson(res, 500, { success: false, message: error.message || 'Database error' });
@@ -352,36 +452,32 @@ async function getQueueStatusByConcert(req, res, rawConcertId, userIdQuery) {
       return;
     }
 
-    const [queuedRows] = await pool.promise().query(
-      `
-      SELECT history_id, user_id, queued_at, priority_level
-      FROM queue_history
-      WHERE concert_id = ?
-        AND status = 'queued'
-        AND in_line_status = 'in_line'
-      ORDER BY COALESCE(priority_level, 0) DESC, queued_at ASC, history_id ASC
-      `,
-      [concertID]
-    );
+    const queuedRows = await fetchQueuedRowsForConcertFair(concertID);
+    const completedCount = await getCompletedPurchaseCountForConcert(concertID);
+    const orderedFair = buildFairQueueOrder(queuedRows, completedCount);
 
-    const totalInQueue = queuedRows.length;
+    const totalInQueue = orderedFair.length;
     const userID = Number(userIdQuery);
     const userRowIndex = Number.isInteger(userID)
-      ? queuedRows.findIndex((h) => toNumber(h.user_id) === userID)
+      ? orderedFair.findIndex((h) => toNumber(h.userId) === userID)
       : -1;
 
     const defaultPosition = totalInQueue > 0 ? totalInQueue + 1 : 1;
     const position = userRowIndex >= 0 ? userRowIndex + 1 : defaultPosition;
-    const completedCount = await getCompletedCountForConcert(concertID);
-    const aheadRows = userRowIndex >= 0 ? queuedRows.slice(0, userRowIndex) : queuedRows;
-    const userPriorityLevel = userRowIndex >= 0 ? queuedRows[userRowIndex]?.priority_level : 0;
-    const servesUntil = estimateServesUntilUser({
-      userPriorityLevel,
-      aheadRows,
-      completedCount,
-    });
-    const peopleAheadServes = Math.max(0, servesUntil - 1);
-    const estimatedWaitMinutes = peopleAheadServes * 5;
+    const peopleAhead = userRowIndex >= 0 ? Math.max(0, position - 1) : 0;
+    const estimatedWaitMinutes = peopleAhead * 5;
+
+    const canProceedToSeatSelection = userRowIndex >= 0 && position <= 5;
+    const estimatedWaitTime = canProceedToSeatSelection
+      ? '0 minutes — You can proceed to seat selection now'
+      : userRowIndex >= 0
+        ? `${estimatedWaitMinutes} minutes`
+        : '0 minutes';
+
+    if (canProceedToSeatSelection && Number.isInteger(userID) && userID > 0) {
+      const msg = `You can now purchase a ticket for ${concertRows[0]?.concert_name || 'this concert'}. Grab it while it lasts.`;
+      await maybeInsertNotification({ userID, message: msg });
+    }
 
     const concert = concertRows[0];
     sendJson(res, 200, {
@@ -394,11 +490,14 @@ async function getQueueStatusByConcert(req, res, rawConcertId, userIdQuery) {
         venue: concert.venue,
         totalInQueue,
         position,
-        estimatedWaitTime: `${estimatedWaitMinutes} minutes`,
+        estimatedWaitTime,
         isInQueue: userRowIndex >= 0,
+        canProceedToSeatSelection,
         isNextInLine: userRowIndex >= 0 && position === 6,
         priorityLevel:
-          userRowIndex >= 0 ? priorityToLabel(toNumber(queuedRows[userRowIndex]?.priority_level)) : null,
+          userRowIndex >= 0 && toNumber(orderedFair[userRowIndex]?.priority_level) > 0
+            ? passStatusToLabel(orderedFair[userRowIndex]?.passStatus)
+            : null,
       },
     });
   } catch (error) {
@@ -418,8 +517,8 @@ async function joinQueue(req, res) {
     }
 
     const [[concertRows], [userRows]] = await Promise.all([
-      pool.promise().query('SELECT concert_id FROM concerts WHERE concert_id = ? LIMIT 1', [concertID]),
-      pool.promise().query('SELECT user_id FROM users WHERE user_id = ? LIMIT 1', [userID]),
+      pool.promise().query('SELECT concert_id, concert_name FROM concerts WHERE concert_id = ? LIMIT 1', [concertID]),
+      pool.promise().query('SELECT user_id, pass_status FROM users WHERE user_id = ? LIMIT 1', [userID]),
     ]);
 
     if (concertRows.length === 0 || userRows.length === 0) {
@@ -454,6 +553,7 @@ async function joinQueue(req, res) {
     }
 
     const priorityLevel = await fetchEffectiveUserPriority(userID, concertID);
+    const passStatusLabel = priorityLevel > 0 ? passStatusToLabel(userRows[0]?.pass_status) : null;
 
     const [insertResult] = await pool.promise().query(
       `
@@ -466,28 +566,24 @@ async function joinQueue(req, res) {
 
     const newHistoryID = toNumber(insertResult.insertId);
 
-    const [queueForConcert] = await pool.promise().query(
-      `
-      SELECT history_id, priority_level
-      FROM queue_history
-      WHERE concert_id = ?
-        AND status = 'queued'
-        AND in_line_status = 'in_line'
-      ORDER BY COALESCE(priority_level, 0) DESC, queued_at ASC, history_id ASC
-      `,
-      [concertID]
-    );
+    const queuedRows = await fetchQueuedRowsForConcertFair(concertID);
+    const completedCount = await getCompletedPurchaseCountForConcert(concertID);
+    const orderedFair = buildFairQueueOrder(queuedRows, completedCount);
 
-    const position = queueForConcert.findIndex((h) => toNumber(h.history_id) === newHistoryID) + 1;
-    const completedCount = await getCompletedCountForConcert(concertID);
-    const aheadRows = position > 1 ? queueForConcert.slice(0, position - 1) : [];
-    const servesUntil = estimateServesUntilUser({
-      userPriorityLevel: priorityLevel,
-      aheadRows,
-      completedCount,
-    });
-    const peopleAheadServes = Math.max(0, servesUntil - 1);
-    const estimatedWaitMinutes = peopleAheadServes * 5;
+    const position = orderedFair.findIndex((h) => toNumber(h.history_id) === newHistoryID) + 1;
+    const peopleAhead = Math.max(0, position - 1);
+    const estimatedWaitMinutes = peopleAhead * 5;
+
+    const canProceedToSeatSelection = position > 0 && position <= 5;
+    const estimatedWaitTime = canProceedToSeatSelection
+      ? '0 minutes — You can proceed to seat selection now'
+      : `${estimatedWaitMinutes} minutes`;
+
+    if (canProceedToSeatSelection) {
+      const concertName = concertRows[0]?.concert_name || 'this concert';
+      const msg = `You can now purchase a ticket for ${concertName}. Grab it while it lasts.`;
+      await maybeInsertNotification({ userID, message: msg });
+    }
 
     sendJson(res, 201, {
       success: true,
@@ -497,8 +593,9 @@ async function joinQueue(req, res) {
         concertID,
         userID,
         position,
-        estimatedWaitTime: `${estimatedWaitMinutes} minutes`,
-        priorityLevel: priorityToLabel(priorityLevel),
+        estimatedWaitTime,
+        canProceedToSeatSelection,
+        priorityLevel: passStatusLabel,
       },
     });
   } catch (error) {
@@ -547,24 +644,15 @@ async function leaveQueue(req, res) {
       [entryToLeave.history_id]
     );
 
-    // Check if someone is now in 6th position and send them a notification
-    const [usersSixthPosition] = await pool.promise().query(
-      `
-      SELECT qh.user_id, c.concert_name
-      FROM queue_history qh
-      LEFT JOIN concerts c ON c.concert_id = qh.concert_id
-      WHERE qh.concert_id = ?
-        AND qh.status = 'queued'
-        AND qh.in_line_status = 'in_line'
-      ORDER BY qh.queued_at ASC, qh.history_id ASC
-      LIMIT 6, 1
-      `,
-      [concertID]
-    );
+    // Check if someone is now in 6th position (next in line) and send them a notification
+    const queuedRowsAfterLeave = await fetchQueuedRowsForConcertFair(concertID);
+    const completedCountAfterLeave = await getCompletedPurchaseCountForConcert(concertID);
+    const orderedFairAfterLeave = buildFairQueueOrder(queuedRowsAfterLeave, completedCountAfterLeave);
+    const sixth = orderedFairAfterLeave.length >= 6 ? orderedFairAfterLeave[5] : null;
 
-    if (usersSixthPosition.length > 0) {
-      const sixthPositionUserID = toNumber(usersSixthPosition[0].user_id);
-      const concertName = usersSixthPosition[0].concert_name || 'the concert';
+    if (sixth) {
+      const sixthPositionUserID = toNumber(sixth.userId);
+      const concertName = sixth.concertName || 'the concert';
       const notificationMessage = `You're coming up next! You're currently 6th in line for ${concertName}.`;
 
       await pool.promise().query(
@@ -713,10 +801,10 @@ async function getNotifications(req, res) {
 
     const [notifications] = await pool.promise().query(
       `
-      SELECT notification_id, user_id, message, timestamp, status
+      SELECT *
       FROM notifications
       WHERE user_id = ?
-      ORDER BY timestamp DESC
+      ORDER BY notification_id DESC
       `,
       [userID]
     );
@@ -728,7 +816,7 @@ async function getNotifications(req, res) {
         notificationId: toNumber(notif.notification_id),
         userId: toNumber(notif.user_id),
         message: notif.message,
-        timestamp: notif.timestamp,
+        timestamp: notif.timestamp ?? notif.created_at ?? null,
         status: notif.status,
       })),
     });

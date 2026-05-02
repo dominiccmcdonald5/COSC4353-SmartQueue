@@ -326,7 +326,7 @@ const QueuePage: React.FC = () => {
             </div>
 
             <div className="queue-actions">
-              {queueStatus.position <= 10 && (
+              {queueStatus.position <= 5 && (
                 <button 
                   onClick={handleProceedToSeating}
                   className="proceed-btn"

@@ -9,7 +9,13 @@ import { useNotification } from '../context/NotificationContext';
  */
 export const useQueueNotificationMonitor = () => {
   const { user } = useAuth();
-  const { isNextInLine, setIsNextInLine } = useNotification();
+  const {
+    isNextInLine,
+    setIsNextInLine,
+    canProceedToPurchase,
+    setCanProceedToPurchase,
+    setProceedConcertName,
+  } = useNotification();
 
   useEffect(() => {
     if (!user?.id) {
@@ -47,14 +53,34 @@ export const useQueueNotificationMonitor = () => {
             );
             const payload = (await response.json()) as {
               success: boolean;
-              data?: { isNextInLine: boolean; isInQueue: boolean };
+              data?: {
+                isNextInLine: boolean;
+                isInQueue: boolean;
+                canProceedToSeatSelection?: boolean;
+                concertName?: string;
+              };
             };
+
+            if (payload.success && payload.data?.isInQueue && payload.data?.canProceedToSeatSelection === true) {
+              if (!canProceedToPurchase) {
+                setCanProceedToPurchase(true);
+              }
+              setProceedConcertName(payload.data?.concertName ?? null);
+              if (isNextInLine) {
+                setIsNextInLine(false);
+              }
+              return;
+            }
 
             if (payload.success && payload.data?.isInQueue && payload.data?.isNextInLine === true) {
               // User is next in line in at least one concert
               if (!isNextInLine) {
                 setIsNextInLine(true);
               }
+              if (canProceedToPurchase) {
+                setCanProceedToPurchase(false);
+              }
+              setProceedConcertName(null);
               return; // Found a concert where user is next in line
             }
           } catch {
@@ -67,6 +93,10 @@ export const useQueueNotificationMonitor = () => {
         if (isNextInLine) {
           setIsNextInLine(false);
         }
+        if (canProceedToPurchase) {
+          setCanProceedToPurchase(false);
+        }
+        setProceedConcertName(null);
       } catch (error) {
         console.error('Error checking queue status:', error);
       }
@@ -77,5 +107,5 @@ export const useQueueNotificationMonitor = () => {
     const interval = setInterval(checkQueueStatus, 5000);
 
     return () => clearInterval(interval);
-  }, [user?.id, isNextInLine, setIsNextInLine]);
+  }, [user?.id, isNextInLine, setIsNextInLine, canProceedToPurchase, setCanProceedToPurchase]);
 };

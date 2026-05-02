@@ -58,6 +58,21 @@ async function passExpiresColumnExists() {
   return Array.isArray(rows) && rows.length > 0;
 }
 
+function passExpiresMs(value) {
+  if (value == null) return NaN;
+  if (value instanceof Date) return value.getTime();
+  const t = new Date(value).getTime();
+  return Number.isFinite(t) ? t : NaN;
+}
+
+function hasActivePassRow(row) {
+  const status = normalizePassStatus(row?.pass_status);
+  const expMs = passExpiresMs(row?.pass_expires_at);
+  return (
+    (status === 'Gold' || status === 'Silver') && Number.isFinite(expMs) && expMs > Date.now()
+  );
+}
+
 const updateUserPassStatus = async (req, res) => {
   try {
     const payload = await readJsonBody(req);
@@ -83,8 +98,32 @@ const updateUserPassStatus = async (req, res) => {
       return;
     }
 
+    const [existingRows] = await promisePool.execute(
+      `SELECT pass_status, pass_expires_at
+       FROM users
+       WHERE user_id = ?
+       LIMIT 1`,
+      [userID]
+    );
+    if (!Array.isArray(existingRows) || existingRows.length === 0) {
+      sendJson(res, 404, { success: false, message: 'User not found' });
+      return;
+    }
+
+    const currentRow = existingRows[0];
+    const currentStatus = normalizePassStatus(currentRow.pass_status);
+    const active = hasActivePassRow(currentRow);
+
     let result;
+
     if (passStatus === 'None') {
+      if (active) {
+        sendJson(res, 403, {
+          success: false,
+          message: 'An active pass cannot be removed after purchase.',
+        });
+        return;
+      }
       [result] = await promisePool.execute(
         `UPDATE users
          SET pass_status = 'None',
@@ -93,8 +132,33 @@ const updateUserPassStatus = async (req, res) => {
          LIMIT 1`,
         [userID]
       );
+    } else if (passStatus === 'Silver' && currentStatus === 'Gold' && active) {
+      sendJson(res, 400, {
+        success: false,
+        message: 'Cannot downgrade from Gold to Silver while your pass is active.',
+      });
+      return;
+    } else if (passStatus === 'Gold' && currentStatus === 'Silver' && active) {
+      // Upgrade: same expiry date, only tier changes
+      [result] = await promisePool.execute(
+        `UPDATE users
+         SET pass_status = 'Gold'
+         WHERE user_id = ?
+         LIMIT 1`,
+        [userID]
+      );
+    } else if ((passStatus === 'Gold' || passStatus === 'Silver') && active && passStatus === currentStatus) {
+      // Renew same tier: extend one year from later of now or current expiry
+      [result] = await promisePool.execute(
+        `UPDATE users
+         SET pass_status = ?,
+             pass_expires_at = DATE_ADD(GREATEST(NOW(), COALESCE(pass_expires_at, NOW())), INTERVAL 1 YEAR)
+         WHERE user_id = ?
+         LIMIT 1`,
+        [passStatus, userID]
+      );
     } else {
-      // Extend from later of (now, current expiry)
+      // New purchase or re-buy after expiry
       [result] = await promisePool.execute(
         `UPDATE users
          SET pass_status = ?,
