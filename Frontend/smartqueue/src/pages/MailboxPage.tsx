@@ -15,6 +15,35 @@ interface Row {
   status: string;
 }
 
+interface ConcertLite {
+  id: string;
+  name: string;
+}
+
+/** Matches backend notification copy (purchase + 6th-in-line). */
+function extractQueueConcertHint(message: string): string | null {
+  const purchase = message.match(/purchase a ticket for\s+(.+?)\.\s*Grab\s+it/i);
+  if (purchase) {
+    const raw = purchase[1].trim();
+    if (raw.toLowerCase() === 'this concert') return null;
+    return raw;
+  }
+  const sixth = message.match(/6th in line for\s+(.+?)\./i);
+  if (sixth) return sixth[1].trim();
+  return null;
+}
+
+function findConcertIdForHint(hint: string, concerts: ConcertLite[]): string | null {
+  const h = hint.toLowerCase().trim();
+  for (const c of concerts) {
+    const n = c.name.toLowerCase().trim();
+    if (n === h || n.includes(h) || h.includes(n)) {
+      return c.id;
+    }
+  }
+  return null;
+}
+
 function formatTime(ts: string | null): string {
   if (ts == null || ts === '') return '';
   const ms = Date.parse(ts);
