@@ -35,11 +35,10 @@ const RecommendedConcerts: React.FC<RecommendedConcertsProps> = ({ allConcerts, 
 
   useEffect(() => {
     if (isAuthenticated && user && !isAdmin && allConcerts.length > 0) {
-      // Get recommendations
+      // Get recommendations - FIXED: removed the third parameter
       const recs = RecommendationEngine.getRecommendations(
         user.id,
-        allConcerts,
-        user.passStatus || 'None'
+        allConcerts
       );
       setRecommendations(recs);
       
@@ -78,17 +77,8 @@ const RecommendedConcerts: React.FC<RecommendedConcertsProps> = ({ allConcerts, 
     if (topGenres.length > 0) {
       return `Based on your interest in ${topGenres[0].genre}`;
     }
-    if (user?.passStatus === 'Gold') {
-      return `Gold member picks for you`;
-    }
-    if (user?.passStatus === 'Silver') {
-      return `Silver member picks for you`;
-    }
     return `Recommended just for you`;
   };
-
-  // Check if user has premium status (Gold or Silver)
-  const hasPremiumStatus = user?.passStatus === 'Gold' || user?.passStatus === 'Silver';
 
   // Format date
   const formatDate = (dateString: string) => {
@@ -103,14 +93,9 @@ const RecommendedConcerts: React.FC<RecommendedConcertsProps> = ({ allConcerts, 
     <div className="recommended-section">
       <div className="recommended-header">
         <div>
-          <h2>Recommended Events For You</h2>
+          <h2>🎯 Recommended Events For You</h2>
           <p className="recommended-subtitle">{getPersonalizedGreeting()}</p>
         </div>
-        {hasPremiumStatus && (
-          <div className="premium-badge">
-            ⭐ {user?.passStatus} Member Benefit
-          </div>
-        )}
       </div>
 
       <div className="recommended-grid">
