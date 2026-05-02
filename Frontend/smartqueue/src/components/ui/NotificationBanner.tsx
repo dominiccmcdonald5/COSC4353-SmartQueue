@@ -1,16 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNotification } from '../../context/NotificationContext';
 import './NotificationBanner.css';
 
-function clearQueueBannerSessionForUser(userId: string) {
-  const prefix = `sq_qb_${userId}_`;
-  for (let i = sessionStorage.length - 1; i >= 0; i--) {
-    const k = sessionStorage.key(i);
-    if (k?.startsWith(prefix)) {
-      sessionStorage.removeItem(k);
-    }
-  }
+/** Separate keys so “6th in line” and “top 5” each show once per queue visit; cleared when concert queue context clears. */
+function bannerSessionKey(userId: string, concertId: number, mode: 'next' | 'proceed') {
+  return `sq_banner_${userId}_${concertId}_${mode}`;
 }
 
 export const NotificationBanner: React.FC = () => {
@@ -23,12 +18,14 @@ export const NotificationBanner: React.FC = () => {
   } = useNotification();
 
   const [suppressTick, setSuppressTick] = useState(0);
+  const prevCidRef = useRef<number | null>(null);
 
   const active = isNextInLine || canProceedToPurchase;
-  const mode = canProceedToPurchase ? 'proceed' : 'next';
+  const mode: 'next' | 'proceed' = canProceedToPurchase ? 'proceed' : 'next';
   const cid = queueBannerConcertId ?? 0;
+
   const suppressKey =
-    user?.id && active ? `sq_qb_${user.id}_${cid}_${mode}` : '';
+    user?.id && active && cid > 0 ? bannerSessionKey(user.id, cid, mode) : '';
 
   const suppressed = useMemo(() => {
     if (!suppressKey || typeof sessionStorage === 'undefined') return false;
@@ -43,11 +40,17 @@ export const NotificationBanner: React.FC = () => {
     setSuppressTick((n) => n + 1);
   }, [suppressKey]);
 
+  /** Leaving queue clears concert id — reset both banner suppressions for that concert so the next join works. */
   useEffect(() => {
-    if (!active && user?.id) {
-      clearQueueBannerSessionForUser(user.id);
+    const uid = user?.id;
+    if (!uid) return;
+    const prev = prevCidRef.current;
+    if (prev != null && prev > 0 && queueBannerConcertId === null) {
+      sessionStorage.removeItem(bannerSessionKey(uid, prev, 'next'));
+      sessionStorage.removeItem(bannerSessionKey(uid, prev, 'proceed'));
     }
-  }, [active, user?.id]);
+    prevCidRef.current = queueBannerConcertId;
+  }, [queueBannerConcertId, user?.id]);
 
   const handleAnimationEnd = useCallback(
     (e: React.AnimationEvent<HTMLDivElement>) => {

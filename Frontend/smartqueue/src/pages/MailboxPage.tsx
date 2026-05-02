@@ -30,6 +30,12 @@ function extractQueueConcertHint(message: string): string | null {
   }
   const sixth = message.match(/6th in line for\s+(.+?)\./i);
   if (sixth) return sixth[1].trim();
+  const left = message.match(/left the queue for\s+(.+?)\./i);
+  if (left) {
+    const raw = left[1].trim();
+    if (raw.toLowerCase() === 'this concert') return null;
+    return raw;
+  }
   return null;
 }
 
