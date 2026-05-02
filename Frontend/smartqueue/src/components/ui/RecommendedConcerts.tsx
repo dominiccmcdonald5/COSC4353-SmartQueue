@@ -34,7 +34,7 @@ const RecommendedConcerts: React.FC<RecommendedConcertsProps> = ({ allConcerts, 
   const [topGenres, setTopGenres] = useState<{ genre: string; count: number }[]>([]);
   const [startIndex, setStartIndex] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
-  const autoPlayIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const autoPlayIntervalRef = useRef<number | null>(null); // Fixed: changed from NodeJS.Timeout to number
   
   // Number of cards to show based on screen size
   const getCardsToShow = () => {
@@ -80,7 +80,7 @@ const RecommendedConcerts: React.FC<RecommendedConcertsProps> = ({ allConcerts, 
     const maxStartIndex = Math.max(0, recommendations.length - cardsToShow);
     
     if (isAutoPlaying && recommendations.length > cardsToShow && maxStartIndex > 0) {
-      autoPlayIntervalRef.current = setInterval(() => {
+      autoPlayIntervalRef.current = window.setInterval(() => { // Fixed: use window.setInterval
         setStartIndex((prevIndex) => {
           const maxIndex = Math.max(0, recommendations.length - cardsToShow);
           return prevIndex + 1 > maxIndex ? 0 : prevIndex + 1;
@@ -90,7 +90,7 @@ const RecommendedConcerts: React.FC<RecommendedConcertsProps> = ({ allConcerts, 
 
     return () => {
       if (autoPlayIntervalRef.current) {
-        clearInterval(autoPlayIntervalRef.current);
+        window.clearInterval(autoPlayIntervalRef.current); // Fixed: use window.clearInterval
       }
     };
   }, [isAutoPlaying, recommendations.length, cardsToShow]);
