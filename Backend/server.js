@@ -30,8 +30,8 @@ const map_route = {
   ],
   PUT: [
     //'/api/services/', 
-    '/api/admin/concerts/', '/api/admin/users/'],
-  DELETE: ['/api/admin/concerts/', '/api/admin/users/'],
+    '/api/admin/concerts/', '/api/admin/users/', '/api/admin/queue/reorder'],
+  DELETE: ['/api/admin/concerts/', '/api/admin/users/', '/api/admin/queue/'],
 };
 
 const server = http.createServer((req, res) => {
@@ -83,6 +83,24 @@ server.on('error', (err) => {
   }
   throw err;
 });
+
+// Gracefully close the DB pool when the process exits so connections are released
+// on the MySQL server immediately rather than waiting for wait_timeout to expire.
+const { pool } = require('./database');
+function gracefulShutdown(signal) {
+  console.log(`${signal} received – closing DB pool and HTTP server...`);
+  server.close(() => {
+    pool.end(err => {
+      if (err) console.error('Error closing DB pool:', err.message);
+      else console.log('DB pool closed cleanly.');
+      process.exit(0);
+    });
+  });
+  // Force-exit after 8 s if something hangs
+  setTimeout(() => { process.exit(1); }, 8000).unref();
+}
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

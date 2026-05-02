@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import '../styling/LoginSignup.css';
 
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'https://cosc-4353-smart-queue-6ixj.vercel.app').replace(/\/$/, '');
+
 const SignUpPage: React.FC = () => {
   const [formData, setFormData] = useState({
     firstName: '',
@@ -39,7 +41,7 @@ const SignUpPage: React.FC = () => {
     try {
       setIsSubmitting(true);
 
-      const response = await fetch('https://cosc-4353-smart-queue-6ixj.vercel.app/api/signup', {
+      const response = await fetch(`${API_BASE}/api/signup`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

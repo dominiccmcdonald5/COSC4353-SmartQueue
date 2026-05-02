@@ -60,12 +60,27 @@ const PaymentPage: React.FC = () => {
     const { name, value } = e.target;
     let filteredValue = value;
 
-    if (name === 'cardholderName') {
+    if (name === 'cardNumber') {
+      // Digits only, formatted as groups of 4 separated by spaces, max 16 digits
+      const digits = value.replace(/\D/g, '').slice(0, 16);
+      filteredValue = digits.replace(/(.{4})/g, '$1 ').trim();
+    } else if (name === 'expiryDate') {
+      // Digits only, auto-insert slash after MM, format MM/YY
+      const digits = value.replace(/\D/g, '').slice(0, 4);
+      filteredValue = digits.length > 2 ? `${digits.slice(0, 2)}/${digits.slice(2)}` : digits;
+    } else if (name === 'cvv') {
+      // Digits only, max 4
+      filteredValue = value.replace(/\D/g, '').slice(0, 4);
+    } else if (name === 'cardholderName') {
       filteredValue = value.replace(/[^a-zA-Z\s]/g, '');
-    } else if (name === 'billingAddress.city' || name === 'billingAddress.state') {
+    } else if (name === 'billingAddress.city') {
       filteredValue = value.replace(/[^a-zA-Z\s]/g, '');
+    } else if (name === 'billingAddress.state') {
+      // Letters only, max 2 characters (standard US state abbreviation)
+      filteredValue = value.replace(/[^a-zA-Z]/g, '').slice(0, 2).toUpperCase();
     } else if (name === 'billingAddress.zipCode') {
-      filteredValue = value.replace(/\D/g, '');
+      // Digits only, max 5 (standard US ZIP)
+      filteredValue = value.replace(/\D/g, '').slice(0, 5);
     }
 
     if (name.includes('.')) {
@@ -105,6 +120,33 @@ const PaymentPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validate card fields before processing
+    const newErrors: typeof errors = {};
+    const rawDigits = paymentForm.cardNumber.replace(/\s/g, '');
+    if (rawDigits.length !== 16) {
+      newErrors.cardNumber = 'Card number must be exactly 16 digits';
+    }
+    const expParts = paymentForm.expiryDate.split('/');
+    const expMonth = Number(expParts[0]);
+    const expYear = Number(`20${expParts[1]}`);
+    if (expParts.length !== 2 || expParts[0].length !== 2 || expParts[1].length !== 2 ||
+        expMonth < 1 || expMonth > 12) {
+      newErrors.expiryDate = 'Enter a valid expiry date (MM/YY)';
+    } else {
+      const now = new Date();
+      const expDate = new Date(expYear, expMonth - 1 + 1, 1); // first day of month after expiry
+      if (expDate <= now) {
+        newErrors.expiryDate = 'Card has expired';
+      }
+    }
+    if (paymentForm.cvv.length < 3) {
+      newErrors.cvv = 'CVV must be 3 or 4 digits';
+    }
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
 
     setProcessing(true);
 
@@ -230,6 +272,7 @@ const PaymentPage: React.FC = () => {
                   onChange={handleInputChange}
                   placeholder="1234 5678 9012 3456"
                   maxLength={19}
+                  inputMode="numeric"
                   required
                 />
                 {errors.cardNumber && <span className="error">{errors.cardNumber}</span>}
@@ -246,6 +289,7 @@ const PaymentPage: React.FC = () => {
                     onChange={handleInputChange}
                     placeholder="MM/YY"
                     maxLength={5}
+                    inputMode="numeric"
                     required
                   />
                   {errors.expiryDate && <span className="error">{errors.expiryDate}</span>}
@@ -261,6 +305,7 @@ const PaymentPage: React.FC = () => {
                     onChange={handleInputChange}
                     placeholder="123"
                     maxLength={4}
+                    inputMode="numeric"
                     required
                   />
                   {errors.cvv && <span className="error">{errors.cvv}</span>}
@@ -325,9 +370,9 @@ const PaymentPage: React.FC = () => {
                     value={paymentForm.billingAddress.state}
                     onChange={handleInputChange}
                     placeholder="NY"
-                    pattern="[A-Za-z\s]+"
-                    title="Letters and spaces only"
-                    maxLength={50}
+                    pattern="[A-Za-z]{2}"
+                    title="2-letter state abbreviation (e.g. TX)"
+                    maxLength={2}
                     required
                   />
                   {errors.billingAddress?.state && <span className="error">{errors.billingAddress.state}</span>}
@@ -343,9 +388,9 @@ const PaymentPage: React.FC = () => {
                     value={paymentForm.billingAddress.zipCode}
                     onChange={handleInputChange}
                     placeholder="10001"
-                    pattern="[0-9]+"
-                    title="Numbers only"
-                    maxLength={10}
+                    pattern="[0-9]{5}"
+                    title="5-digit ZIP code"
+                    maxLength={5}
                     required
                   />
                   {errors.billingAddress?.zipCode && <span className="error">{errors.billingAddress.zipCode}</span>}

@@ -112,6 +112,15 @@ function routes(req, res) {
     return adminQueue.serveNext(req, res);
   }
 
+  if (pathname === '/api/admin/queue/reorder' && method === 'PUT') {
+    return adminQueue.reorderQueueEntry(req, res);
+  }
+
+  if (method === 'DELETE' && /^\/api\/admin\/queue\/\d+$/.test(pathname)) {
+    const historyId = pathname.split('/').pop();
+    return adminQueue.removeFromQueue(req, res, historyId);
+  }
+
   /** Optional: POST { label?, priorityLevel? } — for manual / Postman tests */
   if (pathname === '/api/queue/join' && method === 'POST') {
     return adminQueue.joinQueue(req, res);

@@ -1,5 +1,5 @@
 const bcrypt = require('bcrypt');
-const { promisePool } = require('../database');
+const { promisePool, queryWithRetry } = require('../database');
 const { adminEmailTaken } = require('../db/adminsAuth');
 
 const PASS_TYPES = new Set(['none', 'silver', 'gold']);
@@ -124,7 +124,7 @@ async function buildUserSelectSql() {
 async function getAllUsers(req, res) {
   try {
     const sql = await buildUserSelectSql();
-    const [rows] = await promisePool.query(sql);
+    const [rows] = await queryWithRetry(sql);
     const users = (rows || []).map(rowToAdminShape);
     sendJson(res, 200, {
       success: true,
