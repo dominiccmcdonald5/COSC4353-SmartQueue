@@ -801,10 +801,10 @@ async function getNotifications(req, res) {
 
     const [notifications] = await pool.promise().query(
       `
-      SELECT notification_id, user_id, message, timestamp, status
+      SELECT *
       FROM notifications
       WHERE user_id = ?
-      ORDER BY timestamp DESC
+      ORDER BY notification_id DESC
       `,
       [userID]
     );
@@ -816,7 +816,7 @@ async function getNotifications(req, res) {
         notificationId: toNumber(notif.notification_id),
         userId: toNumber(notif.user_id),
         message: notif.message,
-        timestamp: notif.timestamp,
+        timestamp: notif.timestamp ?? notif.created_at ?? null,
         status: notif.status,
       })),
     });

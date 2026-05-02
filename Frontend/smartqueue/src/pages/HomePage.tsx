@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { formatLocalDateFromApi, formatPassExpiresForDisplay, parseLocalDateFromApi } from '../utils/apiDate';
+import { MdOutlineMail } from 'react-icons/md';
 import '../styling/HomePage.css';
 
 const API_BASE = 'https://cosc-4353-smart-queue-6ixj.vercel.app';
@@ -47,6 +48,50 @@ const HomePage: React.FC = () => {
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'date' | 'name' | 'price'>('date');
   const [genres, setGenres] = useState<string[]>([]);
+  const [mailboxUnreadCount, setMailboxUnreadCount] = useState(0);
+
+  const refreshMailboxUnread = useCallback(async () => {
+    if (!user?.id || !/^\d+$/.test(user.id)) {
+      setMailboxUnreadCount(0);
+      return;
+    }
+    try {
+      const res = await fetch(`${API_BASE}/api/notifications`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: Number(user.id) }),
+      });
+      const data = (await res.json()) as {
+        success?: boolean;
+        notifications?: Array<{ status?: string }>;
+      };
+      if (!res.ok || !data.success || !Array.isArray(data.notifications)) {
+        return;
+      }
+      const unread = data.notifications.filter(
+        (n) => String(n.status).toLowerCase() !== 'viewed'
+      ).length;
+      setMailboxUnreadCount(unread);
+    } catch {
+      /* silent — badge is optional */
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    void refreshMailboxUnread();
+    const intervalId = window.setInterval(() => void refreshMailboxUnread(), 60000);
+    const onFocus = () => void refreshMailboxUnread();
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void refreshMailboxUnread();
+    };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [refreshMailboxUnread]);
 
   // Extract unique genres from concerts
   useEffect(() => {
@@ -250,10 +295,12 @@ const HomePage: React.FC = () => {
 
   return (
     <div className="home-page">
-      <header className="home-header">
-        <div className="header-content">
-          <h1>ticketQ</h1>
-          <div className="user-info">
+        <header className="home-header">
+          <div className="header-content">
+            <div className="header-brand">
+              <h1>ticketQ</h1>
+            </div>
+            <div className="user-info">
             {/* Show User Dashboard button for regular users */}
             {isUser && (
               <Link to="/dashboard" className="dashboard-link">
@@ -307,6 +354,26 @@ const HomePage: React.FC = () => {
               </span>
             )}
             
+            {user && /^\d+$/.test(user.id) && (
+              <Link
+                to="/mailbox"
+                className="mailbox-top-icon"
+                title="Mailbox"
+                aria-label={
+                  mailboxUnreadCount > 0
+                    ? `Mailbox, ${mailboxUnreadCount} unread`
+                    : 'Open mailbox'
+                }
+              >
+                <MdOutlineMail size={22} />
+                {mailboxUnreadCount > 0 && (
+                  <span className="mailbox-unread-badge">
+                    {mailboxUnreadCount > 99 ? '99+' : mailboxUnreadCount}
+                  </span>
+                )}
+              </Link>
+            )}
+
             <button onClick={handleLogout} className="logout-btn">
               🚪 Logout
             </button>
