@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { formatLocalDateFromApi, parseLocalDateFromApi } from '../utils/apiDate';
+import RecommendedConcerts from '../components/ui/RecommendedConcerts';
+import RecommendationEngine from '../utils/recommendationEngine';
 import '../styling/HomePage.css';
 
 const API_BASE = 'https://cosc-4353-smart-queue-6ixj.vercel.app';
@@ -126,13 +128,27 @@ const HomePage: React.FC = () => {
 
   const filteredConcerts = getFilteredAndSortedConcerts();
 
+  // Updated handleJoinQueue to track interactions
   const handleJoinQueue = (concertId: string) => {
     if (!user) {
       navigate('/login');
       return;
     }
 
+    // Track this interaction for recommendations
+    const concert = concerts.find(c => c.id === concertId);
+    if (concert && user) {
+      RecommendationEngine.trackInteraction(user.id, concert, 'queue_join');
+    }
+
     navigate(`/queue/${concertId}`);
+  };
+
+  // Track view interactions for recommendations
+  const handleTrackView = (concert: Concert, action: string) => {
+    if (user && action === 'view') {
+      RecommendationEngine.trackInteraction(user.id, concert, 'view');
+    }
   };
 
   const handleLogout = () => {
@@ -308,6 +324,14 @@ const HomePage: React.FC = () => {
             </div>
           )}
         </section>
+
+        {/* Recommended Concerts Section - Only for logged-in users who are not admins */}
+        {user && !isAdmin && concerts.length > 0 && (
+          <RecommendedConcerts 
+            allConcerts={concerts} 
+            onTrackInteraction={handleTrackView}
+          />
+        )}
 
         {error && (
           <div className="error-message" style={{
