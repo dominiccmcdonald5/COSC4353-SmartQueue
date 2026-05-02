@@ -469,7 +469,7 @@ async function getQueueStatusByConcert(req, res, rawConcertId, userIdQuery) {
 
     const canProceedToSeatSelection = userRowIndex >= 0 && position <= 5;
     const estimatedWaitTime = canProceedToSeatSelection
-      ? '0 minutes — You can proceed to seat selection now'
+      ? '0 minutes'
       : userRowIndex >= 0
         ? `${estimatedWaitMinutes} minutes`
         : '0 minutes';
@@ -576,7 +576,7 @@ async function joinQueue(req, res) {
 
     const canProceedToSeatSelection = position > 0 && position <= 5;
     const estimatedWaitTime = canProceedToSeatSelection
-      ? '0 minutes — You can proceed to seat selection now'
+      ? '0 minutes'
       : `${estimatedWaitMinutes} minutes`;
 
     if (canProceedToSeatSelection) {

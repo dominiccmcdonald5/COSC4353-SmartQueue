@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
 import { NotificationBanner } from './components/ui/NotificationBanner';
@@ -26,19 +26,13 @@ function SeatingMapKeyed() {
   return <SeatingMapPage key={concertId} />;
 }
 
-/** Wrapper to remount NotificationBanner on each page navigation */
-function NotificationBannerWithLocationKey() {
-  const location = useLocation();
-  return <NotificationBanner key={location.pathname} />;
-}
-
 /** Inner app wrapper that uses the queue notification monitor hook */
 function AppContent() {
   useQueueNotificationMonitor();
 
   return (
     <Router>
-      <NotificationBannerWithLocationKey />
+      <NotificationBanner />
       <div className="App">
         <Routes>
             {/* Public routes */}

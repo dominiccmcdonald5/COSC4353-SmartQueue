@@ -18,6 +18,9 @@ interface NotificationContextType {
   setCanProceedToPurchase: (canProceed: boolean) => void;
   proceedConcertName: string | null;
   setProceedConcertName: (name: string | null) => void;
+  /** Concert currently driving the queue banner (for session suppress keys). */
+  queueBannerConcertId: number | null;
+  setQueueBannerConcertId: (id: number | null) => void;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
@@ -27,6 +30,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [isNextInLine, setIsNextInLine] = useState(false);
   const [canProceedToPurchase, setCanProceedToPurchase] = useState(false);
   const [proceedConcertName, setProceedConcertName] = useState<string | null>(null);
+  const [queueBannerConcertId, setQueueBannerConcertId] = useState<number | null>(null);
 
   const addNotification = useCallback((notification: Omit<Notification, 'id'>) => {
     const id = Date.now().toString();
@@ -55,6 +59,8 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         setCanProceedToPurchase,
         proceedConcertName,
         setProceedConcertName,
+        queueBannerConcertId,
+        setQueueBannerConcertId,
       }}
     >
       {children}
