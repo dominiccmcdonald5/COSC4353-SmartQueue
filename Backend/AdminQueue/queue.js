@@ -635,6 +635,12 @@ async function leaveQueue(req, res) {
 
     const entryToLeave = activeRows[0];
 
+    const [[concertNameRow]] = await pool.promise().query(
+      `SELECT concert_name FROM concerts WHERE concert_id = ? LIMIT 1`,
+      [concertID]
+    );
+    const concertNameLeave = concertNameRow?.concert_name || 'this concert';
+
     await pool.promise().query(
       `
       UPDATE queue_history
@@ -643,6 +649,11 @@ async function leaveQueue(req, res) {
       `,
       [entryToLeave.history_id]
     );
+
+    await maybeInsertNotification({
+      userID,
+      message: `You have left the queue for ${concertNameLeave}.`,
+    });
 
     // Check if someone is now in 6th position (next in line) and send them a notification
     const queuedRowsAfterLeave = await fetchQueuedRowsForConcertFair(concertID);

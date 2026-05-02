@@ -5,8 +5,8 @@ import { useNotification } from '../context/NotificationContext';
 const API_BASE = 'https://cosc-4353-smart-queue-6ixj.vercel.app';
 
 /**
- * Polls queue status. Updates banner flags + queueBannerConcertId for UI suppression keys.
- * Effect depends only on user id so polling is stable (no reset on every flag change).
+ * Polls queue status for top-5 (banner + proceed) and 6th / next-in-line (banner).
+ * Top 5 is checked first per concert; effect depends only on user id for a stable interval.
  */
 export const useQueueNotificationMonitor = () => {
   const { user } = useAuth();
@@ -90,7 +90,7 @@ export const useQueueNotificationMonitor = () => {
     };
 
     checkQueueStatus();
-    const interval = setInterval(checkQueueStatus, 5000);
+    const interval = setInterval(checkQueueStatus, 8000);
 
     return () => clearInterval(interval);
   }, [user?.id, setIsNextInLine, setCanProceedToPurchase, setProceedConcertName, setQueueBannerConcertId]);
