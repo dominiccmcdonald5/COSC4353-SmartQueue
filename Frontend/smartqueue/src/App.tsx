@@ -16,6 +16,7 @@ import SeatingMapPage from './pages/SeatingMapPage';
 import PaymentPage from './pages/PaymentPage';
 import PurchasePassPage from './pages/PurchasePassPage';
 import PassPurchasePage from './pages/PassPurchasePage';
+import MailboxPage from './pages/MailboxPage';
 
 import './App.css';
 
@@ -90,6 +91,12 @@ function AppContent() {
             <Route path="/purchase-pass/checkout" element={
               <ProtectedRoute>
                 <PassPurchasePage />
+              </ProtectedRoute>
+            } />
+
+            <Route path="/mailbox" element={
+              <ProtectedRoute>
+                <MailboxPage />
               </ProtectedRoute>
             } />
             

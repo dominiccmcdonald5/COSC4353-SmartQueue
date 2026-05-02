@@ -1,11 +1,29 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { MdClose } from 'react-icons/md';
 import { useNotification } from '../../context/NotificationContext';
 import './NotificationBanner.css';
 
 export const NotificationBanner: React.FC = () => {
   const { isNextInLine, canProceedToPurchase, proceedConcertName } = useNotification();
+  const [dismissed, setDismissed] = useState(false);
+  const prevNl = useRef<boolean | null>(null);
+  const prevCp = useRef<boolean | null>(null);
 
-  if (!isNextInLine && !canProceedToPurchase) {
+  useEffect(() => {
+    if (
+      prevNl.current !== null &&
+      (prevNl.current !== isNextInLine || prevCp.current !== canProceedToPurchase)
+    ) {
+      setDismissed(false);
+    }
+    prevNl.current = isNextInLine;
+    prevCp.current = canProceedToPurchase;
+  }, [isNextInLine, canProceedToPurchase]);
+
+  const active = isNextInLine || canProceedToPurchase;
+  const show = active && !dismissed;
+
+  if (!show) {
     return null;
   }
 
@@ -28,6 +46,14 @@ export const NotificationBanner: React.FC = () => {
             </>
           )}
         </div>
+        <button
+          type="button"
+          className="notification-close"
+          aria-label="Dismiss notification"
+          onClick={() => setDismissed(true)}
+        >
+          <MdClose size={22} aria-hidden />
+        </button>
       </div>
     </div>
   );
