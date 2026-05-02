@@ -39,7 +39,7 @@ interface UserStats {
 type PassStatus = 'Gold' | 'Silver' | 'None';
 
 const UserDashboard: React.FC = () => {
-  const { user, logout, updatePassStatus } = useAuth();
+  const { user, logout } = useAuth();
   const [queueHistory, setQueueHistory] = useState<QueueHistory[]>([]);
   const [userStats, setUserStats] = useState<UserStats | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);

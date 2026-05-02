@@ -618,7 +618,7 @@ async function getQueueStatusByConcert(req, res, rawConcertId, userIdQuery) {
 
     const canProceedToSeatSelection = userRowIndex >= 0 && position <= 5;
     const estimatedWaitTime = canProceedToSeatSelection
-      ? `0 minutes remaining — You can proceed now (waited ${elapsedWaitMinutes} min)`
+      ? `0 minutes remaining - You can proceed now (waited ${elapsedWaitMinutes} min)`
       : userRowIndex >= 0
         ? `${estimatedRemainingWaitMinutes} minutes remaining (waited ${elapsedWaitMinutes} min)`
         : '0 minutes';
@@ -743,7 +743,7 @@ async function joinQueue(req, res) {
 
     const canProceedToSeatSelection = position > 0 && position <= 5;
     const estimatedWaitTime = canProceedToSeatSelection
-      ? '0 minutes — You can proceed to seat selection now'
+      ? '0 minutes'
       : `${estimatedWaitMinutes} minutes`;
 
     if (canProceedToSeatSelection) {
@@ -804,6 +804,12 @@ async function leaveQueue(req, res) {
 
     const entryToLeave = activeRows[0];
 
+    const [[concertNameRow]] = await pool.promise().query(
+      `SELECT concert_name FROM concerts WHERE concert_id = ? LIMIT 1`,
+      [concertID]
+    );
+    const concertNameLeave = concertNameRow?.concert_name || 'this concert';
+
     await pool.promise().query(
       `
       UPDATE queue_history
@@ -812,6 +818,11 @@ async function leaveQueue(req, res) {
       `,
       [entryToLeave.history_id]
     );
+
+    await maybeInsertNotification({
+      userID,
+      message: `You have left the queue for ${concertNameLeave}.`,
+    });
 
     // Check if someone is now in 6th position (next in line) and send them a notification
     const queuedRowsAfterLeave = await fetchQueuedRowsForConcertFair(concertID);
@@ -972,10 +983,10 @@ async function getNotifications(req, res) {
 
     const [notifications] = await pool.promise().query(
       `
-      SELECT notification_id, user_id, message, timestamp, status
+      SELECT *
       FROM notifications
       WHERE user_id = ?
-      ORDER BY timestamp DESC
+      ORDER BY notification_id DESC
       `,
       [userID]
     );
@@ -987,7 +998,7 @@ async function getNotifications(req, res) {
         notificationId: toNumber(notif.notification_id),
         userId: toNumber(notif.user_id),
         message: notif.message,
-        timestamp: notif.timestamp,
+        timestamp: notif.timestamp ?? notif.created_at ?? null,
         status: notif.status,
       })),
     });

@@ -26,6 +26,7 @@ const map_route = {
     '/api/payment/complete',
     '/api/admin/concerts',
     '/api/admin/users',
+    '/api/notifications',
   ],
   PUT: [
     //'/api/services/', 

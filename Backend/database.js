@@ -48,7 +48,7 @@ async function queryWithRetry(sql, params, { maxRetries = 3, delayMs = 600 } = {
       return await promisePool.query(sql, params);
     } catch (err) {
       if (err.errno === 1040 && attempt < maxRetries) {
-        console.warn(`DB: Too many connections – retry ${attempt}/${maxRetries - 1} in ${delayMs}ms`);
+        console.warn(`DB: Too many connections - retry ${attempt}/${maxRetries - 1} in ${delayMs}ms`);
         await new Promise(r => setTimeout(r, delayMs * attempt));
       } else {
         throw err;

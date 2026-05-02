@@ -1,11 +1,35 @@
-const fs = require('fs');
-const path = require('path');
 const url = require('url');
+const { promisePool } = require('../database');
 
-function readMockDataStore() {
-    const mockDataPath = path.join(__dirname, '../mockDataStore.json');
-    const mockDataRaw = fs.readFileSync(mockDataPath, 'utf8');
-    return JSON.parse(mockDataRaw);
+async function fetchReportData() {
+    const [users] = await promisePool.query(
+        `SELECT user_id AS userID, first_name AS firstName, last_name AS lastName,
+                email, pass_status AS passStatus, created_at AS createdAt
+         FROM users
+         WHERE LOWER(TRIM(COALESCE(role, 'user'))) = 'user'
+         ORDER BY user_id ASC`
+    );
+
+    const [concerts] = await promisePool.query(
+        `SELECT concert_id AS concertID, concert_name AS concertName, artist_name AS artistName,
+                genre, event_date AS date, venue
+         FROM concerts
+         ORDER BY concert_id ASC`
+    );
+
+    const [history] = await promisePool.query(
+        `SELECT history_id AS historyID, user_id AS userID, concert_id AS concertID,
+                ticket_count AS ticketCount, total_cost AS totalCost, wait_time AS waitTime,
+                status, in_line_status AS inLineStatus, queued_at AS queuedAt
+         FROM queue_history
+         ORDER BY queued_at DESC, history_id DESC`
+    );
+
+    return {
+        users: Array.isArray(users) ? users : [],
+        concerts: Array.isArray(concerts) ? concerts : [],
+        history: Array.isArray(history) ? history : [],
+    };
 }
 
 function sendJson(res, statusCode, payload) {
@@ -32,12 +56,8 @@ function toCsv(rows, headers) {
     return [headerLine, ...bodyLines].join('\n');
 }
 
-function getReportModel() {
-    const mockData = readMockDataStore();
-
-    const users = Array.isArray(mockData.USER) ? mockData.USER : [];
-    const concerts = Array.isArray(mockData.CONCERT) ? mockData.CONCERT : [];
-    const history = Array.isArray(mockData.HISTORY) ? mockData.HISTORY : [];
+async function getReportModel() {
+    const { users, concerts, history } = await fetchReportData();
 
     const userMap = new Map(users.map((u) => [Number(u.userID), u]));
     const concertMap = new Map(concerts.map((concert) => [Number(concert.concertID), concert]));
@@ -327,7 +347,7 @@ function getReportModel() {
  */
 const getDataReportStats = async (req, res) => {
     try {
-        const model = getReportModel();
+        const model = await getReportModel();
         sendJson(res, 200, {
             success: true,
             data: model.summaryStats,
@@ -350,7 +370,7 @@ const getDataReportStats = async (req, res) => {
  */
 const getDataReportDetails = async (req, res) => {
     try {
-        const model = getReportModel();
+        const model = await getReportModel();
         sendJson(res, 200, {
             success: true,
             data: model.detailStats,
@@ -372,7 +392,7 @@ const exportDataReportCsv = async (req, res) => {
     try {
         const parsed = url.parse(req.url || '', true);
         const reportType = String(parsed.query?.report || '').toLowerCase();
-        const model = getReportModel();
+        const model = await getReportModel();
 
         let filename = 'data-report.csv';
         let csv = '';
