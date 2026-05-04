@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { formatLocalDateFromApi, formatPassExpiresForDisplay } from '../utils/apiDate';
+import { formatLocalDateFromApi, formatPassExpiresForDisplay, parseLocalDateFromApi } from '../utils/apiDate';
 import { GiPoliceBadge } from 'react-icons/gi';
 import { FaDollarSign } from 'react-icons/fa';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell } from 'recharts';
@@ -20,6 +20,15 @@ interface QueueHistory {
   imageUrl: string;
   queueStatus: 'secured' | 'pending' | 'sold-out';
 }
+
+type HistorySort =
+  | 'date-desc'
+  | 'date-asc'
+  | 'name-asc'
+  | 'name-desc'
+  | 'status-secured-first'
+  | 'status-pending-first'
+  | 'status-soldout-first';
 
 interface UserStats {
   totalQueues: number;
@@ -48,6 +57,7 @@ const UserDashboard: React.FC = () => {
   const [statsError, setStatsError] = useState('');
   const [activeTab, setActiveTab] = useState<'history' | 'stats'>('history');
   const [showBadgePopup, setShowBadgePopup] = useState(false);
+  const [historySort, setHistorySort] = useState<HistorySort>('status-pending-first');
 
   const userPassStatus: PassStatus = user?.passStatus ?? 'None';
 
@@ -222,6 +232,45 @@ const UserDashboard: React.FC = () => {
     loadUserStats();
   }, [user?.id]);
 
+  const sortedQueueHistory = useMemo(() => {
+    const list = [...queueHistory];
+    const dateMs = (d: string) => parseLocalDateFromApi(d)?.getTime() ?? 0;
+    const statusRank = (q: QueueHistory) =>
+      q.queueStatus === 'secured' ? 0 : q.queueStatus === 'pending' ? 1 : 2;
+
+    switch (historySort) {
+      case 'date-desc':
+        return list.sort((a, b) => dateMs(b.date) - dateMs(a.date));
+      case 'date-asc':
+        return list.sort((a, b) => dateMs(a.date) - dateMs(b.date));
+      case 'name-asc':
+        return list.sort((a, b) => a.concertName.localeCompare(b.concertName, undefined, { sensitivity: 'base' }));
+      case 'name-desc':
+        return list.sort((a, b) => b.concertName.localeCompare(a.concertName, undefined, { sensitivity: 'base' }));
+      case 'status-secured-first':
+        return list.sort((a, b) => {
+          const dr = statusRank(a) - statusRank(b);
+          return dr !== 0 ? dr : dateMs(b.date) - dateMs(a.date);
+        });
+      case 'status-pending-first':
+        return list.sort((a, b) => {
+          const order = (q: QueueHistory) =>
+            q.queueStatus === 'pending' ? 0 : q.queueStatus === 'secured' ? 1 : 2;
+          const dr = order(a) - order(b);
+          return dr !== 0 ? dr : dateMs(b.date) - dateMs(a.date);
+        });
+      case 'status-soldout-first':
+        return list.sort((a, b) => {
+          const order = (q: QueueHistory) =>
+            q.queueStatus === 'sold-out' ? 0 : q.queueStatus === 'pending' ? 1 : 2;
+          const dr = order(a) - order(b);
+          return dr !== 0 ? dr : dateMs(b.date) - dateMs(a.date);
+        });
+      default:
+        return list;
+    }
+  }, [queueHistory, historySort]);
+
   const getBadgeInfo = () => {
     switch (userPassStatus) {
       case 'Silver':
@@ -303,14 +352,43 @@ const UserDashboard: React.FC = () => {
 
         {activeTab === 'history' && (
           <section className="queue-history">
-            <h3>Your Queue History</h3>
+            <div className="history-history-header">
+              <h3>Your Queue History</h3>
+              {!historyLoading && !historyError && queueHistory.length > 0 && (
+                <div className="history-toolbar">
+                  <label htmlFor="history-sort" className="history-sort-label">
+                    Order list by
+                  </label>
+                  <select
+                    id="history-sort"
+                    className="history-sort-select"
+                    value={historySort}
+                    onChange={(e) => setHistorySort(e.target.value as HistorySort)}
+                  >
+                    <optgroup label="By show date">
+                      <option value="date-desc">Newest first</option>
+                      <option value="date-asc">Oldest first</option>
+                    </optgroup>
+                    <optgroup label="By concert name">
+                      <option value="name-asc">A to Z</option>
+                      <option value="name-desc">Z to A</option>
+                    </optgroup>
+                    <optgroup label="By status">
+                      <option value="status-secured-first">Secured</option>
+                      <option value="status-pending-first">In queue</option>
+                      <option value="status-soldout-first">Sold out</option>
+                    </optgroup>
+                  </select>
+                </div>
+              )}
+            </div>
             {historyLoading && <p>Loading history...</p>}
             {historyError && <p className="error-message">{historyError}</p>}
             <div className="history-list">
               {!historyLoading && !historyError && queueHistory.length === 0 && (
                 <p>No history found for this user.</p>
               )}
-              {queueHistory.map((item) => (
+              {sortedQueueHistory.map((item) => (
                 <div key={item.id} className="history-item">
                   <div className="concert-image">
                     <img
