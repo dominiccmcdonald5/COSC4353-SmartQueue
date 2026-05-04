@@ -767,6 +767,8 @@ const AdminDashboard: React.FC = () => {
       capacity: newEvent.capacity,
       // Backend schema stores one base price; use the low end of the range.
       ticketPrice: Math.min(min, max),
+      ticketPriceMin: Math.min(min, max),
+      ticketPriceMax: Math.max(min, max),
       concertImage: newEvent.image || DEFAULT_CONCERT_IMAGE,
     };
 
@@ -821,6 +823,8 @@ const AdminDashboard: React.FC = () => {
       capacity: editingEvent.capacity,
       // Backend schema stores one base price; use the low end of the range.
       ticketPrice: Math.min(min, max),
+      ticketPriceMin: Math.min(min, max),
+      ticketPriceMax: Math.max(min, max),
       concertImage: editingEvent.image || DEFAULT_CONCERT_IMAGE,
       concertStatus: editingEvent.status === 'completed' || editingEvent.status === 'cancelled'
         ? 'sold_out' : 'open',

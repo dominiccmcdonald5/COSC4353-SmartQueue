@@ -1169,7 +1169,11 @@ async function completePayment(req, res) {
       const standingSold = await getStandingSoldCount(concertID);
       const remaining = Math.max(0, standingCapacity - standingSold);
       if (standingQty > remaining) {
-        sendJson(res, 409, { success: false, message: `Standing tickets sold out (remaining: ${remaining})` });
+        sendJson(res, 200, {
+          success: false,
+          errorCode: 'STANDING_SOLD_OUT',
+          message: `Standing tickets sold out (remaining: ${remaining})`,
+        });
         return;
       }
     }
@@ -1295,7 +1299,11 @@ async function completePayment(req, res) {
       } catch (e) {
         // Unique constraint ensures concurrency safety.
         if (e && (e.code === 'ER_DUP_ENTRY' || e.errno === 1062)) {
-          sendJson(res, 409, { success: false, message: 'One of the selected seats was just purchased by someone else.' });
+          sendJson(res, 200, {
+            success: false,
+            errorCode: 'SEAT_TAKEN',
+            message: 'Someone claimed one of your selected seats. Please choose again.',
+          });
           return;
         }
         throw e;
@@ -1312,7 +1320,11 @@ async function completePayment(req, res) {
         });
       } catch (e) {
         if (e && (e.code === 'ER_DUP_ENTRY' || e.errno === 1062)) {
-          sendJson(res, 409, { success: false, message: 'Standing tickets were just purchased by someone else.' });
+          sendJson(res, 200, {
+            success: false,
+            errorCode: 'STANDING_TAKEN',
+            message: 'Someone claimed the last standing tickets. Please choose again.',
+          });
           return;
         }
         throw e;

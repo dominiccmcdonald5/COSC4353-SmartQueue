@@ -7,7 +7,7 @@ import RecommendationEngine from '../utils/recommendationEngine';
 import { MdOutlineMail } from 'react-icons/md';
 import '../styling/HomePage.css';
 
-const API_BASE = 'https://cosc4353-smartqueue.onrender.com';
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'https://cosc4353-smartqueue.onrender.com').replace(/\/$/, '');
 
 interface Concert {
   id: string;
@@ -49,6 +49,8 @@ const HomePage: React.FC = () => {
   const [selectedGenre, setSelectedGenre] = useState<string>('all');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'date' | 'name' | 'price'>('date');
+  const [priceMin, setPriceMin] = useState('');
+  const [priceMax, setPriceMax] = useState('');
   const [genres, setGenres] = useState<string[]>([]);
   const [mailboxUnreadCount, setMailboxUnreadCount] = useState(0);
 
@@ -111,7 +113,7 @@ const HomePage: React.FC = () => {
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, selectedGenre, selectedStatus, sortBy, concertsPerPage]);
+  }, [searchTerm, selectedGenre, selectedStatus, sortBy, concertsPerPage, priceMin, priceMax]);
 
   const fetchConcerts = async () => {
     setLoading(true);
@@ -163,12 +165,35 @@ const HomePage: React.FC = () => {
 
   // Filter and sort concerts
   const getFilteredAndSortedConcerts = () => {
+    const parsePriceRange = (priceText: string): { min: number; max: number } => {
+      // Expected examples: "$50", "$50 - $100", "50 - 100"
+      const nums = String(priceText)
+        .replace(/,/g, '')
+        .match(/\d+(\.\d+)?/g)
+        ?.map((n) => Number(n))
+        .filter((n) => Number.isFinite(n)) ?? [];
+      if (nums.length === 0) return { min: Number.POSITIVE_INFINITY, max: Number.NEGATIVE_INFINITY };
+      if (nums.length === 1) return { min: nums[0], max: nums[0] };
+      const a = nums[0];
+      const b = nums[1];
+      return { min: Math.min(a, b), max: Math.max(a, b) };
+    };
+
+    const minFilter = priceMin.trim() === '' ? null : Number(priceMin);
+    const maxFilter = priceMax.trim() === '' ? null : Number(priceMax);
+
     let filtered = concerts.filter(concert => {
       const matchesSearch = concert.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                             concert.artist.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesGenre = selectedGenre === 'all' || concert.genre === selectedGenre;
       const matchesStatus = selectedStatus === 'all' || concert.status === selectedStatus;
-      return matchesSearch && matchesGenre && matchesStatus;
+      const pr = parsePriceRange(concert.price);
+      const hasValidPrice = Number.isFinite(pr.min) && Number.isFinite(pr.max) && pr.min !== Number.POSITIVE_INFINITY;
+      const matchesPrice =
+        (!minFilter || (!hasValidPrice ? true : pr.max >= minFilter)) &&
+        (!maxFilter || (!hasValidPrice ? true : pr.min <= maxFilter));
+
+      return matchesSearch && matchesGenre && matchesStatus && matchesPrice;
     });
     
     // Apply sorting
@@ -183,9 +208,11 @@ const HomePage: React.FC = () => {
         return filtered.sort((a, b) => a.name.localeCompare(b.name));
       case 'price':
         return filtered.sort((a, b) => {
-          const priceA = parseInt(a.price.split(' - ')[0].replace('$', ''));
-          const priceB = parseInt(b.price.split(' - ')[0].replace('$', ''));
-          return priceA - priceB;
+          const priceA = parsePriceRange(a.price).min;
+          const priceB = parsePriceRange(b.price).min;
+          const safeA = Number.isFinite(priceA) ? priceA : Number.POSITIVE_INFINITY;
+          const safeB = Number.isFinite(priceB) ? priceB : Number.POSITIVE_INFINITY;
+          return safeA - safeB;
         });
       default:
         return filtered;
@@ -306,6 +333,8 @@ const HomePage: React.FC = () => {
     setSelectedGenre('all');
     setSelectedStatus('all');
     setSortBy('date');
+    setPriceMin('');
+    setPriceMax('');
     setCurrentPage(1);
   };
 
@@ -502,6 +531,31 @@ const HomePage: React.FC = () => {
               <option value="sold-out">Sold Out</option>
             </select>
             
+            <div className="price-filter">
+              <span className="price-filter-label">Price</span>
+              <div className="price-filter-inputs">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  className="price-filter-input"
+                  placeholder="Min $"
+                  value={priceMin}
+                  onChange={(e) => setPriceMin(e.target.value.replace(/[^\d.]/g, '').slice(0, 8))}
+                  aria-label="Minimum price"
+                />
+                <span className="price-filter-sep">–</span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  className="price-filter-input"
+                  placeholder="Max $"
+                  value={priceMax}
+                  onChange={(e) => setPriceMax(e.target.value.replace(/[^\d.]/g, '').slice(0, 8))}
+                  aria-label="Maximum price"
+                />
+              </div>
+            </div>
+
             <select 
               value={sortBy} 
               onChange={(e) => setSortBy(e.target.value as 'date' | 'name' | 'price')}
@@ -604,32 +658,42 @@ const HomePage: React.FC = () => {
                               
                               {concert.availableTickets !== undefined && concert.totalTickets !== undefined && (
                                 <div className="ticket-progress">
+                                  {(() => {
+                                    const total = Number(concert.totalTickets);
+                                    const left = Number(concert.availableTickets);
+                                    const safeTotal = Number.isFinite(total) && total > 0 ? total : 0;
+                                    const safeLeft = Number.isFinite(left) && left >= 0 ? left : 0;
+                                    const remainingPct =
+                                      safeTotal > 0 ? Math.max(0, Math.min(100, (safeLeft / safeTotal) * 100)) : 0;
+                                    return (
+                                      <>
                                   <div className="progress-bar">
                                     <div 
                                       className="progress-fill"
                                       style={{
-                                        width: `${(concert.availableTickets / concert.totalTickets) * 100}%`,
+                                        width: `${remainingPct}%`,
                                         background: (() => {
-                                          const percentRemaining = (concert.availableTickets / concert.totalTickets) * 100;
                                           if (concert.status === 'sold-out') return '#ef4444';
-                                          if (percentRemaining < 10) return '#f59e0b';
+                                          if (remainingPct < 10) return '#f59e0b';
                                           return '#10b981';
                                         })()
                                       }}
                                     ></div>
                                   </div>
                                   <div className="ticket-stats">
-                                    <span>{concert.availableTickets} tickets left</span>
-                                    <span>{Math.round((concert.availableTickets / concert.totalTickets) * 100)}% available</span>
+                                    <span>{safeLeft} tickets left</span>
+                                    <span>{Math.round(remainingPct)}% left</span>
                                   </div>
                                   {(() => {
-                                    const percentRemaining = (concert.availableTickets / concert.totalTickets) * 100;
-                                    const isAlmostSoldOut = percentRemaining < 10 && percentRemaining > 0;
+                                    const isAlmostSoldOut = remainingPct < 10 && remainingPct > 0;
                                     return isAlmostSoldOut && concert.status !== 'sold-out' ? (
                                       <div className="low-ticket-warning">
-                                        🔥 Almost sold out! Only {concert.availableTickets} tickets left!
+                                        🔥 Almost sold out! Only {safeLeft} tickets left!
                                       </div>
                                     ) : null;
+                                  })()}
+                                      </>
+                                    );
                                   })()}
                                 </div>
                               )}

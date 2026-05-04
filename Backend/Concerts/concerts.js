@@ -20,8 +20,8 @@ const formatConcertForFrontend = (concert) => {
         }
     }
     
-    const minPrice = concert.ticket_price;
-    const maxPrice = (concert.ticket_price * 2).toFixed(2);
+    const minPrice = concert.ticket_price_min != null ? Number(concert.ticket_price_min) : Number(concert.ticket_price);
+    const maxPrice = concert.ticket_price_max != null ? Number(concert.ticket_price_max) : Number(concert.ticket_price * 2);
     
     return {
         id: concert.concert_id.toString(),
@@ -30,7 +30,7 @@ const formatConcertForFrontend = (concert) => {
         date: concert.event_date,
         venue: concert.venue,
         image: concert.concert_image,
-        price: `$${minPrice} - $${maxPrice}`,
+        price: `$${Number(minPrice).toFixed(2)} - $${Number(maxPrice).toFixed(2)}`,
         status: status,
         availableTickets: concert.availableTickets,
         totalTickets: concert.capacity,
@@ -53,7 +53,7 @@ const handleGetConcertTicketing = (req, res, concertId) => {
     const runConcertQuery = (sql, params, cb) => pool.query(sql, params, cb);
 
     const concertQueryWithMin = `
-        SELECT concert_id, capacity, ticket_price, ticket_price_min
+        SELECT concert_id, capacity, ticket_price, ticket_price_min, ticket_price_max
         FROM concerts
         WHERE concert_id = ?
         LIMIT 1
@@ -106,10 +106,19 @@ const handleGetConcertTicketing = (req, res, concertId) => {
                 ? Number(concertRows[0].ticket_price_min)
                 : NaN;
         const ticketCandidate = Number(concertRows[0].ticket_price);
+        const maxCandidate =
+            hasMinColumn && concertRows[0].ticket_price_max != null
+                ? Number(concertRows[0].ticket_price_max)
+                : NaN;
         const basePrice = Number.isFinite(minCandidate)
             ? minCandidate
             : Number.isFinite(ticketCandidate)
                 ? ticketCandidate
+                : STANDING_MIN_PRICE;
+        const maxPrice = Number.isFinite(maxCandidate)
+            ? maxCandidate
+            : Number.isFinite(ticketCandidate)
+                ? ticketCandidate * 2
                 : STANDING_MIN_PRICE;
         const standingCapacity = Math.max(0, Math.floor(capacity * STANDING_CAPACITY_FRACTION));
         const standingPrice = Number.isFinite(basePrice)
@@ -148,6 +157,7 @@ const handleGetConcertTicketing = (req, res, concertId) => {
                 sendJson(res, 200, {
                     success: true,
                     soldSeats: Array.isArray(soldRows) ? soldRows : [],
+                    priceRange: { min: basePrice, max: maxPrice },
                     standing: {
                         capacity: standingCapacity,
                         sold: standingSold,
@@ -163,7 +173,28 @@ const handleGetConcertTicketing = (req, res, concertId) => {
 const handleGetConcerts = (req, res) => {
     console.log('Fetching concerts from Azure MySQL...');
     
-    const query = `
+    const queryWithRange = `
+        SELECT 
+            c.concert_id,
+            c.concert_name,
+            c.artist_name,
+            c.genre,
+            c.event_date,
+            c.venue,
+            c.capacity,
+            c.ticket_price,
+            c.ticket_price_min,
+            c.ticket_price_max,
+            c.concert_image,
+            c.concert_status,
+            COALESCE(SUM(qh.ticket_count), 0) as tickets_sold
+        FROM concerts c
+        LEFT JOIN queue_history qh ON c.concert_id = qh.concert_id AND qh.status = 'completed'
+        GROUP BY c.concert_id
+        ORDER BY c.event_date ASC
+    `;
+
+    const queryFallback = `
         SELECT 
             c.concert_id,
             c.concert_name,
@@ -182,7 +213,26 @@ const handleGetConcerts = (req, res) => {
         ORDER BY c.event_date ASC
     `;
     
-    pool.query(query, (error, rows) => {
+    pool.query(queryWithRange, (error, rows) => {
+        if (error && error.code === 'ER_BAD_FIELD_ERROR') {
+            pool.query(queryFallback, (fallbackErr, fallbackRows) => {
+                if (fallbackErr) {
+                    console.error('Error fetching concerts:', fallbackErr);
+                    sendJson(res, 500, { success: false, message: 'Failed to fetch concerts', error: fallbackErr.message });
+                    return;
+                }
+                console.log(`Found ${fallbackRows.length} concerts in database`);
+                const concerts = (fallbackRows || []).map(concert => {
+                    const availableTickets = concert.capacity - (concert.tickets_sold || 0);
+                    return formatConcertForFrontend({
+                        ...concert,
+                        availableTickets: availableTickets > 0 ? availableTickets : 0
+                    });
+                });
+                sendJson(res, 200, { success: true, concerts: concerts });
+            });
+            return;
+        }
         if (error) {
             console.error('Error fetching concerts:', error);
             sendJson(res, 500, { success: false, message: 'Failed to fetch concerts', error: error.message });
@@ -207,7 +257,28 @@ const handleGetConcertById = (req, res, concertId) => {
     const id = parseInt(concertId);
     console.log(`Fetching concert with ID: ${id}`);
     
-    const query = `
+    const queryWithRange = `
+        SELECT 
+            c.concert_id,
+            c.concert_name,
+            c.artist_name,
+            c.genre,
+            c.event_date,
+            c.venue,
+            c.capacity,
+            c.ticket_price,
+            c.ticket_price_min,
+            c.ticket_price_max,
+            c.concert_image,
+            c.concert_status,
+            COALESCE(SUM(qh.ticket_count), 0) as tickets_sold
+        FROM concerts c
+        LEFT JOIN queue_history qh ON c.concert_id = qh.concert_id AND qh.status = 'completed'
+        WHERE c.concert_id = ?
+        GROUP BY c.concert_id
+    `;
+
+    const queryFallback = `
         SELECT 
             c.concert_id,
             c.concert_name,
@@ -226,7 +297,28 @@ const handleGetConcertById = (req, res, concertId) => {
         GROUP BY c.concert_id
     `;
     
-    pool.query(query, [id], (error, rows) => {
+    pool.query(queryWithRange, [id], (error, rows) => {
+        if (error && error.code === 'ER_BAD_FIELD_ERROR') {
+            pool.query(queryFallback, [id], (fallbackErr, fallbackRows) => {
+                if (fallbackErr) {
+                    console.error('Error fetching concert:', fallbackErr);
+                    sendJson(res, 500, { success: false, message: 'Failed to fetch concert details' });
+                    return;
+                }
+                if (fallbackRows.length === 0) {
+                    sendJson(res, 404, { success: false, message: 'Concert not found' });
+                    return;
+                }
+                const concert = fallbackRows[0];
+                const availableTickets = concert.capacity - (concert.tickets_sold || 0);
+                const formattedConcert = formatConcertForFrontend({
+                    ...concert,
+                    availableTickets: availableTickets > 0 ? availableTickets : 0
+                });
+                sendJson(res, 200, { success: true, concert: formattedConcert });
+            });
+            return;
+        }
         if (error) {
             console.error('Error fetching concert:', error);
             sendJson(res, 500, { success: false, message: 'Failed to fetch concert details' });
