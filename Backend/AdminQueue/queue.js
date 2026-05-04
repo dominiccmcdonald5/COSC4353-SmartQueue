@@ -1276,9 +1276,78 @@ async function removeFromQueue(req, res, rawHistoryId) {
   }
 }
 
+/**
+ * Single-call endpoint: returns the user's active queue status across all concerts.
+ * Replaces the pattern of fetching every concert then polling each one individually.
+ * GET /api/queue/user-status?userId=<id>
+ */
+async function getUserActiveQueueStatus(req, res, userIdQuery) {
+  try {
+    const userID = Number(userIdQuery);
+    if (!Number.isInteger(userID) || userID <= 0) {
+      sendJson(res, 400, { success: false, message: 'userId must be a positive integer' });
+      return;
+    }
+
+    // One query: is this user actively queued anywhere?
+    const [activeRows] = await pool.promise().query(
+      `SELECT qh.concert_id, c.concert_name
+       FROM queue_history qh
+       JOIN concerts c ON c.concert_id = qh.concert_id
+       WHERE qh.user_id = ?
+         AND qh.status = 'queued'
+         AND qh.in_line_status = 'in_line'
+       LIMIT 1`,
+      [userID]
+    );
+
+    if (activeRows.length === 0) {
+      sendJson(res, 200, { success: true, data: { isInQueue: false } });
+      return;
+    }
+
+    const concertID = Number(activeRows[0].concert_id);
+    const concertName = activeRows[0].concert_name;
+
+    const queuedRows = await fetchQueuedRowsForConcertFair(concertID);
+    const completedCount = await getCompletedPurchaseCountForConcert(concertID);
+    const orderedFair = buildFairQueueOrder(queuedRows, completedCount);
+
+    const userRowIndex = orderedFair.findIndex((h) => toNumber(h.userId) === userID);
+    if (userRowIndex < 0) {
+      sendJson(res, 200, { success: true, data: { isInQueue: false } });
+      return;
+    }
+
+    const position = userRowIndex + 1;
+    const canProceedToSeatSelection = position <= 5;
+    const isNextInLine = position === 6;
+
+    if (canProceedToSeatSelection) {
+      const msg = `You can now purchase a ticket for ${concertName}. Grab it while it lasts.`;
+      await maybeInsertNotification({ userID, message: msg });
+    }
+
+    sendJson(res, 200, {
+      success: true,
+      data: {
+        isInQueue: true,
+        concertId: concertID,
+        concertName,
+        position,
+        canProceedToSeatSelection,
+        isNextInLine,
+      },
+    });
+  } catch (error) {
+    sendJson(res, 500, { success: false, message: error.message || 'Database error' });
+  }
+}
+
 module.exports = {
   getQueue,
   getQueueStatusByConcert,
+  getUserActiveQueueStatus,
   serveNext,
   joinQueue,
   leaveQueue,

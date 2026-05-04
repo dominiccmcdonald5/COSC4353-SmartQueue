@@ -22,62 +22,46 @@ export const useQueueNotificationMonitor = () => {
       return;
     }
 
-    const getConcertIds = async (): Promise<number[]> => {
-      try {
-        const response = await fetch(`${API_BASE}/api/admin/concerts`);
-        const payload = (await response.json()) as {
-          success: boolean;
-          concerts?: Array<{ concert_id?: number; concertID?: number }>;
-        };
-
-        if (!response.ok || !payload.success || !Array.isArray(payload.concerts)) {
-          return [];
-        }
-
-        return payload.concerts
-          .map((concert) => Number(concert.concert_id ?? concert.concertID ?? 0))
-          .filter((id) => Number.isInteger(id) && id > 0);
-      } catch {
-        return [];
-      }
-    };
-
     const checkQueueStatus = async () => {
       try {
-        const concertIds = await getConcertIds();
-        for (const concertId of concertIds) {
-          try {
-            const response = await fetch(
-              `${API_BASE}/api/queue/${concertId}?userId=${encodeURIComponent(user.id)}`
-            );
-            const payload = (await response.json()) as {
-              success: boolean;
-              data?: {
-                isNextInLine: boolean;
-                isInQueue: boolean;
-                canProceedToSeatSelection?: boolean;
-                concertName?: string;
-              };
-            };
+        const response = await fetch(
+          `${API_BASE}/api/queue/user-status?userId=${encodeURIComponent(user.id)}`
+        );
+        const payload = (await response.json()) as {
+          success: boolean;
+          data?: {
+            isInQueue: boolean;
+            concertId?: number;
+            concertName?: string;
+            canProceedToSeatSelection?: boolean;
+            isNextInLine?: boolean;
+          };
+        };
 
-            if (payload.success && payload.data?.isInQueue && payload.data?.canProceedToSeatSelection === true) {
-              setQueueBannerConcertId(concertId);
-              setCanProceedToPurchase(true);
-              setProceedConcertName(payload.data?.concertName ?? null);
-              setIsNextInLine(false);
-              return;
-            }
+        if (!payload.success || !payload.data?.isInQueue) {
+          setQueueBannerConcertId(null);
+          setIsNextInLine(false);
+          setCanProceedToPurchase(false);
+          setProceedConcertName(null);
+          return;
+        }
 
-            if (payload.success && payload.data?.isInQueue && payload.data?.isNextInLine === true) {
-              setQueueBannerConcertId(concertId);
-              setIsNextInLine(true);
-              setCanProceedToPurchase(false);
-              setProceedConcertName(null);
-              return;
-            }
-          } catch {
-            continue;
-          }
+        const { concertId, concertName, canProceedToSeatSelection, isNextInLine } = payload.data;
+
+        if (canProceedToSeatSelection) {
+          setQueueBannerConcertId(concertId ?? null);
+          setCanProceedToPurchase(true);
+          setProceedConcertName(concertName ?? null);
+          setIsNextInLine(false);
+          return;
+        }
+
+        if (isNextInLine) {
+          setQueueBannerConcertId(concertId ?? null);
+          setIsNextInLine(true);
+          setCanProceedToPurchase(false);
+          setProceedConcertName(null);
+          return;
         }
 
         setQueueBannerConcertId(null);

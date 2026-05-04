@@ -134,6 +134,12 @@ function routes(req, res) {
     return adminQueue.completePayment(req, res);
   }
 
+  /* —— Get active queue status for a single user (all concerts, one call) —— */
+  if (pathname === '/api/queue/user-status' && method === 'GET') {
+    const userId = parsed.query.userId;
+    return adminQueue.getUserActiveQueueStatus(req, res, userId);
+  }
+
   /* —— Get queue status for a specific concert —— */
   if (method === 'GET' && /^\/api\/queue\/\d+$/.test(pathname)) {
     const concertId = pathname.split('/').pop();
