@@ -425,7 +425,7 @@ const UserDashboard: React.FC = () => {
                     <optgroup label="By status">
                       <option value="status-secured-first">Secured</option>
                       <option value="status-pending-first">In queue</option>
-                      <option value="status-soldout-first">Sold out</option>
+                      <option value="status-soldout-first">Left Queue</option>
                     </optgroup>
                   </select>
                 </div>
