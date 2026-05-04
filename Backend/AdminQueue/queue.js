@@ -233,20 +233,92 @@ function buildFairOrderedActiveQueueResponse(rawRows, completedByConcert) {
   }));
 }
 
+async function insertNotificationRow(userID, message, status = 'sent') {
+  if (await notificationDeletedAtColumnExists()) {
+    await pool
+      .promise()
+      .query(
+        `INSERT INTO notifications (user_id, message, status, deleted_at) VALUES (?, ?, ?, NULL)`,
+        [userID, message, status]
+      );
+  } else {
+    await pool
+      .promise()
+      .query(`INSERT INTO notifications (user_id, message, status) VALUES (?, ?, ?)`, [userID, message, status]);
+  }
+}
+
 async function maybeInsertNotification({ userID, message }) {
   try {
-    const [existingRows] = await pool
-      .promise()
-      .query(`SELECT 1 AS ok FROM notifications WHERE user_id = ? AND message = ? LIMIT 1`, [userID, message]);
+    let existsSql = `SELECT 1 AS ok FROM notifications WHERE user_id = ? AND message = ?`;
+    const existsParams = [userID, message];
+    if (await notificationDeletedAtColumnExists()) {
+      existsSql += ` AND deleted_at IS NULL`;
+    }
+    existsSql += ` LIMIT 1`;
+
+    const [existingRows] = await pool.promise().query(existsSql, existsParams);
 
     if (Array.isArray(existingRows) && existingRows.length > 0) return;
 
-    await pool
-      .promise()
-      .query(`INSERT INTO notifications (user_id, message, status) VALUES (?, ?, 'sent')`, [userID, message]);
+    await insertNotificationRow(userID, message, 'sent');
   } catch {
     // Notifications should never break queue operations if the table is missing/misconfigured.
   }
+}
+
+function formatNotifEventDate(d) {
+  if (d == null) return '—';
+  if (d instanceof Date) return d.toISOString().slice(0, 10);
+  const s = String(d);
+  return s.length >= 10 ? s.slice(0, 10) : s;
+}
+
+async function insertTicketPurchaseMailboxNotification({
+  userID,
+  concertName,
+  venue,
+  eventDate,
+  totalCost,
+  seatsRaw,
+  ticketCount,
+  historyID,
+}) {
+  const seats = Array.isArray(seatsRaw) ? seatsRaw : [];
+  const seatLines =
+    seats.length > 0
+      ? seats
+          .map((s, i) => {
+            if (!s || typeof s !== 'object') return `  ${i + 1}. (invalid seat)`;
+            const sec = String(/** @type {any} */ (s).section ?? '').trim() || '—';
+            const row = String(/** @type {any} */ (s).row ?? '').trim() || '—';
+            const num = String(
+              /** @type {any} */ (s).seatNumber ?? /** @type {any} */ (s).seat ?? ''
+            ).trim() || '—';
+            const p = Number(/** @type {any} */ (s).price);
+            const pricePart = Number.isFinite(p) ? ` ($${p.toFixed(2)})` : '';
+            return `  ${i + 1}. Section ${sec}, Row ${row}, Seat ${num}${pricePart}`;
+          })
+          .join('\n')
+      : `  (${ticketCount} ticket(s); seat details were not saved with this payment)`;
+
+  const msg = [
+    'You successfully purchased tickets.',
+    '',
+    `Concert: ${concertName || 'Concert'}`,
+    `Date: ${formatNotifEventDate(eventDate)}`,
+    `Venue: ${venue ? String(venue) : '—'}`,
+    '',
+    `Amount paid: $${Number(totalCost).toFixed(2)}`,
+    `Order ref: #${historyID}`,
+    '',
+    `Seats (${seats.length || ticketCount}):`,
+    seatLines,
+    '',
+    `Purchased: ${new Date().toLocaleString('en-US')}`,
+  ].join('\n');
+
+  await maybeInsertNotification({ userID, message: msg });
 }
 
 async function priorityColumnExists() {
@@ -285,10 +357,12 @@ function normalizeSeatsForStorage(raw) {
       ).trim();
       const section = /** @type {any} */ (s).section;
       if (!row || !seatNumber) return null;
+      const price = Number(/** @type {any} */ (s).price);
       return {
         row,
         seatNumber,
         ...(section != null && String(section).trim() ? { section: String(section).trim() } : {}),
+        ...(Number.isFinite(price) ? { price } : {}),
       };
     })
     .filter(Boolean);
@@ -780,10 +854,13 @@ async function joinQueue(req, res) {
       ? '0 minutes'
       : `${estimatedWaitMinutes} minutes`;
 
+    const concertNameJoin = concertRows[0]?.concert_name || 'this concert';
     if (canProceedToSeatSelection) {
-      const concertName = concertRows[0]?.concert_name || 'this concert';
-      const msg = `You can now purchase a ticket for ${concertName}. Grab it while it lasts.`;
+      const msg = `You can now purchase a ticket for ${concertNameJoin}. Grab it while it lasts.`;
       await maybeInsertNotification({ userID, message: msg });
+    } else {
+      const joinMsg = `You joined the queue for ${concertNameJoin}. You are #${position} in line. Estimated wait: ${estimatedWaitTime}.`;
+      await maybeInsertNotification({ userID, message: joinMsg });
     }
 
     sendJson(res, 201, {
@@ -869,13 +946,7 @@ async function leaveQueue(req, res) {
       const concertName = sixth.concertName || 'the concert';
       const notificationMessage = `You're coming up next! You're currently 6th in line for ${concertName}.`;
 
-      await pool.promise().query(
-        `
-        INSERT INTO notifications (user_id, message, status)
-        VALUES (?, ?, 'sent')
-        `,
-        [sixthPositionUserID, notificationMessage]
-      );
+      await insertNotificationRow(sixthPositionUserID, notificationMessage, 'sent');
     }
 
     sendJson(res, 200, {
@@ -1027,6 +1098,26 @@ async function completePayment(req, res) {
       [roundedCost, userID]
     );
 
+    const [[purchaseConcertRow]] = await pool.promise().query(
+      `
+      SELECT concert_name, venue, event_date
+      FROM concerts
+      WHERE concert_id = ?
+      LIMIT 1
+      `,
+      [concertID]
+    );
+    await insertTicketPurchaseMailboxNotification({
+      userID,
+      concertName: purchaseConcertRow?.concert_name ? String(purchaseConcertRow.concert_name) : '',
+      venue: purchaseConcertRow?.venue != null ? String(purchaseConcertRow.venue) : '',
+      eventDate: purchaseConcertRow?.event_date ?? null,
+      totalCost: roundedCost,
+      seatsRaw: payload.seats,
+      ticketCount,
+      historyID: history.historyID,
+    });
+
     sendJson(res, 200, {
       success: true,
       message: 'Payment completed and ticket status updated',
@@ -1037,28 +1128,79 @@ async function completePayment(req, res) {
   }
 }
 
+async function notificationDeletedAtColumnExists() {
+  try {
+    const [rows] = await pool.promise().query(
+      "SHOW COLUMNS FROM notifications LIKE 'deleted_at'"
+    );
+    if (Array.isArray(rows) && rows.length > 0) return true;
+  } catch {
+    /* table missing or no permission */
+  }
+  const dbName = process.env.DB_DATABASE;
+  if (!dbName || typeof dbName !== 'string') return false;
+  try {
+    const [rows] = await pool.promise().query(
+      `SELECT 1 AS ok
+       FROM INFORMATION_SCHEMA.COLUMNS
+       WHERE TABLE_SCHEMA = ?
+         AND TABLE_NAME = 'notifications'
+         AND LOWER(COLUMN_NAME) = 'deleted_at'
+       LIMIT 1`,
+      [dbName]
+    );
+    return Array.isArray(rows) && rows.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+function normalizeNotificationIdList(raw) {
+  if (!Array.isArray(raw)) return [];
+  const out = [];
+  for (const x of raw) {
+    const n = Number(x);
+    if (Number.isInteger(n) && n > 0) out.push(n);
+  }
+  return out.slice(0, 500);
+}
+
 async function getNotifications(req, res) {
   try {
     const payload = await readJsonBody(req);
     const userID = Number(payload.userId);
+    const folder = payload.folder === 'trash' ? 'trash' : 'inbox';
 
     if (!Number.isInteger(userID) || userID <= 0) {
       sendJson(res, 400, { success: false, message: 'Valid userId is required' });
       return;
     }
 
-    const [notifications] = await pool.promise().query(
-      `
+    const hasTrash = await notificationDeletedAtColumnExists();
+    let sql = `
       SELECT *
       FROM notifications
       WHERE user_id = ?
-      ORDER BY notification_id DESC
-      `,
-      [userID]
-    );
+    `;
+    const params = [userID];
+    if (hasTrash) {
+      sql += folder === 'trash' ? ` AND deleted_at IS NOT NULL ` : ` AND deleted_at IS NULL `;
+    } else if (folder === 'trash') {
+      sendJson(res, 200, {
+        success: true,
+        count: 0,
+        supportsTrash: false,
+        notifications: [],
+      });
+      return;
+    }
+    sql += ` ORDER BY notification_id DESC `;
+
+    const [notifications] = await pool.promise().query(sql, params);
 
     sendJson(res, 200, {
       success: true,
+      supportsTrash: hasTrash,
       count: notifications.length,
       notifications: notifications.map((notif) => ({
         notificationId: toNumber(notif.notification_id),
@@ -1066,10 +1208,182 @@ async function getNotifications(req, res) {
         message: notif.message,
         timestamp: notif.timestamp ?? notif.created_at ?? null,
         status: notif.status,
+        deletedAt: hasTrash && notif.deleted_at ? notif.deleted_at : null,
       })),
     });
   } catch (error) {
     sendJson(res, 500, { success: false, message: error.message || 'Database error' });
+  }
+}
+
+async function notificationsMoveToTrash(req, res) {
+  try {
+    if (!(await notificationDeletedAtColumnExists())) {
+      sendJson(res, 503, {
+        success: false,
+        message: 'Trash requires database migration: Backend/add_notifications_deleted_at.sql',
+      });
+      return;
+    }
+    const payload = await readJsonBody(req);
+    const userID = Number(payload.userId);
+    const ids = normalizeNotificationIdList(payload.notificationIds);
+    if (!Number.isInteger(userID) || userID <= 0) {
+      sendJson(res, 400, { success: false, message: 'Valid userId is required' });
+      return;
+    }
+    if (ids.length === 0) {
+      sendJson(res, 400, { success: false, message: 'notificationIds must be a non-empty array' });
+      return;
+    }
+    const ph = ids.map(() => '?').join(',');
+    const [result] = await pool.promise().query(
+      `
+      UPDATE notifications
+      SET deleted_at = NOW()
+      WHERE user_id = ?
+        AND deleted_at IS NULL
+        AND notification_id IN (${ph})
+      `,
+      [userID, ...ids]
+    );
+    sendJson(res, 200, {
+      success: true,
+      message: 'Moved to trash',
+      affectedRows: toNumber(result?.affectedRows),
+    });
+  } catch (error) {
+    sendJson(res, 400, { success: false, message: error.message || 'Bad request' });
+  }
+}
+
+async function notificationsMoveAllToTrash(req, res) {
+  try {
+    if (!(await notificationDeletedAtColumnExists())) {
+      sendJson(res, 503, {
+        success: false,
+        message: 'Trash requires database migration: Backend/add_notifications_deleted_at.sql',
+      });
+      return;
+    }
+    const payload = await readJsonBody(req);
+    const userID = Number(payload.userId);
+    if (!Number.isInteger(userID) || userID <= 0) {
+      sendJson(res, 400, { success: false, message: 'Valid userId is required' });
+      return;
+    }
+    const [result] = await pool.promise().query(
+      `
+      UPDATE notifications
+      SET deleted_at = NOW()
+      WHERE user_id = ?
+        AND deleted_at IS NULL
+      `,
+      [userID]
+    );
+    sendJson(res, 200, {
+      success: true,
+      message: 'All inbox messages moved to trash',
+      affectedRows: toNumber(result?.affectedRows),
+    });
+  } catch (error) {
+    sendJson(res, 400, { success: false, message: error.message || 'Bad request' });
+  }
+}
+
+async function notificationsRestore(req, res) {
+  try {
+    if (!(await notificationDeletedAtColumnExists())) {
+      sendJson(res, 503, { success: false, message: 'Trash is not available on this database.' });
+      return;
+    }
+    const payload = await readJsonBody(req);
+    const userID = Number(payload.userId);
+    const ids = normalizeNotificationIdList(payload.notificationIds);
+    if (!Number.isInteger(userID) || userID <= 0) {
+      sendJson(res, 400, { success: false, message: 'Valid userId is required' });
+      return;
+    }
+    if (ids.length === 0) {
+      sendJson(res, 400, { success: false, message: 'notificationIds must be a non-empty array' });
+      return;
+    }
+    const ph = ids.map(() => '?').join(',');
+    const [result] = await pool.promise().query(
+      `
+      UPDATE notifications
+      SET deleted_at = NULL
+      WHERE user_id = ?
+        AND deleted_at IS NOT NULL
+        AND notification_id IN (${ph})
+      `,
+      [userID, ...ids]
+    );
+    sendJson(res, 200, {
+      success: true,
+      message: 'Restored to inbox',
+      affectedRows: toNumber(result?.affectedRows),
+    });
+  } catch (error) {
+    sendJson(res, 400, { success: false, message: error.message || 'Bad request' });
+  }
+}
+
+async function notificationsDeletePermanent(req, res) {
+  try {
+    if (!(await notificationDeletedAtColumnExists())) {
+      sendJson(res, 503, { success: false, message: 'Trash is not available on this database.' });
+      return;
+    }
+    const payload = await readJsonBody(req);
+    const userID = Number(payload.userId);
+    const deleteAll = payload.deleteAll === true || payload.deleteAll === 'true';
+    const ids = normalizeNotificationIdList(payload.notificationIds);
+
+    if (!Number.isInteger(userID) || userID <= 0) {
+      sendJson(res, 400, { success: false, message: 'Valid userId is required' });
+      return;
+    }
+
+    let affected = 0;
+    if (deleteAll) {
+      const [result] = await pool.promise().query(
+        `
+        DELETE FROM notifications
+        WHERE user_id = ?
+          AND deleted_at IS NOT NULL
+        `,
+        [userID]
+      );
+      affected = toNumber(result?.affectedRows);
+    } else {
+      if (ids.length === 0) {
+        sendJson(res, 400, {
+          success: false,
+          message: 'Provide notificationIds or deleteAll: true',
+        });
+        return;
+      }
+      const ph = ids.map(() => '?').join(',');
+      const [result] = await pool.promise().query(
+        `
+        DELETE FROM notifications
+        WHERE user_id = ?
+          AND deleted_at IS NOT NULL
+          AND notification_id IN (${ph})
+        `,
+        [userID, ...ids]
+      );
+      affected = toNumber(result?.affectedRows);
+    }
+
+    sendJson(res, 200, {
+      success: true,
+      message: 'Permanently deleted',
+      affectedRows: affected,
+    });
+  } catch (error) {
+    sendJson(res, 400, { success: false, message: error.message || 'Bad request' });
   }
 }
 
@@ -1261,6 +1575,22 @@ async function removeFromQueue(req, res, rawHistoryId) {
       [userID, concertID]
     );
 
+    const [[adminKickNameRow]] = await pool.promise().query(
+      `SELECT concert_name FROM concerts WHERE concert_id = ? LIMIT 1`,
+      [concertID]
+    );
+    const adminKickConcertName = adminKickNameRow?.concert_name
+      ? String(adminKickNameRow.concert_name)
+      : `Concert #${concertID}`;
+    await maybeInsertNotification({
+      userID,
+      message: [
+        'You were removed from the queue by an administrator.',
+        '',
+        `Concert: ${adminKickConcertName}`,
+      ].join('\n'),
+    });
+
     sendJson(res, 200, {
       success: true,
       message: `User removed from queue by admin (${result.affectedRows} entr${result.affectedRows === 1 ? 'y' : 'ies'} cleared).`,
@@ -1356,4 +1686,8 @@ module.exports = {
   reorderQueueEntry,
   getNotifications,
   markNotificationAsViewed,
+  notificationsMoveToTrash,
+  notificationsMoveAllToTrash,
+  notificationsRestore,
+  notificationsDeletePermanent,
 };

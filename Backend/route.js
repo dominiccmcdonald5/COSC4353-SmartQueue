@@ -147,13 +147,29 @@ function routes(req, res) {
     return adminQueue.getQueueStatusByConcert(req, res, concertId, userId);
   }
 
-  /* —— Notifications —— */
-  if (pathname === '/api/notifications' && method === 'POST') {
-    return adminQueue.getNotifications(req, res);
+  /* —— Notifications (specific paths before POST /api/notifications) —— */
+  if (pathname === '/api/notifications/move-to-trash' && method === 'POST') {
+    return adminQueue.notificationsMoveToTrash(req, res);
+  }
+
+  if (pathname === '/api/notifications/move-all-to-trash' && method === 'POST') {
+    return adminQueue.notificationsMoveAllToTrash(req, res);
+  }
+
+  if (pathname === '/api/notifications/restore' && method === 'POST') {
+    return adminQueue.notificationsRestore(req, res);
+  }
+
+  if (pathname === '/api/notifications/delete-permanent' && method === 'POST') {
+    return adminQueue.notificationsDeletePermanent(req, res);
   }
 
   if (pathname === '/api/notifications/mark-viewed' && method === 'POST') {
     return adminQueue.markNotificationAsViewed(req, res);
+  }
+
+  if (pathname === '/api/notifications' && method === 'POST') {
+    return adminQueue.getNotifications(req, res);
   }
 
   res.writeHead(404, { 'Content-Type': 'application/json' });
