@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { formatLocalDateFromApi } from '../utils/apiDate';
+import { seatPriceForRowIndex } from '../utils/seatingPriceBand';
 import '../styling/SeatingMapPage.css';
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'https://cosc4353-smartqueue.onrender.com').replace(/\/$/, '');
@@ -46,7 +47,16 @@ interface ApiConcertResponse {
 
 interface TicketingResponse {
   success: boolean;
-  soldSeats?: Array<{ section?: string; rowLabel?: string; seatNumber?: string }>;
+  soldSeats?: Array<{
+    section?: string;
+    rowLabel?: string;
+    /** legacy backend shape */
+    row?: string;
+    seatNumber?: string;
+    /** legacy backend shape */
+    seat_number?: string;
+  }>;
+  priceRange?: { min?: number; max?: number };
   standing?: { capacity?: number; sold?: number; remaining?: number; price?: number };
   message?: string;
 }
@@ -76,6 +86,8 @@ const SeatingMapPage: React.FC = () => {
   const [concertInfo, setConcertInfo] = useState<ConcertInfo | null>(null);
   const [ticketingLoading, setTicketingLoading] = useState(true);
   const [soldSeatIds, setSoldSeatIds] = useState<Set<string>>(new Set());
+  const [priceMin, setPriceMin] = useState<number | null>(null);
+  const [priceMax, setPriceMax] = useState<number | null>(null);
 
   useEffect(() => {
     if (!concertId) {
@@ -144,13 +156,15 @@ const SeatingMapPage: React.FC = () => {
           setSoldSeatIds(new Set());
           setStandingRemaining(null);
           setStandingPrice(null);
+          setPriceMin(null);
+          setPriceMax(null);
           return;
         }
         const sold = new Set<string>();
         (payload.soldSeats || []).forEach((s) => {
           const section = String(s.section || 'Orchestra').trim();
-          const row = String(s.rowLabel || '').trim();
-          const seatNumber = String(s.seatNumber || '').trim();
+          const row = String(s.rowLabel ?? s.row ?? '').trim();
+          const seatNumber = String(s.seatNumber ?? s.seat_number ?? '').trim();
           if (!row || !seatNumber) return;
           sold.add(`${section}||${row}||${seatNumber}`.toLowerCase());
         });
@@ -159,6 +173,10 @@ const SeatingMapPage: React.FC = () => {
         const price = payload.standing?.price;
         setStandingRemaining(Number.isFinite(Number(remaining)) ? Number(remaining) : null);
         setStandingPrice(Number.isFinite(Number(price)) ? Number(price) : null);
+        const min = payload.priceRange?.min;
+        const max = payload.priceRange?.max;
+        setPriceMin(Number.isFinite(Number(min)) ? Number(min) : null);
+        setPriceMax(Number.isFinite(Number(max)) ? Number(max) : null);
         setStandingQty((prev) => {
           const max = Number.isFinite(Number(remaining)) ? Math.max(0, Number(remaining)) : prev;
           return Math.min(prev, 4, max);
@@ -168,6 +186,8 @@ const SeatingMapPage: React.FC = () => {
         setSoldSeatIds(new Set());
         setStandingRemaining(null);
         setStandingPrice(null);
+        setPriceMin(null);
+        setPriceMax(null);
       } finally {
         if (mounted) setTicketingLoading(false);
       }
@@ -191,12 +211,15 @@ const SeatingMapPage: React.FC = () => {
         const section = 'Orchestra';
         const soldKey = `${section}||${row}||${s}`.toLowerCase();
         const statusFromInventory = soldSeatIds.has(soldKey) ? 'taken' : null;
+        const min = priceMin ?? 50;
+        const max = priceMax ?? Math.max(min, 100);
+        const seatPrice = seatPriceForRowIndex(ri, rows.length, min, max);
         mainSeats.push({
           id: `main-${concertId}-${row}-${s}`,
           section,
           row,
           seatNumber: String(s),
-          price: 100 - ri * 6,
+          price: seatPrice,
           status: statusFromInventory || 'available',
         });
       }
@@ -204,7 +227,7 @@ const SeatingMapPage: React.FC = () => {
 
     setSections([{ name: 'Orchestra', seats: mainSeats, color: '#64748b', subsection: 'center' }]);
     setLoading(false);
-  }, [concertId, soldSeatIds]);
+  }, [concertId, soldSeatIds, priceMin, priceMax]);
 
   const renderedTotalSeats = sections.reduce((sum, section) => sum + section.seats.length, 0);
   const renderedAvailableSeats = sections.reduce(

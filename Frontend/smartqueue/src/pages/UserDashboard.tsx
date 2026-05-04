@@ -50,6 +50,7 @@ interface UserStats {
   secondPopularGenre: string | null;
   thirdPopularGenre: string | null;
   totalSpending: number;
+  topGenres?: Array<{ genre: string; frequency: number }>;
   spendingByConcert: {
     concertID: number;
     concertName: string;
@@ -88,14 +89,17 @@ const UserDashboard: React.FC = () => {
       return [] as { name: string; count: number; fill: string }[];
     }
 
-    const values = [userStats.firstPopularGenre, userStats.secondPopularGenre, userStats.thirdPopularGenre]
-      .filter((genre): genre is string => Boolean(genre));
-    const fallbackCounts = [3, 2, 1];
+    const values =
+      Array.isArray(userStats.topGenres) && userStats.topGenres.length > 0
+        ? userStats.topGenres
+        : [userStats.firstPopularGenre, userStats.secondPopularGenre, userStats.thirdPopularGenre]
+            .filter((genre): genre is string => Boolean(genre))
+            .map((genre) => ({ genre, frequency: 1 }));
     const fills = ['#f59e0b', '#9ca3af', '#cd7f32'];
 
-    return values.map((genre, index) => ({
-      name: genre,
-      count: fallbackCounts[index] || 1,
+    return values.map((g, index) => ({
+      name: g.genre,
+      count: Number(g.frequency) || 0,
       fill: fills[index] || '#9ca3af',
     }));
   }, [userStats]);

@@ -118,6 +118,9 @@ const getUserStats = async (req, res) => {
             const firstPopularGenre = topGenresNormalized[0]?.genre || null;
             const secondPopularGenre = topGenresNormalized[1]?.genre || null;
             const thirdPopularGenre = topGenresNormalized[2]?.genre || null;
+            const topGenres = topGenresNormalized
+                .filter((g) => g && typeof g.genre === 'string' && g.genre.trim())
+                .map((g) => ({ genre: g.genre, frequency: toNumber(g.frequency) }));
 
             const spendingByConcert = spendingByConcertRows
                 .map((item) => ({
@@ -148,6 +151,7 @@ const getUserStats = async (req, res) => {
                 secondPopularGenre,
                 thirdPopularGenre,
                 totalSpending,
+                topGenres,
                 spendingByConcert,
             }));
             return;

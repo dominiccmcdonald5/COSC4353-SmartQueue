@@ -230,7 +230,17 @@ const PaymentPage: React.FC = () => {
 
       const paymentPayload = await paymentResponse.json();
       if (!paymentResponse.ok || !paymentPayload.success) {
-        throw new Error(paymentPayload.message || 'Failed to finalize payment status');
+        const code = String(paymentPayload?.errorCode || '');
+        const msg = String(paymentPayload?.message || 'Failed to finalize payment status');
+        if (code === 'SEAT_TAKEN' || code === 'STANDING_TAKEN' || code === 'STANDING_SOLD_OUT') {
+          window.alert(msg);
+          sessionStorage.removeItem('selectedSeats');
+          sessionStorage.removeItem('standingQty');
+          sessionStorage.removeItem('standingPrice');
+          navigate(`/seating/${concertId}`);
+          return;
+        }
+        throw new Error(msg);
       }
       
       // Clear selected seats from storage

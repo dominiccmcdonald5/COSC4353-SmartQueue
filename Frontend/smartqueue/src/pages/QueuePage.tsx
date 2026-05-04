@@ -326,6 +326,12 @@ const QueuePage: React.FC = () => {
           </div>
         ) : (
           <div className="queue-status-section">
+            {(() => {
+              // Per requirement: top 5 positions show 0 remaining minutes,
+              // then start at 5 minutes for position 6, 10 minutes for 7, etc.
+              const remainingEstimateMinutes = Math.max(0, (queueStatus.position - 5) * 5);
+
+              return (
             <div className="status-display">
               <div className="position-info">
                 <h3>Your Position</h3>
@@ -340,11 +346,11 @@ const QueuePage: React.FC = () => {
                     ? `Waited: ${queueStatus.elapsedWaitMinutes} min`
                     : queueStatus.estimatedWaitTime}
                 </p>
-                {queueStatus.estimatedRemainingWaitMinutes != null && (
-                  <p className="time">Remaining: {queueStatus.estimatedRemainingWaitMinutes} min</p>
-                )}
+                <p className="time">Remaining: {remainingEstimateMinutes} min</p>
               </div>
             </div>
+              );
+            })()}
 
             <div className="progress-bar">
               <div 
