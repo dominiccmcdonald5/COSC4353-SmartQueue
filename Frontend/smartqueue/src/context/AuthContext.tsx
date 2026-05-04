@@ -27,6 +27,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'https://cosc4353-smartqueue.onrender.com').replace(/\/$/, '');
+const AUTH_STORAGE_KEY = 'smartqueue_user';
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -44,6 +45,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isHistoryLoading, setIsHistoryLoading] = useState(true);
+
+  const readStoredUser = (): User | null => {
+    try {
+      const raw = sessionStorage.getItem(AUTH_STORAGE_KEY);
+      if (!raw) return null;
+      return JSON.parse(raw) as User;
+    } catch {
+      return null;
+    }
+  };
+
+  const writeStoredUser = (value: User) => {
+    sessionStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(value));
+  };
+
+  const clearStoredUser = () => {
+    sessionStorage.removeItem(AUTH_STORAGE_KEY);
+  };
 
   const normalizeMembership = (u: User): User => {
     if (u.accountType !== 'user') return { ...u, passStatus: 'None', passExpiresAt: null };
@@ -144,9 +163,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   useEffect(() => {
-    const savedUser = localStorage.getItem('smartqueue_user');
+    const savedUser = readStoredUser();
     if (savedUser) {
-      const parsedUser = normalizeMembership(JSON.parse(savedUser));
+      const parsedUser = normalizeMembership(savedUser);
       setUser(parsedUser);
       
       if (parsedUser.accountType === 'user') {
@@ -192,7 +211,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       const normalizedUser = normalizeMembership(userData);
       setUser(normalizedUser);
-      localStorage.setItem('smartqueue_user', JSON.stringify(normalizedUser));
+      writeStoredUser(normalizedUser);
       
       if (normalizedUser.accountType === 'user') {
         await Promise.all([
@@ -235,7 +254,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       };
       
       setUser(userData);
-      localStorage.setItem('smartqueue_user', JSON.stringify(userData));
+      writeStoredUser(userData);
     } catch (error) {
       console.error('Signup error:', error);
       throw new Error('Signup failed');
@@ -246,14 +265,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem('smartqueue_user');
+    clearStoredUser();
   };
 
   const updatePassStatus = (passStatus: 'Gold' | 'Silver' | 'None') => {
     if (user) {
       const updatedUser = normalizeMembership({ ...user, passStatus });
       setUser(updatedUser);
-      localStorage.setItem('smartqueue_user', JSON.stringify(updatedUser));
+      writeStoredUser(updatedUser);
     }
   };
 
@@ -261,7 +280,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (!user) return;
     const updatedUser = normalizeMembership({ ...user, passStatus, passExpiresAt });
     setUser(updatedUser);
-    localStorage.setItem('smartqueue_user', JSON.stringify(updatedUser));
+    writeStoredUser(updatedUser);
   };
 
   const isAdmin = user?.accountType === 'admin';

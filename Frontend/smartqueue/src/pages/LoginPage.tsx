@@ -10,6 +10,7 @@ const LoginPage: React.FC = () => {
   const { login, isLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const AUTH_STORAGE_KEY = 'smartqueue_user';
 
   const requestedFrom = location.state?.from?.pathname || '/home';
 
@@ -34,7 +35,7 @@ const LoginPage: React.FC = () => {
     try {
       // Pass the identifier (can be email or username) to login
       await login(identifier, password);
-      const savedUserRaw = localStorage.getItem('smartqueue_user');
+      const savedUserRaw = sessionStorage.getItem(AUTH_STORAGE_KEY);
       const accountType = savedUserRaw
         ? (JSON.parse(savedUserRaw)?.accountType as 'admin' | 'user' | undefined)
         : undefined;
