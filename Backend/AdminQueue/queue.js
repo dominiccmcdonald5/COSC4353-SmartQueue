@@ -261,6 +261,40 @@ async function priorityColumnExists() {
   return Array.isArray(rows) && rows.length > 0;
 }
 
+async function seatSelectionColumnExists() {
+  const [rows] = await pool.promise().query(
+    `SELECT 1 AS ok
+     FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'queue_history'
+       AND LOWER(COLUMN_NAME) = 'seat_selection'
+     LIMIT 1`
+  );
+  return Array.isArray(rows) && rows.length > 0;
+}
+
+/** @param {unknown} raw @returns {string | null} */
+function normalizeSeatsForStorage(raw) {
+  if (!Array.isArray(raw) || raw.length === 0) return null;
+  const out = raw
+    .map((s) => {
+      if (!s || typeof s !== 'object') return null;
+      const row = String(/** @type {any} */ (s).row ?? '').trim();
+      const seatNumber = String(
+        /** @type {any} */ (s).seatNumber ?? /** @type {any} */ (s).seat_number ?? ''
+      ).trim();
+      const section = /** @type {any} */ (s).section;
+      if (!row || !seatNumber) return null;
+      return {
+        row,
+        seatNumber,
+        ...(section != null && String(section).trim() ? { section: String(section).trim() } : {}),
+      };
+    })
+    .filter(Boolean);
+  return out.length ? JSON.stringify(out) : null;
+}
+
 async function fetchEffectiveUserPriority(userID, concertID) {
   // If schema isn't updated yet, degrade gracefully to FIFO.
   if (!(await priorityColumnExists())) return PRIORITY.NONE;
@@ -901,6 +935,8 @@ async function completePayment(req, res) {
 
     let history;
     const roundedCost = Number(totalCost.toFixed(2));
+    const seatJson = normalizeSeatsForStorage(payload.seats);
+    const hasSeatCol = await seatSelectionColumnExists();
 
     if (activeRows.length > 0) {
       const row = activeRows[0];
@@ -909,18 +945,34 @@ async function completePayment(req, res) {
         ? Math.max(0, Math.round((Date.now() - queuedAtMs) / 1000))
         : toNumber(row.wait_time);
 
-      await pool.promise().query(
-        `
-        UPDATE queue_history
-        SET status = 'completed',
-            in_line_status = 'entered',
-            ticket_count = ?,
-            total_cost = ?,
-            wait_time = COALESCE(wait_time, 0) + ?
-        WHERE history_id = ?
-        `,
-        [ticketCount, roundedCost, waitSeconds, row.history_id]
-      );
+      if (hasSeatCol && seatJson) {
+        await pool.promise().query(
+          `
+          UPDATE queue_history
+          SET status = 'completed',
+              in_line_status = 'entered',
+              ticket_count = ?,
+              total_cost = ?,
+              wait_time = ?,
+              seat_selection = ?
+          WHERE history_id = ?
+          `,
+          [ticketCount, roundedCost, waitSeconds, seatJson, row.history_id]
+        );
+      } else {
+        await pool.promise().query(
+          `
+          UPDATE queue_history
+          SET status = 'completed',
+              in_line_status = 'entered',
+              ticket_count = ?,
+              total_cost = ?,
+              wait_time = ?
+          WHERE history_id = ?
+          `,
+          [ticketCount, roundedCost, waitSeconds, row.history_id]
+        );
+      }
 
       history = {
         historyID: toNumber(row.history_id),
@@ -932,17 +984,31 @@ async function completePayment(req, res) {
         totalCost: roundedCost,
       };
     } else {
-      const [insertResult] = await pool.promise().query(
-        `
-        INSERT INTO queue_history (
-          user_id, concert_id, ticket_count, total_cost, wait_time, status, in_line_status, queued_at
-        ) VALUES (?, ?, ?, ?, ?, 'completed', 'entered', NOW())
-        `,
-        [userID, concertID, ticketCount, roundedCost, 0]
-      );
+      let insertId;
+      if (hasSeatCol && seatJson) {
+        const [insertResult] = await pool.promise().query(
+          `
+          INSERT INTO queue_history (
+            user_id, concert_id, ticket_count, total_cost, wait_time, status, in_line_status, queued_at, seat_selection
+          ) VALUES (?, ?, ?, ?, ?, 'completed', 'entered', NOW(), ?)
+          `,
+          [userID, concertID, ticketCount, roundedCost, 0, seatJson]
+        );
+        insertId = insertResult.insertId;
+      } else {
+        const [insertResult] = await pool.promise().query(
+          `
+          INSERT INTO queue_history (
+            user_id, concert_id, ticket_count, total_cost, wait_time, status, in_line_status, queued_at
+          ) VALUES (?, ?, ?, ?, ?, 'completed', 'entered', NOW())
+          `,
+          [userID, concertID, ticketCount, roundedCost, 0]
+        );
+        insertId = insertResult.insertId;
+      }
 
       history = {
-        historyID: toNumber(insertResult.insertId),
+        historyID: toNumber(insertId),
         userID,
         concertID,
         status: 'completed',
