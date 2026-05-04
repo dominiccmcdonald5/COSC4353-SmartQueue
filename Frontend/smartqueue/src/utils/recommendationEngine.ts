@@ -1,6 +1,5 @@
 // src/utils/recommendationEngine.ts
 
-// Match the Concert interface from HomePage
 interface Concert {
   id: string;
   name: string;
@@ -15,7 +14,7 @@ interface Concert {
   genre?: string;
 }
 
-interface UserInteraction {
+export interface UserInteraction {
   concertId: string;
   action: 'view' | 'queue_join' | 'purchase';
   timestamp: string;
@@ -26,37 +25,39 @@ interface UserInteraction {
 class RecommendationEngine {
   private static readonly STORAGE_KEY_PREFIX = 'ticketq_behavior_';
   
-  // Track user interaction with concerts
   static trackInteraction(userId: string, concert: Concert, action: 'view' | 'queue_join' | 'purchase') {
     try {
       const storageKey = `${this.STORAGE_KEY_PREFIX}${userId}`;
       const storage = localStorage.getItem(storageKey);
       const interactions: UserInteraction[] = storage ? JSON.parse(storage) : [];
       
-      interactions.push({
-        concertId: concert.id,
-        action,
-        timestamp: new Date().toISOString(),
-        artist: concert.artist,
-        genre: concert.genre
-      });
+      // Check for duplicate within last 5 seconds
+      const now = new Date();
+      const isDuplicate = interactions.some(i => 
+        i.concertId === concert.id && 
+        i.action === action &&
+        (now.getTime() - new Date(i.timestamp).getTime()) < 5000
+      );
       
-      // Keep last 50 interactions
-      const trimmed = interactions.slice(-50);
-      localStorage.setItem(storageKey, JSON.stringify(trimmed));
-      
-      console.log(`Tracked ${action} for user ${userId} on concert ${concert.name} (Genre: ${concert.genre})`);
+      if (!isDuplicate) {
+        interactions.push({
+          concertId: concert.id,
+          action,
+          timestamp: now.toISOString(),
+          artist: concert.artist,
+          genre: concert.genre || 'Unknown',
+        });
+        
+        const trimmed = interactions.slice(-50);
+        localStorage.setItem(storageKey, JSON.stringify(trimmed));
+        console.log(`✅ Tracked ${action} for ${concert.name} (${concert.genre})`);
+      }
     } catch (error) {
       console.error('Failed to track interaction:', error);
     }
   }
   
-  // Get personalized recommendations
-  static getRecommendations(
-    userId: string, 
-    allConcerts: Concert[]
-  ): Concert[] {
-    // 1. Filter to ONLY future concerts
+  static getRecommendations(userId: string, allConcerts: Concert[]): Concert[] {
     const now = new Date();
     const futureConcerts = allConcerts.filter(concert => {
       const concertDate = new Date(concert.date);
@@ -65,73 +66,87 @@ class RecommendationEngine {
     
     if (futureConcerts.length === 0) return [];
     
-    // Get user's interaction history
     const interactions = this.getUserInteractions(userId);
     
-    // Debug: Log user's genre history
-    const userGenres = [...new Set(interactions.map(i => i.genre).filter(Boolean))];
-    console.log(`User ${userId} has interacted with genres:`, userGenres);
+    // Only count queue_join and purchase for genre preference
+    const meaningfulInteractions = interactions.filter(i => 
+      i.action === 'queue_join' || i.action === 'purchase'
+    );
     
-    if (interactions.length === 0) {
-      console.log('New user - showing default recommendations');
-      return this.getDefaultRecommendations(futureConcerts);
-    }
+    console.log(`Total interactions: ${interactions.length}, Meaningful: ${meaningfulInteractions.length}`);
     
-    // Calculate scores for each future concert
-    const scoredConcerts = futureConcerts.map(concert => {
-      let score = 0;
-      let breakdown = {} as any;
-      
-      // Factor 1: Genre preference (70% weight - increased from 60%)
-      const genreScore = this.calculateGenreScore(interactions, concert);
-      const genreContribution = genreScore * 0.7;
-      score += genreContribution;
-      breakdown.genre = { score: genreScore, contribution: genreContribution };
-      
-      // Factor 2: Artist affinity (20% weight)
-      const artistScore = this.calculateArtistScore(interactions, concert);
-      const artistContribution = artistScore * 0.2;
-      score += artistContribution;
-      breakdown.artist = { score: artistScore, contribution: artistContribution };
-      
-      // Factor 3: Availability/urgency (10% weight - tiebreaker)
-      const availabilityScore = this.calculateAvailabilityScore(concert);
-      const availabilityContribution = availabilityScore * 0.1;
-      score += availabilityContribution;
-      breakdown.availability = { score: availabilityScore, contribution: availabilityContribution };
-      
-      // Only penalize if user already committed to THIS concert
-      const alreadyCommitted = interactions.some(i => 
-        i.concertId === concert.id && 
-        (i.action === 'queue_join' || i.action === 'purchase')
-      );
-      
-      if (alreadyCommitted) {
-        score *= 0.2;
-        breakdown.penalty = 'Applied 80% penalty (already committed)';
+    // Get user's preferred genres from MEANINGFUL interactions only
+    const genreCounts: Record<string, number> = {};
+    meaningfulInteractions.forEach(i => {
+      if (i.genre && i.genre !== 'Unknown') {
+        const weight = i.action === 'purchase' ? 3 : 1;
+        genreCounts[i.genre] = (genreCounts[i.genre] || 0) + weight;
       }
-      
-      // Debug logging for EDM issue
-      if (concert.genre === 'EDM' || concert.genre === 'Electronic') {
-        console.log(`Concert "${concert.name}" (${concert.genre}) - Genre Score: ${genreScore}, Total: ${score}`);
-      }
-      
-      return { ...concert, recommendationScore: score, scoreBreakdown: breakdown };
     });
     
-    // Sort by score and return top recommendations (show up to 6 for carousel)
-    const sorted = scoredConcerts
-      .sort((a, b) => (b as any).recommendationScore - (a as any).recommendationScore)
-      .slice(0, 6);
+    const preferredGenres = Object.keys(genreCounts).sort((a, b) => genreCounts[b] - genreCounts[a]);
+    console.log('Preferred genres (from purchases/queues):', preferredGenres);
+    console.log('Genre weights:', genreCounts);
     
-    // Debug: Log top recommendations
-    console.log('Top recommendations:', sorted.map(c => ({ 
-      name: c.name, 
-      genre: c.genre, 
-      score: (c as any).recommendationScore 
-    })));
+    // If user has meaningful interactions, use those genres
+    if (preferredGenres.length > 0) {
+      const filteredByGenre = futureConcerts.filter(concert => 
+        preferredGenres.includes(concert.genre || '')
+      );
+      
+      if (filteredByGenre.length > 0) {
+        // FIX: Sort by weight (higher first) THEN by date
+        const sorted = filteredByGenre.sort((a, b) => {
+          // Get weight for each concert's genre
+          const weightA = genreCounts[a.genre || ''] || 0;
+          const weightB = genreCounts[b.genre || ''] || 0;
+          
+          // If weights are different, higher weight comes first
+          if (weightA !== weightB) {
+            return weightB - weightA;
+          }
+          
+          // If same weight, sort by date (soonest first)
+          return new Date(a.date).getTime() - new Date(b.date).getTime();
+        });
+        
+        const recommendations = sorted.slice(0, 6);
+        console.log('Recommendations (sorted by weight then date):', recommendations.map(c => `${c.name} (${c.genre})`));
+        return recommendations;
+      }
+    }
     
-    return sorted;
+    // If no meaningful interactions, show diverse defaults
+    console.log('No meaningful interactions - showing diverse defaults');
+    return this.getDiverseDefaultRecommendations(futureConcerts);
+  }
+  
+  private static getDiverseDefaultRecommendations(futureConcerts: Concert[]): Concert[] {
+    // Group by genre
+    const byGenre: Record<string, Concert[]> = {};
+    for (const concert of futureConcerts) {
+      const genre = concert.genre || 'Other';
+      if (!byGenre[genre]) byGenre[genre] = [];
+      byGenre[genre].push(concert);
+    }
+    
+    const result: Concert[] = [];
+    const genres = Object.keys(byGenre);
+    
+    // Sort each genre's concerts by date
+    for (const genre of genres) {
+      byGenre[genre].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    }
+    
+    // Take the soonest concert from each genre
+    for (const genre of genres) {
+      if (result.length >= 6) break;
+      if (byGenre[genre].length > 0) {
+        result.push(byGenre[genre][0]);
+      }
+    }
+    
+    return result.slice(0, 6);
   }
   
   private static getUserInteractions(userId: string): UserInteraction[] {
@@ -140,105 +155,21 @@ class RecommendationEngine {
       const storage = localStorage.getItem(storageKey);
       return storage ? JSON.parse(storage) : [];
     } catch (error) {
-      console.error('Failed to get user interactions:', error);
       return [];
     }
   }
   
-  private static calculateGenreScore(interactions: UserInteraction[], concert: Concert): number {
-    // If concert has no genre, give 0 score
-    if (!concert.genre) return 0;
-    
-    // Get all interactions for this specific genre
-    const genreInteractions = interactions.filter(i => i.genre === concert.genre);
-    
-    // CRITICAL FIX: If user has NEVER interacted with this genre, score should be 0
-    if (genreInteractions.length === 0) {
-      return 0;
-    }
-    
-    // Calculate weighted score based on action types
-    const weightedScore = genreInteractions.reduce((sum, interaction) => {
-      const actionWeight = interaction.action === 'purchase' ? 3 : 
-                          interaction.action === 'queue_join' ? 2 : 1;
-      return sum + actionWeight;
-    }, 0);
-    
-    // Normalize to 0-100 (max 100 for 10+ weighted interactions)
-    // A single view gives ~10 points, a single queue gives ~20, a single purchase gives ~30
-    const normalizedScore = Math.min(100, weightedScore * 10);
-    
-    return normalizedScore;
-  }
-  
-  private static calculateArtistScore(interactions: UserInteraction[], concert: Concert): number {
-    const artistInteractions = interactions.filter(i => i.artist === concert.artist);
-    
-    // If user has never interacted with this artist, score should be 0
-    if (artistInteractions.length === 0) return 0;
-    
-    const weightedScore = artistInteractions.reduce((sum, interaction) => {
-      const actionWeight = interaction.action === 'purchase' ? 3 : 
-                          interaction.action === 'queue_join' ? 2 : 1;
-      return sum + actionWeight;
-    }, 0);
-    
-    return Math.min(100, weightedScore * 20);
-  }
-  
-  private static calculateAvailabilityScore(concert: Concert): number {
-    let score = 50; // Base score
-    
-    // Better availability = higher score
-    if (concert.status === 'available') {
-      score += 30;
-    } else if (concert.status === 'queue-active') {
-      score += 15;
-    } else if (concert.status === 'sold-out') {
-      score -= 40;
-    }
-    
-    // Urgency (low tickets = higher score due to FOMO)
-    if (concert.availableTickets && concert.availableTickets < 50) {
-      score += 20;
-    } else if (concert.availableTickets && concert.availableTickets < 100) {
-      score += 10;
-    }
-    
-    // Concerts happening sooner get a small boost
-    const concertDate = new Date(concert.date);
-    const daysUntil = Math.ceil((concertDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-    if (daysUntil > 0 && daysUntil <= 7) {
-      score += 10;
-    } else if (daysUntil > 7 && daysUntil <= 30) {
-      score += 5;
-    }
-    
-    return Math.min(100, Math.max(0, score));
-  }
-  
-  private static getDefaultRecommendations(futureConcerts: Concert[]): Concert[] {
-    // For new users: show available concerts coming up soon
-    const sorted = [...futureConcerts].sort((a, b) => {
-      // Available concerts first
-      if (a.status === 'available' && b.status !== 'available') return -1;
-      if (a.status !== 'available' && b.status === 'available') return 1;
-      
-      // Then by date (soonest first)
-      return new Date(a.date).getTime() - new Date(b.date).getTime();
-    });
-    
-    return sorted.slice(0, 6);
-  }
-  
-  // Analytics: Get user's top genres
   static getUserTopGenres(userId: string): { genre: string; count: number }[] {
     const interactions = this.getUserInteractions(userId);
     const genreCount: Record<string, number> = {};
     
+    // Only count meaningful interactions (queue_join and purchase)
     interactions.forEach(interaction => {
-      if (interaction.genre) {
-        genreCount[interaction.genre] = (genreCount[interaction.genre] || 0) + 1;
+      if (interaction.genre && interaction.genre !== 'Unknown') {
+        if (interaction.action === 'queue_join' || interaction.action === 'purchase') {
+          const weight = interaction.action === 'purchase' ? 3 : 1;
+          genreCount[interaction.genre] = (genreCount[interaction.genre] || 0) + weight;
+        }
       }
     });
     
@@ -246,17 +177,6 @@ class RecommendationEngine {
       .map(([genre, count]) => ({ genre, count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 3);
-  }
-  
-  // Debug method to clear user history (for testing)
-  static clearUserHistory(userId: string): void {
-    try {
-      const storageKey = `${this.STORAGE_KEY_PREFIX}${userId}`;
-      localStorage.removeItem(storageKey);
-      console.log(`Cleared history for user ${userId}`);
-    } catch (error) {
-      console.error('Failed to clear user history:', error);
-    }
   }
 }
 
