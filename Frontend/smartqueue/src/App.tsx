@@ -47,13 +47,13 @@ function AppContent() {
             } />
             
             <Route path="/dashboard" element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['user']}>
                 <UserDashboard />
               </ProtectedRoute>
             } />
             
             <Route path="/admin" element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['admin']}>
                 <AdminDashboard />
               </ProtectedRoute>
             } />

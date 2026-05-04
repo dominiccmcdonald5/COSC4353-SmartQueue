@@ -2327,7 +2327,7 @@ const AdminDashboard: React.FC = () => {
                     : null;
                 const flags: { label: string; color: string; reason: string; tip: string }[] = [];
                 if (entry.isDuplicate) flags.push({ label: '👥 Duplicate', color: '#f59e0b', reason: 'duplicate', tip: 'User has multiple entries in the queue' });
-                if (waitMins != null && waitMins > 120) flags.push({ label: '⏱ Stuck Entry', color: '#ef4444', reason: 'no-show', tip: `Stuck ${waitMins} min — auto-expired; user may have abandoned queue` });
+                if (waitMins != null && waitMins > 480) flags.push({ label: '⏱ Stuck Entry', color: '#ef4444', reason: 'no-show', tip: `Stuck ${waitMins} min — user may have abandoned queue` });
                 if (entry.isSuspectedBot) flags.push({ label: '🤖 Bot?', color: '#7c3aed', reason: 'fraud', tip: '3+ queue joins in the last 30 minutes' });
                 const suggestedReason = flags[0]?.reason ?? '';
                 const currentReason = kickReasons[entry.queueEntryId] ?? '';
@@ -2377,14 +2377,14 @@ const AdminDashboard: React.FC = () => {
                         className="queue-reason-select"
                         style={{ borderColor: currentReason ? '#6366f1' : '#d1d5db', background: currentReason ? '#eef2ff' : undefined }}
                         aria-label="Removal reason">
-                        <option value="">{suggestedReason ? `Suggested: ${flags[0]?.label}` : 'Select reason…'}</option>
-                        <option value="no-show">No-show / Abandoned</option>
-                        <option value="duplicate">Duplicate entry</option>
-                        <option value="fraud">Fraud / Bot</option>
+                        <option value="">{suggestedReason ? `⚑ ${flags[0]?.label.replace(/^[^\w]+/, '')}` : 'Select reason…'}</option>
+                        <option value="no-show">No-show</option>
+                        <option value="duplicate">Duplicate</option>
+                        <option value="fraud">Bot / Fraud</option>
                         <option value="expired-pass">Expired pass</option>
-                        <option value="stuck-entry">Stuck / Technical error</option>
-                        <option value="capacity">Capacity change</option>
-                        <option value="conduct">Code of conduct</option>
+                        <option value="stuck-entry">Stuck</option>
+                        <option value="capacity">Capacity</option>
+                        <option value="conduct">Conduct</option>
                       </select>
                       {!currentReason && suggestedReason && (
                         <button type="button" onClick={() => setKickReasons((prev) => ({ ...prev, [entry.queueEntryId]: suggestedReason }))}

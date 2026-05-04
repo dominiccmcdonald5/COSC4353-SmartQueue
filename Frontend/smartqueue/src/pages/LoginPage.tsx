@@ -11,7 +11,21 @@ const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const from = location.state?.from?.pathname || '/home';
+  const requestedFrom = location.state?.from?.pathname || '/home';
+
+  const isSafePostLoginPath = (path: string, accountType: 'admin' | 'user') => {
+    if (accountType === 'admin') {
+      return path === '/admin' || path === '/home';
+    }
+    return path !== '/admin';
+  };
+
+  const getPostLoginPath = (accountType: 'admin' | 'user') => {
+    if (isSafePostLoginPath(requestedFrom, accountType)) {
+      return requestedFrom;
+    }
+    return accountType === 'admin' ? '/admin' : '/home';
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,7 +34,11 @@ const LoginPage: React.FC = () => {
     try {
       // Pass the identifier (can be email or username) to login
       await login(identifier, password);
-      navigate(from, { replace: true });
+      const savedUserRaw = localStorage.getItem('smartqueue_user');
+      const accountType = savedUserRaw
+        ? (JSON.parse(savedUserRaw)?.accountType as 'admin' | 'user' | undefined)
+        : undefined;
+      navigate(getPostLoginPath(accountType === 'admin' ? 'admin' : 'user'), { replace: true });
     } catch (error: unknown) {
       if (error instanceof Error) {
         setError(error.message);

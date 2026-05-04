@@ -1247,19 +1247,28 @@ async function removeFromQueue(req, res, rawHistoryId) {
     }
 
     const entry = rows[0];
+    const userID = toNumber(entry.user_id);
+    const concertID = toNumber(entry.concert_id);
 
-    await pool.promise().query(
-      `UPDATE queue_history SET status = 'cancelled', in_line_status = 'left' WHERE history_id = ?`,
-      [historyID]
+    // Remove ALL active entries for this user in this concert (handles duplicates/bots)
+    const [result] = await pool.promise().query(
+      `UPDATE queue_history
+       SET status = 'cancelled', in_line_status = 'left'
+       WHERE user_id = ?
+         AND concert_id = ?
+         AND status = 'queued'
+         AND in_line_status = 'in_line'`,
+      [userID, concertID]
     );
 
     sendJson(res, 200, {
       success: true,
-      message: 'User removed from queue by admin.',
+      message: `User removed from queue by admin (${result.affectedRows} entr${result.affectedRows === 1 ? 'y' : 'ies'} cleared).`,
       entry: {
         historyID: toNumber(entry.history_id),
-        userID: toNumber(entry.user_id),
-        concertID: toNumber(entry.concert_id),
+        userID,
+        concertID,
+        removedCount: result.affectedRows,
       },
     });
   } catch (error) {
