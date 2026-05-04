@@ -1,15 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useNotification } from '../../context/NotificationContext';
 import './NotificationBanner.css';
 
-/** Separate keys so “6th in line” and “top 5” each show once per queue visit; cleared when concert queue context clears. */
-function bannerSessionKey(userId: string, concertId: number, mode: 'next' | 'proceed') {
-  return `sq_banner_${userId}_${concertId}_${mode}`;
+function bannerNeverKey(userId: string, concertId: number) {
+  return `sq_banner_never_${userId}_${concertId}`;
 }
 
 export const NotificationBanner: React.FC = () => {
   const { user } = useAuth();
+  const location = useLocation();
   const {
     isNextInLine,
     canProceedToPurchase,
@@ -17,55 +18,78 @@ export const NotificationBanner: React.FC = () => {
     queueBannerConcertId,
   } = useNotification();
 
-  const [suppressTick, setSuppressTick] = useState(0);
+  const [neverTick, setNeverTick] = useState(0);
+  const [softDismissed, setSoftDismissed] = useState(false);
+  const [isFadingOut, setIsFadingOut] = useState(false);
   const prevCidRef = useRef<number | null>(null);
 
   const active = isNextInLine || canProceedToPurchase;
-  const mode: 'next' | 'proceed' = canProceedToPurchase ? 'proceed' : 'next';
   const cid = queueBannerConcertId ?? 0;
 
-  const suppressKey =
-    user?.id && active && cid > 0 ? bannerSessionKey(user.id, cid, mode) : '';
+  const neverKey =
+    user?.id && active && cid > 0 ? bannerNeverKey(user.id, cid) : '';
 
-  const suppressed = useMemo(() => {
-    if (!suppressKey || typeof sessionStorage === 'undefined') return false;
-    return sessionStorage.getItem(suppressKey) === '1';
-  }, [suppressKey, suppressTick]);
+  const neverSuppressed = useMemo(() => {
+    if (!neverKey || typeof sessionStorage === 'undefined') return false;
+    return sessionStorage.getItem(neverKey) === '1';
+  }, [neverKey, neverTick]);
 
-  const show = Boolean(user?.id) && active && !suppressed;
+  const baseEligible = Boolean(user?.id) && active && cid > 0 && !neverSuppressed;
 
-  const suppressNow = useCallback(() => {
-    if (!suppressKey) return;
-    sessionStorage.setItem(suppressKey, '1');
-    setSuppressTick((n) => n + 1);
-  }, [suppressKey]);
+  /** New route or different concert → banner may show again (unless “don’t remind”). */
+  useEffect(() => {
+    setSoftDismissed(false);
+    setIsFadingOut(false);
+  }, [location.pathname, neverKey]);
 
-  /** Leaving queue clears concert id — reset both banner suppressions for that concert so the next join works. */
   useEffect(() => {
     const uid = user?.id;
     if (!uid) return;
     const prev = prevCidRef.current;
     if (prev != null && prev > 0 && queueBannerConcertId === null) {
-      sessionStorage.removeItem(bannerSessionKey(uid, prev, 'next'));
-      sessionStorage.removeItem(bannerSessionKey(uid, prev, 'proceed'));
+      sessionStorage.removeItem(bannerNeverKey(uid, prev));
     }
     prevCidRef.current = queueBannerConcertId;
   }, [queueBannerConcertId, user?.id]);
 
-  const handleAnimationEnd = useCallback(
-    (e: React.AnimationEvent<HTMLDivElement>) => {
-      if (e.animationName !== 'slideUp') return;
-      suppressNow();
+  useEffect(() => {
+    if (!baseEligible || softDismissed || isFadingOut) return undefined;
+    const t = window.setTimeout(() => setIsFadingOut(true), 10_000);
+    return () => window.clearTimeout(t);
+  }, [baseEligible, softDismissed, isFadingOut, location.pathname, neverKey]);
+
+  const dismissSoft = useCallback(() => {
+    setSoftDismissed(true);
+    setIsFadingOut(false);
+  }, []);
+
+  const dismissNever = useCallback(() => {
+    if (!neverKey) return;
+    sessionStorage.setItem(neverKey, '1');
+    setNeverTick((n) => n + 1);
+    setIsFadingOut(false);
+    setSoftDismissed(false);
+  }, [neverKey]);
+
+  const onFadeTransitionEnd = useCallback(
+    (e: React.TransitionEvent<HTMLDivElement>) => {
+      if (e.propertyName !== 'opacity') return;
+      if (!isFadingOut) return;
+      dismissSoft();
     },
-    [suppressNow]
+    [isFadingOut, dismissSoft]
   );
 
-  if (!show) {
+  const renderBanner = baseEligible && (!softDismissed || isFadingOut);
+  if (!renderBanner) {
     return null;
   }
 
   return (
-    <div className="position-6-notification" onAnimationEnd={handleAnimationEnd}>
+    <div
+      className={`position-6-notification${isFadingOut ? ' is-fading-out' : ''}`}
+      onTransitionEnd={onFadeTransitionEnd}
+    >
       <div className="notification-content">
         <span className="notification-icon">🎉</span>
         <div className="notification-text">
@@ -82,17 +106,31 @@ export const NotificationBanner: React.FC = () => {
               <p>You are 6th in line. Prepare your payment method to quickly get your tickets!</p>
             </>
           )}
+          {cid > 0 ? (
+            <Link className="notification-go-queue-btn" to={`/queue/${cid}`}>
+              Go to queue →
+            </Link>
+          ) : null}
         </div>
-        <button
-          type="button"
-          className="notification-close"
-          aria-label="Dismiss notification"
-          onClick={suppressNow}
-        >
-          <span className="notification-close-x" aria-hidden>
-            ×
-          </span>
-        </button>
+        <div className="notification-actions">
+          <button
+            type="button"
+            className="notification-dismiss-never"
+            onClick={dismissNever}
+          >
+            Don&apos;t remind me again
+          </button>
+          <button
+            type="button"
+            className="notification-close"
+            aria-label="Dismiss notification"
+            onClick={dismissSoft}
+          >
+            <span className="notification-close-x" aria-hidden>
+              ×
+            </span>
+          </button>
+        </div>
       </div>
     </div>
   );

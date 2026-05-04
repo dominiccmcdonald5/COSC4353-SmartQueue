@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { formatLocalDateFromApi } from '../utils/apiDate';
 import '../styling/SeatingMapPage.css';
 
-const API_BASE = 'https://cosc4353-smartqueue.onrender.com';
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'https://cosc4353-smartqueue.onrender.com').replace(/\/$/, '');
 
 interface Seat {
   id: string;
@@ -44,27 +44,11 @@ interface ApiConcertResponse {
   message?: string;
 }
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}
-
-// Deterministic shuffle so the same concert id keeps the same seat pattern.
-function buildAvailabilityMask(totalSeats: number, availableSeats: number, seedInput: string): Set<number> {
-  const seats = Array.from({ length: totalSeats }, (_, i) => i);
-  let seed = 0;
-  for (let i = 0; i < seedInput.length; i += 1) {
-    seed = (seed * 31 + seedInput.charCodeAt(i)) >>> 0;
-  }
-
-  for (let i = seats.length - 1; i > 0; i -= 1) {
-    seed = (seed * 1664525 + 1013904223) >>> 0;
-    const j = seed % (i + 1);
-    const t = seats[i];
-    seats[i] = seats[j];
-    seats[j] = t;
-  }
-
-  return new Set(seats.slice(0, clamp(availableSeats, 0, totalSeats)));
+interface TicketingResponse {
+  success: boolean;
+  soldSeats?: Array<{ section?: string; row?: string; seatNumber?: string }>;
+  standing?: { capacity?: number; sold?: number; remaining?: number; price?: number };
+  message?: string;
 }
 
 function groupSeatsByRow(seats: Seat[]): Record<string, Seat[]> {
@@ -82,11 +66,16 @@ const SeatingMapPage: React.FC = () => {
   const navigate = useNavigate();
   const [sections, setSections] = useState<SeatingSection[]>([]);
   const [selectedSeats, setSelectedSeats] = useState<Seat[]>([]);
+  const [standingQty, setStandingQty] = useState(0);
+  const [standingRemaining, setStandingRemaining] = useState<number | null>(null);
+  const [standingPrice, setStandingPrice] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [concertLoading, setConcertLoading] = useState(true);
   const [hoveredSeat, setHoveredSeat] = useState<Seat | null>(null);
   const [popupPos, setPopupPos] = useState<{ x: number; y: number } | null>(null);
   const [concertInfo, setConcertInfo] = useState<ConcertInfo | null>(null);
+  const [ticketingLoading, setTicketingLoading] = useState(true);
+  const [soldSeatIds, setSoldSeatIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!concertId) {
@@ -144,45 +133,78 @@ const SeatingMapPage: React.FC = () => {
 
   useEffect(() => {
     if (!concertId) return;
+    let mounted = true;
+    setTicketingLoading(true);
+    void (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/concerts/${concertId}/ticketing`);
+        const payload = (await res.json()) as TicketingResponse;
+        if (!mounted) return;
+        if (!res.ok || !payload.success) {
+          setSoldSeatIds(new Set());
+          setStandingRemaining(null);
+          setStandingPrice(null);
+          return;
+        }
+        const sold = new Set<string>();
+        (payload.soldSeats || []).forEach((s) => {
+          const section = String(s.section || 'Orchestra').trim();
+          const row = String(s.row || '').trim();
+          const seatNumber = String(s.seatNumber || '').trim();
+          if (!row || !seatNumber) return;
+          sold.add(`${section}||${row}||${seatNumber}`.toLowerCase());
+        });
+        setSoldSeatIds(sold);
+        const remaining = payload.standing?.remaining;
+        const price = payload.standing?.price;
+        setStandingRemaining(Number.isFinite(Number(remaining)) ? Number(remaining) : null);
+        setStandingPrice(Number.isFinite(Number(price)) ? Number(price) : null);
+        setStandingQty((prev) => {
+          const max = Number.isFinite(Number(remaining)) ? Math.max(0, Number(remaining)) : prev;
+          return Math.min(prev, 4, max);
+        });
+      } catch {
+        if (!mounted) return;
+        setSoldSeatIds(new Set());
+        setStandingRemaining(null);
+        setStandingPrice(null);
+      } finally {
+        if (mounted) setTicketingLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [concertId]);
+
+  useEffect(() => {
+    if (!concertId) return;
 
     setLoading(true);
     // Single block — 11 rows (A–K), 12 seats per side (24 per row), center walkway
     const rows = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'];
     const seatsPerSide = 12;
-    const totalRenderedSeats = rows.length * seatsPerSide * 2;
-
-    let targetAvailable = Math.round(totalRenderedSeats * 0.5);
-    if (
-      concertInfo &&
-      Number.isFinite(concertInfo.availableTickets) &&
-      Number.isFinite(concertInfo.totalTickets) &&
-      (concertInfo.totalTickets as number) > 0
-    ) {
-      const ratio = (concertInfo.availableTickets as number) / (concertInfo.totalTickets as number);
-      targetAvailable = Math.round(totalRenderedSeats * clamp(ratio, 0, 1));
-    }
-
-    const availableMask = buildAvailabilityMask(totalRenderedSeats, targetAvailable, String(concertId));
-    let seatIndex = 0;
     const mainSeats: Seat[] = [];
 
     rows.forEach((row, ri) => {
       for (let s = 1; s <= seatsPerSide * 2; s++) {
+        const section = 'Orchestra';
+        const soldKey = `${section}||${row}||${s}`.toLowerCase();
+        const statusFromInventory = soldSeatIds.has(soldKey) ? 'taken' : null;
         mainSeats.push({
           id: `main-${concertId}-${row}-${s}`,
-          section: 'Orchestra',
+          section,
           row,
           seatNumber: String(s),
           price: 100 - ri * 6,
-          status: availableMask.has(seatIndex) ? 'available' : 'taken',
+          status: statusFromInventory || 'available',
         });
-        seatIndex += 1;
       }
     });
 
     setSections([{ name: 'Orchestra', seats: mainSeats, color: '#64748b', subsection: 'center' }]);
     setLoading(false);
-  }, [concertId, concertInfo?.availableTickets, concertInfo?.totalTickets]);
+  }, [concertId, soldSeatIds]);
 
   const renderedTotalSeats = sections.reduce((sum, section) => sum + section.seats.length, 0);
   const renderedAvailableSeats = sections.reduce(
@@ -204,7 +226,7 @@ const SeatingMapPage: React.FC = () => {
       })));
     } else {
       // Select seat (limit to 4 seats)
-      if (selectedSeats.length < 4) {
+      if (selectedSeats.length + standingQty < 4) {
         setSelectedSeats(prev => [...prev, seat]);
         setSections(prev => prev.map(section => ({
           ...section,
@@ -217,7 +239,9 @@ const SeatingMapPage: React.FC = () => {
   };
 
   const getTotalPrice = () => {
-    return selectedSeats.reduce((total, seat) => total + seat.price, 0);
+    const seatsTotal = selectedSeats.reduce((total, seat) => total + seat.price, 0);
+    const standTotal = standingPrice != null ? standingQty * standingPrice : 0;
+    return seatsTotal + standTotal;
   };
 
   const handleSeatMouseEnter = (seat: Seat, e: React.MouseEvent<HTMLDivElement>) => {
@@ -232,14 +256,16 @@ const SeatingMapPage: React.FC = () => {
   };
 
   const handleProceedToPayment = () => {
-    if (selectedSeats.length === 0) return;
+    if (selectedSeats.length + standingQty === 0) return;
     
     // Store selected seats in session storage for payment page
     sessionStorage.setItem('selectedSeats', JSON.stringify(selectedSeats));
+    sessionStorage.setItem('standingQty', String(standingQty));
+    if (standingPrice != null) sessionStorage.setItem('standingPrice', String(standingPrice));
     navigate(`/payment/${concertId}`);
   };
 
-  if (loading || concertLoading) {
+  if (loading || concertLoading || ticketingLoading) {
     return (
       <div className="seating-page loading">
         <p>Loading seating map...</p>
@@ -478,10 +504,9 @@ const SeatingMapPage: React.FC = () => {
 
         <aside className="selection-summary">
           <div className="selected-seats">
-            <h3>Selected Seats ({selectedSeats.length}/4)</h3>
-            {selectedSeats.length === 0 ? (
-              <p>No seats selected</p>
-            ) : (
+            <h3>Selected Tickets ({selectedSeats.length + standingQty}/4)</h3>
+            {selectedSeats.length + standingQty === 0 ? <p>No tickets selected</p> : null}
+            {selectedSeats.length > 0 ? (
               <div className="seats-list">
                 {selectedSeats.map((seat) => (
                   <div key={seat.id} className="selected-seat">
@@ -490,7 +515,47 @@ const SeatingMapPage: React.FC = () => {
                   </div>
                 ))}
               </div>
-            )}
+            ) : null}
+            <div className="standing-picker">
+              <div className="standing-picker-row">
+                <span className="standing-label">
+                  Standing (no seat)
+                  {standingRemaining != null ? ` • ${standingRemaining} left` : ''}
+                </span>
+                <span className="standing-price">
+                  {standingPrice != null ? `$${standingPrice.toFixed(2)}` : ''}
+                </span>
+              </div>
+              <div className="standing-controls">
+                <button
+                  type="button"
+                  className="standing-btn"
+                  onClick={() => setStandingQty((q) => Math.max(0, q - 1))}
+                  disabled={standingQty <= 0}
+                >
+                  −
+                </button>
+                <span className="standing-qty" aria-label="Standing ticket quantity">{standingQty}</span>
+                <button
+                  type="button"
+                  className="standing-btn"
+                  onClick={() =>
+                    setStandingQty((q) => {
+                      const maxByLimit = 4 - selectedSeats.length;
+                      const maxByInv = standingRemaining != null ? standingRemaining : 4;
+                      return Math.min(q + 1, maxByLimit, maxByInv);
+                    })
+                  }
+                  disabled={
+                    standingRemaining === 0 ||
+                    standingQty >= (standingRemaining != null ? standingRemaining : 4) ||
+                    selectedSeats.length + standingQty >= 4
+                  }
+                >
+                  +
+                </button>
+              </div>
+            </div>
           </div>
 
           <div className="total-price">
@@ -500,7 +565,7 @@ const SeatingMapPage: React.FC = () => {
           <div className="seating-actions">
             <button 
               onClick={handleProceedToPayment}
-              disabled={selectedSeats.length === 0}
+              disabled={selectedSeats.length + standingQty === 0}
               className="proceed-payment-btn"
             >
               Proceed to Payment

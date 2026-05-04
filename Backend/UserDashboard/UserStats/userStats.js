@@ -85,6 +85,8 @@ const getUserStats = async (req, res) => {
                     FROM queue_history qh
                     INNER JOIN concerts c ON c.concert_id = qh.concert_id
                     WHERE qh.user_id = ?
+                      AND qh.status = 'completed'
+                      AND qh.total_cost > 0
                     GROUP BY
                         c.concert_id,
                         c.concert_name,

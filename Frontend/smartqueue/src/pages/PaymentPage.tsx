@@ -3,6 +3,8 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import '../styling/PaymentPage.css';
 
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'https://cosc4353-smartqueue.onrender.com').replace(/\/$/, '');
+
 interface SelectedSeat {
   id: string;
   section: string;
@@ -29,6 +31,8 @@ const PaymentPage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [selectedSeats, setSelectedSeats] = useState<SelectedSeat[]>([]);
+  const [standingQty, setStandingQty] = useState(0);
+  const [standingPrice, setStandingPrice] = useState<number | null>(null);
   const [paymentForm, setPaymentForm] = useState<PaymentForm>({
     cardNumber: '',
     expiryDate: '',
@@ -48,10 +52,23 @@ const PaymentPage: React.FC = () => {
   useEffect(() => {
     // Get selected seats from session storage
     const storedSeats = sessionStorage.getItem('selectedSeats');
+    const storedStandingQty = sessionStorage.getItem('standingQty');
+    const storedStandingPrice = sessionStorage.getItem('standingPrice');
     if (storedSeats) {
       setSelectedSeats(JSON.parse(storedSeats));
     } else {
       // Redirect back if no seats selected
+      // (standing-only still counts as a selection)
+    }
+    if (storedStandingQty) {
+      const qty = Number(storedStandingQty);
+      setStandingQty(Number.isFinite(qty) ? Math.max(0, Math.min(4, qty)) : 0);
+    }
+    if (storedStandingPrice) {
+      const p = Number(storedStandingPrice);
+      setStandingPrice(Number.isFinite(p) ? p : null);
+    }
+    if (!storedSeats && !storedStandingQty) {
       navigate(`/seating/${concertId}`);
     }
   }, [concertId, navigate]);
@@ -160,7 +177,7 @@ const PaymentPage: React.FC = () => {
         throw new Error('Missing user or concert information for payment confirmation');
       }
 
-      const paymentResponse = await fetch('https://cosc4353-smartqueue.onrender.com/api/payment/complete', {
+      const paymentResponse = await fetch(`${API_BASE}/api/payment/complete`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -168,8 +185,15 @@ const PaymentPage: React.FC = () => {
         body: JSON.stringify({
           userId: userID,
           concertId: concertID,
-          ticketCount: selectedSeats.length,
+          ticketCount: selectedSeats.length + standingQty,
           totalCost: getGrandTotal(),
+          seats: selectedSeats.map((s) => ({
+            section: s.section,
+            row: s.row,
+            seatNumber: s.seatNumber,
+            price: s.price,
+          })),
+          standingQty,
         }),
       });
 
@@ -180,6 +204,8 @@ const PaymentPage: React.FC = () => {
       
       // Clear selected seats from storage
       sessionStorage.removeItem('selectedSeats');
+      sessionStorage.removeItem('standingQty');
+      sessionStorage.removeItem('standingPrice');
       
       // Show success modal
       setShowSuccessModal(true);
@@ -192,7 +218,9 @@ const PaymentPage: React.FC = () => {
   };
 
   const getTotalPrice = () => {
-    return selectedSeats.reduce((total, seat) => total + seat.price, 0);
+    const seatTotal = selectedSeats.reduce((total, seat) => total + seat.price, 0);
+    const standTotal = standingPrice != null ? standingQty * standingPrice : 0;
+    return seatTotal + standTotal;
   };
 
   const getFees = () => {
@@ -228,13 +256,19 @@ const PaymentPage: React.FC = () => {
             </div>
 
             <div className="selected-seats">
-              <h4>Selected Seats ({selectedSeats.length})</h4>
+              <h4>Selected Tickets ({selectedSeats.length + standingQty})</h4>
               {selectedSeats.map((seat) => (
                 <div key={seat.id} className="seat-item">
                   <span>Seat {seat.row}{seat.seatNumber}</span>
                   <span>${seat.price.toFixed(2)}</span>
                 </div>
               ))}
+              {standingQty > 0 && standingPrice != null && (
+                <div className="seat-item">
+                  <span>Standing × {standingQty}</span>
+                  <span>${(standingQty * standingPrice).toFixed(2)}</span>
+                </div>
+              )}
             </div>
 
             <div className="pricing-breakdown">

@@ -1,4 +1,4 @@
-/* Position 6 Notification Banner */
+/* Queue banner: slide in, stay ~10s, then fade (handled in TS + .is-fading-out) */
 .position-6-notification {
   position: fixed;
   top: 0;
@@ -7,8 +7,14 @@
   background: linear-gradient(135deg, #10b981 0%, #059669 100%);
   color: white;
   z-index: 1000;
-  animation: slideDown 0.5s ease-out, slideUp 5s ease-in 4.5s forwards;
+  animation: slideDown 0.5s ease-out;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  opacity: 1;
+  transition: opacity 0.55s ease;
+}
+
+.position-6-notification.is-fading-out {
+  opacity: 0;
 }
 
 @keyframes slideDown {
@@ -17,17 +23,6 @@
   }
   to {
     transform: translateY(0);
-  }
-}
-
-@keyframes slideUp {
-  from {
-    transform: translateY(0);
-    opacity: 1;
-  }
-  to {
-    transform: translateY(-100%);
-    opacity: 0;
   }
 }
 
@@ -59,6 +54,53 @@
   margin: 0;
   font-size: 1rem;
   opacity: 0.95;
+}
+
+.notification-go-queue-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 0.75rem;
+  padding: 0.45rem 1.1rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.95);
+  color: #047857;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-decoration: none;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  transition: background 0.2s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.notification-go-queue-btn:hover {
+  background: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.notification-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.notification-dismiss-never {
+  background: rgba(255, 255, 255, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  color: white;
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 0.45rem 0.9rem;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s ease;
+}
+
+.notification-dismiss-never:hover {
+  background: rgba(255, 255, 255, 0.32);
 }
 
 .notification-close {
@@ -106,5 +148,15 @@
 
   .notification-icon {
     font-size: 2rem;
+  }
+
+  .notification-actions {
+    width: 100%;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+
+  .notification-dismiss-never {
+    font-size: 0.82rem;
   }
 }

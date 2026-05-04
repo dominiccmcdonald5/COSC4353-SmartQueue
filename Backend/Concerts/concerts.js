@@ -1,5 +1,10 @@
 const { pool } = require('../database');
 
+function sendJson(res, status, body) {
+    res.writeHead(status, { "Content-Type": "application/json" });
+    res.end(JSON.stringify(body));
+}
+
 // Helper function to format concert for frontend
 const formatConcertForFrontend = (concert) => {
     let status = 'available';
@@ -33,10 +38,91 @@ const formatConcertForFrontend = (concert) => {
     };
 };
 
+const STANDING_CAPACITY_FRACTION = 0.3;
+const STANDING_PRICE_FRACTION = 0.6;
+const STANDING_MIN_PRICE = 10;
+const STANDING_SECTION = 'Standing';
+const STANDING_ROW = 'NOSEAT';
+
+const handleGetConcertTicketing = (req, res, concertId) => {
+    const id = parseInt(concertId);
+    if (!Number.isInteger(id) || id <= 0) {
+        sendJson(res, 400, { success: false, message: 'Invalid concert id' });
+        return;
+    }
+
+    const concertQuery = `
+        SELECT concert_id, capacity, ticket_price
+        FROM concerts
+        WHERE concert_id = ?
+        LIMIT 1
+    `;
+
+    pool.query(concertQuery, [id], (concertErr, concertRows) => {
+        if (concertErr) {
+            console.error('Error fetching concert ticketing info:', concertErr);
+            sendJson(res, 500, { success: false, message: 'Failed to fetch concert ticketing info' });
+            return;
+        }
+        if (!Array.isArray(concertRows) || concertRows.length === 0) {
+            sendJson(res, 404, { success: false, message: 'Concert not found' });
+            return;
+        }
+
+        const capacity = Math.max(0, Number(concertRows[0].capacity) || 0);
+        const basePrice = Number(concertRows[0].ticket_price);
+        const standingCapacity = Math.max(0, Math.floor(capacity * STANDING_CAPACITY_FRACTION));
+        const standingPrice = Number.isFinite(basePrice)
+            ? Math.max(STANDING_MIN_PRICE, Math.round((basePrice * STANDING_PRICE_FRACTION) * 100) / 100)
+            : 0;
+
+        const soldSeatsQuery = `
+            SELECT section, row_label AS row, seat_number AS seatNumber
+            FROM sold_seats
+            WHERE concert_id = ?
+        `;
+        const standingSoldQuery = `
+            SELECT COUNT(*) AS sold
+            FROM sold_seats
+            WHERE concert_id = ?
+              AND section = ?
+              AND row_label = ?
+        `;
+
+        pool.query(soldSeatsQuery, [id], (soldErr, soldRows) => {
+            if (soldErr) {
+                console.error('Error fetching sold seats:', soldErr);
+                sendJson(res, 500, { success: false, message: 'Failed to fetch sold seats' });
+                return;
+            }
+            pool.query(standingSoldQuery, [id, STANDING_SECTION, STANDING_ROW], (standingErr, standingRows) => {
+                if (standingErr) {
+                    console.error('Error fetching standing sold count:', standingErr);
+                    sendJson(res, 500, { success: false, message: 'Failed to fetch standing inventory' });
+                    return;
+                }
+
+                const standingSold = Math.max(0, Number(standingRows?.[0]?.sold) || 0);
+                const standingRemaining = Math.max(0, standingCapacity - standingSold);
+
+                sendJson(res, 200, {
+                    success: true,
+                    soldSeats: Array.isArray(soldRows) ? soldRows : [],
+                    standing: {
+                        capacity: standingCapacity,
+                        sold: standingSold,
+                        remaining: standingRemaining,
+                        price: standingPrice,
+                    },
+                });
+            });
+        });
+    });
+};
+
 const handleGetConcerts = (req, res) => {
     console.log('Fetching concerts from Azure MySQL...');
     
-    // Query using your actual table and column names
     const query = `
         SELECT 
             c.concert_id,
@@ -59,12 +145,7 @@ const handleGetConcerts = (req, res) => {
     pool.query(query, (error, rows) => {
         if (error) {
             console.error('Error fetching concerts:', error);
-            res.writeHead(500, { "Content-Type": "application/json" });
-            res.end(JSON.stringify({
-                success: false,
-                message: 'Failed to fetch concerts',
-                error: error.message
-            }));
+            sendJson(res, 500, { success: false, message: 'Failed to fetch concerts', error: error.message });
             return;
         }
         
@@ -78,11 +159,7 @@ const handleGetConcerts = (req, res) => {
             });
         });
         
-        res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({
-            success: true,
-            concerts: concerts
-        }));
+        sendJson(res, 200, { success: true, concerts: concerts });
     });
 };
 
@@ -112,20 +189,12 @@ const handleGetConcertById = (req, res, concertId) => {
     pool.query(query, [id], (error, rows) => {
         if (error) {
             console.error('Error fetching concert:', error);
-            res.writeHead(500, { "Content-Type": "application/json" });
-            res.end(JSON.stringify({
-                success: false,
-                message: 'Failed to fetch concert details'
-            }));
+            sendJson(res, 500, { success: false, message: 'Failed to fetch concert details' });
             return;
         }
         
         if (rows.length === 0) {
-            res.writeHead(404, { "Content-Type": "application/json" });
-            res.end(JSON.stringify({
-                success: false,
-                message: 'Concert not found'
-            }));
+            sendJson(res, 404, { success: false, message: 'Concert not found' });
             return;
         }
         
@@ -136,15 +205,12 @@ const handleGetConcertById = (req, res, concertId) => {
             availableTickets: availableTickets > 0 ? availableTickets : 0
         });
         
-        res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({
-            success: true,
-            concert: formattedConcert
-        }));
+        sendJson(res, 200, { success: true, concert: formattedConcert });
     });
 };
 
 module.exports = {
     handleGetConcerts,
-    handleGetConcertById
+    handleGetConcertById,
+    handleGetConcertTicketing
 };

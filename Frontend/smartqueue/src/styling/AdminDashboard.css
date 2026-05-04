@@ -234,6 +234,18 @@
   margin-bottom: 1rem;
 }
 
+.required-asterisk {
+  color: #dc2626;
+  font-weight: 800;
+}
+
+.admin-field-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #4b5563;
+  margin-bottom: 0.35rem;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));

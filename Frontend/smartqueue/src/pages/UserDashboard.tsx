@@ -7,6 +7,16 @@ import { FaDollarSign } from 'react-icons/fa';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell } from 'recharts';
 import '../styling/UserDashboard.css';
 
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'https://cosc4353-smartqueue.onrender.com').replace(/\/$/, '');
+
+interface SeatSelectionEntry {
+  section?: string;
+  row?: string;
+  seatNumber?: string;
+  seat?: string;
+  price?: number;
+}
+
 interface QueueHistory {
   id: string;
   concertID: number;
@@ -17,6 +27,9 @@ interface QueueHistory {
   status: 'completed' | 'cancelled' | 'in-progress';
   waitTime: string;
   ticketsPurchased?: number;
+  venue?: string;
+  totalCost?: number;
+  seatSelection?: SeatSelectionEntry[];
   imageUrl: string;
   queueStatus: 'secured' | 'pending' | 'sold-out';
 }
@@ -47,6 +60,15 @@ interface UserStats {
 
 type PassStatus = 'Gold' | 'Silver' | 'None';
 
+function formatSeatLine(s: SeatSelectionEntry): string {
+  const sec = s.section?.trim() || '—';
+  const row = s.row?.trim() || '—';
+  const num = (s.seatNumber ?? s.seat)?.toString().trim() || '—';
+  const p = Number(s.price);
+  const pricePart = Number.isFinite(p) ? ` ($${p.toFixed(2)})` : '';
+  return `Section ${sec}, Row ${row}, Seat ${num}${pricePart}`;
+}
+
 const UserDashboard: React.FC = () => {
   const { user, logout } = useAuth();
   const [queueHistory, setQueueHistory] = useState<QueueHistory[]>([]);
@@ -55,7 +77,7 @@ const UserDashboard: React.FC = () => {
   const [historyError, setHistoryError] = useState('');
   const [statsLoading, setStatsLoading] = useState(false);
   const [statsError, setStatsError] = useState('');
-  const [activeTab, setActiveTab] = useState<'history' | 'stats'>('history');
+  const [activeTab, setActiveTab] = useState<'history' | 'tickets' | 'stats'>('history');
   const [showBadgePopup, setShowBadgePopup] = useState(false);
   const [historySort, setHistorySort] = useState<HistorySort>('status-pending-first');
 
@@ -84,12 +106,14 @@ const UserDashboard: React.FC = () => {
     }
 
     const colors = ['#667eea', '#764ba2', '#10b981', '#f59e0b', '#ef4444', '#14b8a6', '#a855f7', '#06b6d4'];
-    return userStats.spendingByConcert.map((item, index) => ({
-      id: item.concertID,
-      label: item.concertName,
-      value: item.totalSpent,
-      color: colors[index % colors.length],
-    }));
+    return userStats.spendingByConcert
+      .filter((item) => Number(item.totalSpent) > 0)
+      .map((item, index) => ({
+        id: item.concertID,
+        label: item.concertName,
+        value: item.totalSpent,
+        color: colors[index % colors.length],
+      }));
   }, [userStats]);
 
   const successPercent = useMemo(() => {
@@ -133,7 +157,7 @@ const UserDashboard: React.FC = () => {
         setHistoryLoading(true);
         setHistoryError('');
 
-        const response = await fetch('https://cosc4353-smartqueue.onrender.com/api/user/history', {
+        const response = await fetch(`${API_BASE}/api/user/history`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -153,6 +177,11 @@ const UserDashboard: React.FC = () => {
             concert.concertImage ||
             concert.concert_image ||
             '/concert1.jpg';
+          const rawSeats = history.seatSelection ?? history.seat_selection;
+          let seatSelection: SeatSelectionEntry[] | undefined;
+          if (Array.isArray(rawSeats) && rawSeats.length > 0) {
+            seatSelection = rawSeats as SeatSelectionEntry[];
+          }
 
           return {
             id: String(history.historyID ?? history.history_id ?? concert.concertID ?? concert.concert_id),
@@ -161,6 +190,9 @@ const UserDashboard: React.FC = () => {
             artist: concert.artistName ?? concert.artist_name,
             genre: concert.genre,
             date: concert.date ?? concert.event_date,
+            venue: concert.venue != null ? String(concert.venue) : undefined,
+            totalCost: Number(history.totalCost ?? history.total_cost ?? 0),
+            seatSelection,
             status: historyStatus === 'completed' ? 'completed' : historyStatus === 'cancelled' ? 'cancelled' : 'in-progress',
             waitTime: `${history.waitTime ?? history.wait_time ?? 0} seconds`,
             ticketsPurchased: history.ticketCount ?? history.ticket_count,
@@ -194,7 +226,7 @@ const UserDashboard: React.FC = () => {
         setStatsLoading(true);
         setStatsError('');
 
-        const response = await fetch('https://cosc4353-smartqueue.onrender.com/api/user/stats', {
+        const response = await fetch(`${API_BASE}/api/user/stats`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -271,6 +303,13 @@ const UserDashboard: React.FC = () => {
     }
   }, [queueHistory, historySort]);
 
+  const purchasedTickets = useMemo(() => {
+    const dateMs = (d: string) => parseLocalDateFromApi(d)?.getTime() ?? 0;
+    return queueHistory
+      .filter((q) => q.queueStatus === 'secured' && (q.ticketsPurchased ?? 0) > 0)
+      .sort((a, b) => dateMs(b.date) - dateMs(a.date));
+  }, [queueHistory]);
+
   const getBadgeInfo = () => {
     switch (userPassStatus) {
       case 'Silver':
@@ -341,6 +380,12 @@ const UserDashboard: React.FC = () => {
             onClick={() => setActiveTab('history')}
           >
             Queue History
+          </button>
+          <button 
+            className={`tab ${activeTab === 'tickets' ? 'active' : ''}`}
+            onClick={() => setActiveTab('tickets')}
+          >
+            My Tickets
           </button>
           <button 
             className={`tab ${activeTab === 'stats' ? 'active' : ''}`}
@@ -442,6 +487,75 @@ const UserDashboard: React.FC = () => {
                   </div>
                 </div>
               ))}
+            </div>
+          </section>
+        )}
+
+        {activeTab === 'tickets' && (
+          <section className="queue-history tickets-panel">
+            <div className="history-history-header">
+              <h3>My Tickets</h3>
+              <p className="tickets-tab-lead">Purchases tied to your completed queue orders.</p>
+            </div>
+            {historyLoading && <p>Loading history...</p>}
+            {historyError && <p className="error-message">{historyError}</p>}
+            {!historyLoading && !historyError && purchasedTickets.length === 0 && (
+              <p>No ticket purchases yet.</p>
+            )}
+            <div className="history-list">
+              {!historyLoading &&
+                !historyError &&
+                purchasedTickets.map((item) => (
+                  <div key={item.id} className="history-item ticket-purchase-card">
+                    <div className="concert-image">
+                      <img
+                        src={item.imageUrl}
+                        alt={item.concertName}
+                        onError={(e) => {
+                          e.currentTarget.src = '/concert1.jpg';
+                        }}
+                      />
+                    </div>
+                    <div className="concert-details">
+                      <div className="concert-main-info">
+                        <h4 className="concert-name">{item.concertName}</h4>
+                        <p className="concert-artist">{item.artist}</p>
+                        <div className="concert-meta">
+                          <span className="concert-genre">{item.genre}</span>
+                          <span className="concert-date">{formatLocalDateFromApi(item.date)}</span>
+                        </div>
+                        {item.venue ? (
+                          <p className="ticket-venue-line">
+                            <strong>Venue:</strong> {item.venue}
+                          </p>
+                        ) : null}
+                        <div className="queue-metrics-inline">
+                          <span className="metric-inline">
+                            Tickets: {item.ticketsPurchased ?? 0}
+                          </span>
+                          {item.totalCost != null && item.totalCost > 0 ? (
+                            <span className="metric-inline">
+                              Paid: ${item.totalCost.toFixed(2)}
+                            </span>
+                          ) : null}
+                        </div>
+                        {item.seatSelection && item.seatSelection.length > 0 ? (
+                          <ul className="ticket-seat-list">
+                            {item.seatSelection.map((s, idx) => (
+                              <li key={`${item.id}-seat-${idx}`}>{formatSeatLine(s)}</li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="ticket-seat-missing">Seat details not stored for this order.</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="queue-status-indicator secured">
+                      <span className="status-dot" />
+                      <span className="status-text">Purchased</span>
+                    </div>
+                  </div>
+                ))}
             </div>
           </section>
         )}

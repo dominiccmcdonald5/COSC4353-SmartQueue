@@ -369,6 +369,140 @@ function normalizeSeatsForStorage(raw) {
   return out.length ? JSON.stringify(out) : null;
 }
 
+async function ticketInventoryTablesExist() {
+  const [rows] = await pool.promise().query(
+    `SELECT TABLE_NAME
+     FROM INFORMATION_SCHEMA.TABLES
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME IN ('sold_seats')`
+  );
+  const names = new Set((rows || []).map(r => String(r.TABLE_NAME || '').toLowerCase()));
+  return names.has('sold_seats');
+}
+
+/** @param {unknown} raw @returns {Array<{section:string,row:string,seatNumber:string,price?:number}>} */
+function normalizeSeatsForInventory(raw) {
+  if (!Array.isArray(raw)) return [];
+  const out = [];
+  for (const s of raw) {
+    if (!s || typeof s !== 'object') continue;
+    const section = String(/** @type {any} */ (s).section ?? '').trim() || 'Orchestra';
+    const row = String(/** @type {any} */ (s).row ?? '').trim();
+    const seatNumber = String(
+      /** @type {any} */ (s).seatNumber ?? /** @type {any} */ (s).seat_number ?? ''
+    ).trim();
+    if (!row || !seatNumber) continue;
+    const price = Number(/** @type {any} */ (s).price);
+    out.push({
+      section,
+      row,
+      seatNumber,
+      ...(Number.isFinite(price) ? { price } : {}),
+    });
+  }
+  // de-dupe within payload
+  const seen = new Set();
+  return out.filter((x) => {
+    const k = `${x.section}||${x.row}||${x.seatNumber}`.toLowerCase();
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+
+async function getStandingPolicyForConcert(concertID) {
+  const [[row]] = await pool.promise().query(
+    `SELECT capacity, ticket_price, ticket_price_min
+     FROM concerts
+     WHERE concert_id = ?
+     LIMIT 1`,
+    [concertID]
+  );
+  const capacity = Math.max(0, toNumber(row?.capacity));
+  const basePrice = row?.ticket_price_min != null ? Number(row?.ticket_price_min) : Number(row?.ticket_price);
+  const standingCapacity = Math.max(0, Math.floor(capacity * 0.3));
+  const standingPrice = Number.isFinite(basePrice)
+    ? Math.max(10, Math.round(basePrice * 100) / 100)
+    : 0;
+  return { standingCapacity, standingPrice };
+}
+
+async function getStandingSoldCount(concertID) {
+  const [[row]] = await pool.promise().query(
+    `SELECT COUNT(*) AS sold
+     FROM sold_seats
+     WHERE concert_id = ?
+       AND section = 'Standing'
+       AND row_label = 'NOSEAT'`,
+    [concertID]
+  );
+  return Math.max(0, toNumber(row?.sold));
+}
+
+async function insertStandingPseudoSeats({ concertID, userID, historyID, quantity }) {
+  if (quantity <= 0) return;
+  const { standingPrice } = await getStandingPolicyForConcert(concertID);
+  const conn = await pool.promise().getConnection();
+  try {
+    await conn.beginTransaction();
+
+    // Lock existing standing rows for this concert so seat_number allocation is stable.
+    const [rows] = await conn.query(
+      `SELECT seat_number
+       FROM sold_seats
+       WHERE concert_id = ?
+         AND section = 'Standing'
+         AND row_label = 'NOSEAT'
+       FOR UPDATE`,
+      [concertID]
+    );
+    let maxN = 0;
+    for (const r of rows || []) {
+      const n = Number(String(r.seat_number || '').trim());
+      if (Number.isFinite(n) && n > maxN) maxN = n;
+    }
+    const values = [];
+    for (let i = 1; i <= quantity; i += 1) {
+      values.push([concertID, userID, historyID, 'Standing', 'NOSEAT', String(maxN + i), standingPrice]);
+    }
+
+    await conn.query(
+      `INSERT INTO sold_seats (concert_id, user_id, history_id, section, row_label, seat_number, price)
+       VALUES ?`,
+      [values]
+    );
+
+    await conn.commit();
+  } catch (e) {
+    try { await conn.rollback(); } catch { /* ignore */ }
+    throw e;
+  } finally {
+    conn.release();
+  }
+}
+
+async function assertSeatsAvailableOrThrow(concertID, seats) {
+  if (!seats.length) return;
+  // Query existing sold seats for these keys
+  const clauses = seats.map(() => `(section = ? AND row_label = ? AND seat_number = ?)`).join(' OR ');
+  const params = [];
+  for (const s of seats) {
+    params.push(s.section, s.row, s.seatNumber);
+  }
+  const [rows] = await pool.promise().query(
+    `SELECT section, row_label AS row, seat_number AS seatNumber
+     FROM sold_seats
+     WHERE concert_id = ?
+       AND (${clauses})
+     LIMIT 50`,
+    [concertID, ...params]
+  );
+  if (Array.isArray(rows) && rows.length > 0) {
+    const first = rows[0];
+    throw new Error(`Seat already taken: ${first.section} ${first.row}${first.seatNumber}`);
+  }
+}
+
 async function fetchEffectiveUserPriority(userID, concertID) {
   // If schema isn't updated yet, degrade gracefully to FIFO.
   if (!(await priorityColumnExists())) return PRIORITY.NONE;
@@ -972,6 +1106,7 @@ async function completePayment(req, res) {
     const userID = Number(payload.userId);
     const ticketCount = Number(payload.ticketCount);
     const totalCost = Number(payload.totalCost);
+    const standingQty = Math.max(0, Math.min(4, Number(payload.standingQty || 0)));
 
     if (!Number.isInteger(concertID) || concertID <= 0 || !Number.isInteger(userID) || userID <= 0) {
       sendJson(res, 400, { success: false, message: 'Valid concertId and userId are required' });
@@ -988,7 +1123,39 @@ async function completePayment(req, res) {
       return;
     }
 
+    const seatsForInventory = normalizeSeatsForInventory(payload.seats);
+    const expectedTickets = seatsForInventory.length + standingQty;
+    if (expectedTickets <= 0) {
+      sendJson(res, 400, { success: false, message: 'Select at least one seat or standing ticket' });
+      return;
+    }
+    if (expectedTickets !== ticketCount) {
+      sendJson(res, 400, { success: false, message: 'ticketCount does not match selection' });
+      return;
+    }
+
     await expireStaleQueueEntries({ concertID, userID });
+
+    // Persist inventory if the DB has the tables; otherwise give a clear error.
+    if (!(await ticketInventoryTablesExist())) {
+      sendJson(res, 400, {
+        success: false,
+        message:
+          "Ticket inventory tables are missing. Run Backend/add_ticket_inventory_tables.sql on the database.",
+      });
+      return;
+    }
+
+    await assertSeatsAvailableOrThrow(concertID, seatsForInventory);
+    if (standingQty > 0) {
+      const { standingCapacity } = await getStandingPolicyForConcert(concertID);
+      const standingSold = await getStandingSoldCount(concertID);
+      const remaining = Math.max(0, standingCapacity - standingSold);
+      if (standingQty > remaining) {
+        sendJson(res, 409, { success: false, message: `Standing tickets sold out (remaining: ${remaining})` });
+        return;
+      }
+    }
 
     const [activeRows] = await pool.promise().query(
       `
@@ -1087,6 +1254,52 @@ async function completePayment(req, res) {
         ticketCount,
         totalCost: roundedCost,
       };
+    }
+
+    // Record sold seats + standing after we have a historyID.
+    if (seatsForInventory.length > 0) {
+      const values = seatsForInventory.map((s) => [
+        concertID,
+        userID,
+        history.historyID,
+        s.section,
+        s.row,
+        s.seatNumber,
+        Number.isFinite(Number(s.price)) ? Number(s.price) : null,
+      ]);
+      try {
+        await pool
+          .promise()
+          .query(
+            `INSERT INTO sold_seats (concert_id, user_id, history_id, section, row_label, seat_number, price)
+             VALUES ?`,
+            [values]
+          );
+      } catch (e) {
+        // Unique constraint ensures concurrency safety.
+        if (e && (e.code === 'ER_DUP_ENTRY' || e.errno === 1062)) {
+          sendJson(res, 409, { success: false, message: 'One of the selected seats was just purchased by someone else.' });
+          return;
+        }
+        throw e;
+      }
+    }
+
+    if (standingQty > 0) {
+      try {
+        await insertStandingPseudoSeats({
+          concertID,
+          userID,
+          historyID: history.historyID,
+          quantity: standingQty,
+        });
+      } catch (e) {
+        if (e && (e.code === 'ER_DUP_ENTRY' || e.errno === 1062)) {
+          sendJson(res, 409, { success: false, message: 'Standing tickets were just purchased by someone else.' });
+          return;
+        }
+        throw e;
+      }
     }
 
     await pool.promise().query(

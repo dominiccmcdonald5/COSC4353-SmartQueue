@@ -77,6 +77,8 @@ const EDITABLE_FIELDS = [
   'venue',
   'capacity',
   'ticketPrice',
+  'ticketPriceMin',
+  'ticketPriceMax',
   'concertImage',
   'concertStatus',
 ];
@@ -145,6 +147,16 @@ function validateEditPayload(payload) {
     }
   }
 
+  const hasMin = Object.prototype.hasOwnProperty.call(payload, 'ticketPriceMin');
+  const hasMax = Object.prototype.hasOwnProperty.call(payload, 'ticketPriceMax');
+  if (hasMin || hasMax) {
+    const min = Number(payload.ticketPriceMin);
+    const max = Number(payload.ticketPriceMax);
+    if (!Number.isFinite(min) || min < 0) errors.push('ticketPriceMin must be a non-negative number');
+    if (!Number.isFinite(max) || max < 0) errors.push('ticketPriceMax must be a non-negative number');
+    if (Number.isFinite(min) && Number.isFinite(max) && min > max) errors.push('ticketPriceMin must be <= ticketPriceMax');
+  }
+
   if (Object.prototype.hasOwnProperty.call(payload, 'concertImage')) {
     if (typeof payload.concertImage !== 'string' || !payload.concertImage.trim()) {
       errors.push('concertImage must be a non-empty string');
@@ -187,6 +199,12 @@ function apiPatchToDbColumns(payload) {
   if (Object.prototype.hasOwnProperty.call(payload, 'ticketPrice')) {
     patch.ticket_price = Number(Number(payload.ticketPrice).toFixed(2));
   }
+  if (Object.prototype.hasOwnProperty.call(payload, 'ticketPriceMin')) {
+    patch.ticket_price_min = Number(Number(payload.ticketPriceMin).toFixed(2));
+  }
+  if (Object.prototype.hasOwnProperty.call(payload, 'ticketPriceMax')) {
+    patch.ticket_price_max = Number(Number(payload.ticketPriceMax).toFixed(2));
+  }
   if (Object.prototype.hasOwnProperty.call(payload, 'concertImage')) {
     patch.concert_image = payload.concertImage.trim();
   }
@@ -225,6 +243,13 @@ async function createConcert(req, res) {
     if (!Number.isFinite(price) || price < 0) {
       errors.push('ticketPrice must be a non-negative number');
     }
+    const priceMin = Number(payload.ticketPriceMin);
+    const priceMax = Number(payload.ticketPriceMax);
+    if (!Number.isFinite(priceMin) || priceMin < 0) errors.push('ticketPriceMin must be a non-negative number');
+    if (!Number.isFinite(priceMax) || priceMax < 0) errors.push('ticketPriceMax must be a non-negative number');
+    if (Number.isFinite(priceMin) && Number.isFinite(priceMax) && priceMin > priceMax) {
+      errors.push('ticketPriceMin must be <= ticketPriceMax');
+    }
 
     if (errors.length > 0) {
       sendJson(res, 400, { success: false, errors });
@@ -239,6 +264,8 @@ async function createConcert(req, res) {
       venue: payload.venue.trim(),
       capacity: Number(payload.capacity),
       ticketPrice: Number(price.toFixed(2)),
+      ticketPriceMin: Number(priceMin.toFixed(2)),
+      ticketPriceMax: Number(priceMax.toFixed(2)),
       concertImage:
         typeof payload.concertImage === 'string' && payload.concertImage.trim()
           ? payload.concertImage.trim()

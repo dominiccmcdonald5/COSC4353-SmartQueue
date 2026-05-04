@@ -361,13 +361,18 @@ const HomePage: React.FC = () => {
             )}
             {isUser && user?.passStatus === 'Silver' && (
               <div className="pass-dropdown">
-                <span className="pass-dropdown-trigger pass-link pass-status-static" tabIndex={0}>
+                <span
+                  className="pass-dropdown-trigger pass-link pass-status-static"
+                  tabIndex={0}
+                  aria-haspopup="menu"
+                  aria-label="Silver pass — open menu for expiry and upgrade"
+                >
                   🥈 Silver Pass
                   <span className="pass-dropdown-caret" aria-hidden>
                     ▾
                   </span>
                 </span>
-                <div className="pass-dropdown-panel" role="menu">
+                <div className="pass-dropdown-panel" role="menu" aria-label="Silver pass options">
                   <p className="pass-dropdown-expiry">
                     {user.passExpiresAt
                       ? `Expires ${formatPassExpiresForDisplay(user.passExpiresAt)}`
