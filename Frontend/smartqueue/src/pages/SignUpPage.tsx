@@ -4,6 +4,8 @@ import '../styling/LoginSignup.css';
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'https://cosc4353-smartqueue.onrender.com').replace(/\/$/, '');
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 const SignUpPage: React.FC = () => {
   const [formData, setFormData] = useState({
     firstName: '',
@@ -18,9 +20,19 @@ const SignUpPage: React.FC = () => {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
+    let filteredValue = value;
+
+    if (name === 'firstName' || name === 'lastName') {
+      filteredValue = value.replace(/[^a-zA-Z\s'-]/g, '');
+    }
+
+    if (name === 'email') {
+      filteredValue = value.trim().toLowerCase();
+    }
+
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: filteredValue
     }));
   };
 
@@ -28,13 +40,34 @@ const SignUpPage: React.FC = () => {
     e.preventDefault();
     setError('');
 
-    if (formData.password !== formData.confirmPassword) {
+    const firstName = formData.firstName.trim();
+    const lastName = formData.lastName.trim();
+    const email = formData.email.trim().toLowerCase();
+    const password = formData.password;
+    const confirmPassword = formData.confirmPassword;
+
+    if (firstName.length < 2 || lastName.length < 2) {
+      setError('First and last name must each be at least 2 characters');
+      return;
+    }
+
+    if (!EMAIL_REGEX.test(email)) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
+    if (password !== confirmPassword) {
       setError('Passwords do not match');
       return;
     }
 
-    if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters long');
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters long');
+      return;
+    }
+
+    if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/\d/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
+      setError('Password must include upper, lower, number, and special character');
       return;
     }
 
@@ -47,10 +80,10 @@ const SignUpPage: React.FC = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          email: formData.email,
-          password: formData.password,
+          firstName,
+          lastName,
+          email,
+          password,
         }),
       });
 
@@ -95,6 +128,8 @@ const SignUpPage: React.FC = () => {
               name="firstName"
               value={formData.firstName}
               onChange={handleChange}
+              maxLength={50}
+              autoComplete="given-name"
               required
             />
           </div>
@@ -107,6 +142,8 @@ const SignUpPage: React.FC = () => {
               name="lastName"
               value={formData.lastName}
               onChange={handleChange}
+              maxLength={50}
+              autoComplete="family-name"
               required
             />
           </div>
@@ -119,6 +156,7 @@ const SignUpPage: React.FC = () => {
               name="email"
               value={formData.email}
               onChange={handleChange}
+              autoComplete="email"
               required
             />
           </div>
@@ -132,7 +170,8 @@ const SignUpPage: React.FC = () => {
               value={formData.password}
               onChange={handleChange}
               required
-              minLength={6}
+              minLength={8}
+              autoComplete="new-password"
             />
           </div>
 
@@ -145,6 +184,8 @@ const SignUpPage: React.FC = () => {
               value={formData.confirmPassword}
               onChange={handleChange}
               required
+              minLength={8}
+              autoComplete="new-password"
             />
           </div>
 

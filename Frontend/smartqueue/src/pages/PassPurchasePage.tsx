@@ -4,6 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import '../styling/PassPurchasePage.css';
 import { chargeForPassSelection } from '../utils/passPricing';
 
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'https://cosc4353-smartqueue.onrender.com').replace(/\/$/, '');
+
 interface CheckoutPlan {
   id: string;
   name: string;
@@ -34,6 +36,7 @@ const PassPurchasePage: React.FC = () => {
     city: '',
     zipCode: ''
   });
+  const [errors, setErrors] = useState<Partial<Record<keyof typeof formData, string>>>({});
 
   const amountCharged = useMemo(() => {
     if (!selectedPlan) return 0;
@@ -45,15 +48,93 @@ const PassPurchasePage: React.FC = () => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
+    let filteredValue = value;
+
+    if (name === 'cardNumber') {
+      const digits = value.replace(/\D/g, '').slice(0, 16);
+      filteredValue = digits.replace(/(.{4})/g, '$1 ').trim();
+    } else if (name === 'expiryDate') {
+      const digits = value.replace(/\D/g, '').slice(0, 4);
+      filteredValue = digits.length > 2 ? `${digits.slice(0, 2)}/${digits.slice(2)}` : digits;
+    } else if (name === 'cvv') {
+      filteredValue = value.replace(/\D/g, '').slice(0, 4);
+    } else if (name === 'nameOnCard') {
+      filteredValue = value.replace(/[^a-zA-Z\s'-]/g, '');
+    } else if (name === 'city') {
+      filteredValue = value.replace(/[^a-zA-Z\s'-]/g, '');
+    } else if (name === 'zipCode') {
+      filteredValue = value.replace(/\D/g, '').slice(0, 5);
+    } else if (name === 'billingAddress') {
+      filteredValue = value.replace(/[^a-zA-Z0-9\s#.,-]/g, '');
+    }
+
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: filteredValue
     }));
+
+    if (errors[name as keyof typeof formData]) {
+      setErrors(prev => ({
+        ...prev,
+        [name]: undefined,
+      }));
+    }
   };
 
   const handlePurchase = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPlan || !user?.id || isSamePass) return;
+
+    const newErrors: Partial<Record<keyof typeof formData, string>> = {};
+    const cardDigits = formData.cardNumber.replace(/\s/g, '');
+    const expParts = formData.expiryDate.split('/');
+    const expMonth = Number(expParts[0]);
+    const expYear = Number(`20${expParts[1]}`);
+
+    if (cardDigits.length !== 16) {
+      newErrors.cardNumber = 'Card number must be exactly 16 digits';
+    }
+
+    if (
+      expParts.length !== 2 ||
+      expParts[0].length !== 2 ||
+      expParts[1].length !== 2 ||
+      expMonth < 1 ||
+      expMonth > 12
+    ) {
+      newErrors.expiryDate = 'Enter a valid expiry date (MM/YY)';
+    } else {
+      const now = new Date();
+      const expDate = new Date(expYear, expMonth, 1);
+      if (expDate <= now) {
+        newErrors.expiryDate = 'Card has expired';
+      }
+    }
+
+    if (formData.cvv.length < 3) {
+      newErrors.cvv = 'CVV must be 3 or 4 digits';
+    }
+
+    if (formData.nameOnCard.trim().length < 2) {
+      newErrors.nameOnCard = 'Name on card must be at least 2 characters';
+    }
+
+    if (formData.billingAddress.trim().length < 5) {
+      newErrors.billingAddress = 'Enter a valid billing address';
+    }
+
+    if (formData.city.trim().length < 2) {
+      newErrors.city = 'Enter a valid city';
+    }
+
+    if (formData.zipCode.length !== 5) {
+      newErrors.zipCode = 'ZIP code must be exactly 5 digits';
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
 
     setProcessing(true);
     console.log(selectedPlan);
@@ -72,7 +153,7 @@ const PassPurchasePage: React.FC = () => {
       }
       
       // Call API to update user's pass status
-      const response = await fetch('https://cosc4353-smartqueue.onrender.com/api/user/pass/update', {
+      const response = await fetch(`${API_BASE}/api/user/pass/update`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -178,8 +259,11 @@ const PassPurchasePage: React.FC = () => {
                   value={formData.cardNumber}
                   onChange={handleInputChange}
                   placeholder="1234 5678 9012 3456"
+                  maxLength={19}
+                  inputMode="numeric"
                   required
                 />
+                {errors.cardNumber && <span className="error-message">{errors.cardNumber}</span>}
               </div>
 
               <div className="form-row">
@@ -192,8 +276,11 @@ const PassPurchasePage: React.FC = () => {
                     value={formData.expiryDate}
                     onChange={handleInputChange}
                     placeholder="MM/YY"
+                    maxLength={5}
+                    inputMode="numeric"
                     required
                   />
+                  {errors.expiryDate && <span className="error-message">{errors.expiryDate}</span>}
                 </div>
                 <div className="form-group">
                   <label htmlFor="cvv">CVV</label>
@@ -204,8 +291,11 @@ const PassPurchasePage: React.FC = () => {
                     value={formData.cvv}
                     onChange={handleInputChange}
                     placeholder="123"
+                    maxLength={4}
+                    inputMode="numeric"
                     required
                   />
+                  {errors.cvv && <span className="error-message">{errors.cvv}</span>}
                 </div>
               </div>
 
@@ -220,6 +310,7 @@ const PassPurchasePage: React.FC = () => {
                   placeholder="John Doe"
                   required
                 />
+                {errors.nameOnCard && <span className="error-message">{errors.nameOnCard}</span>}
               </div>
 
               <div className="form-group">
@@ -233,6 +324,7 @@ const PassPurchasePage: React.FC = () => {
                   placeholder="123 Main Street"
                   required
                 />
+                {errors.billingAddress && <span className="error-message">{errors.billingAddress}</span>}
               </div>
 
               <div className="form-row">
@@ -247,6 +339,7 @@ const PassPurchasePage: React.FC = () => {
                     placeholder="New York"
                     required
                   />
+                  {errors.city && <span className="error-message">{errors.city}</span>}
                 </div>
                 <div className="form-group">
                   <label htmlFor="zipCode">ZIP Code</label>
@@ -257,8 +350,11 @@ const PassPurchasePage: React.FC = () => {
                     value={formData.zipCode}
                     onChange={handleInputChange}
                     placeholder="10001"
+                    maxLength={5}
+                    inputMode="numeric"
                     required
                   />
+                  {errors.zipCode && <span className="error-message">{errors.zipCode}</span>}
                 </div>
               </div>
 
