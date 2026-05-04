@@ -411,15 +411,32 @@ function normalizeSeatsForInventory(raw) {
 }
 
 async function getStandingPolicyForConcert(concertID) {
-  const [[row]] = await pool.promise().query(
-    `SELECT capacity, ticket_price, ticket_price_min
-     FROM concerts
-     WHERE concert_id = ?
-     LIMIT 1`,
-    [concertID]
-  );
+  let row;
+  try {
+    [[row]] = await pool.promise().query(
+      `SELECT capacity, ticket_price, ticket_price_min
+       FROM concerts
+       WHERE concert_id = ?
+       LIMIT 1`,
+      [concertID]
+    );
+  } catch (e) {
+    if (e && e.code === 'ER_BAD_FIELD_ERROR') {
+      [[row]] = await pool.promise().query(
+        `SELECT capacity, ticket_price
+         FROM concerts
+         WHERE concert_id = ?
+         LIMIT 1`,
+        [concertID]
+      );
+    } else {
+      throw e;
+    }
+  }
   const capacity = Math.max(0, toNumber(row?.capacity));
-  const basePrice = row?.ticket_price_min != null ? Number(row?.ticket_price_min) : Number(row?.ticket_price);
+  const minCandidate = row?.ticket_price_min != null ? Number(row?.ticket_price_min) : NaN;
+  const ticketCandidate = Number(row?.ticket_price);
+  const basePrice = Number.isFinite(minCandidate) ? minCandidate : Number.isFinite(ticketCandidate) ? ticketCandidate : 10;
   const standingCapacity = Math.max(0, Math.floor(capacity * 0.3));
   const standingPrice = Number.isFinite(basePrice)
     ? Math.max(10, Math.round(basePrice * 100) / 100)
@@ -490,7 +507,7 @@ async function assertSeatsAvailableOrThrow(concertID, seats) {
     params.push(s.section, s.row, s.seatNumber);
   }
   const [rows] = await pool.promise().query(
-    `SELECT section, row_label AS row, seat_number AS seatNumber
+    `SELECT section, row_label AS rowLabel, seat_number AS seatNumber
      FROM sold_seats
      WHERE concert_id = ?
        AND (${clauses})
@@ -499,7 +516,7 @@ async function assertSeatsAvailableOrThrow(concertID, seats) {
   );
   if (Array.isArray(rows) && rows.length > 0) {
     const first = rows[0];
-    throw new Error(`Seat already taken: ${first.section} ${first.row}${first.seatNumber}`);
+    throw new Error(`Seat already taken: ${first.section} ${first.rowLabel}${first.seatNumber}`);
   }
 }
 

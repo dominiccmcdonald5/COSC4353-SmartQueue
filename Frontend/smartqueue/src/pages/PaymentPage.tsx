@@ -26,6 +26,12 @@ interface PaymentForm {
   };
 }
 
+interface TicketingResponse {
+  success: boolean;
+  standing?: { price?: number };
+  message?: string;
+}
+
 const PaymentPage: React.FC = () => {
   const { concertId } = useParams<{ concertId: string }>();
   const { user } = useAuth();
@@ -72,6 +78,31 @@ const PaymentPage: React.FC = () => {
       navigate(`/seating/${concertId}`);
     }
   }, [concertId, navigate]);
+
+  useEffect(() => {
+    if (!concertId) return;
+    if (standingQty <= 0) return;
+    if (standingPrice != null) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/concerts/${concertId}/ticketing`);
+        const payload = (await res.json()) as TicketingResponse;
+        if (cancelled) return;
+        const p = payload?.standing?.price;
+        const n = Number(p);
+        if (res.ok && payload?.success && Number.isFinite(n)) {
+          setStandingPrice(n);
+          sessionStorage.setItem('standingPrice', String(n));
+        }
+      } catch {
+        /* keep UI */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [concertId, standingQty, standingPrice]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;

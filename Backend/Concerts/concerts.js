@@ -39,7 +39,6 @@ const formatConcertForFrontend = (concert) => {
 };
 
 const STANDING_CAPACITY_FRACTION = 0.3;
-const STANDING_PRICE_FRACTION = 0.6;
 const STANDING_MIN_PRICE = 10;
 const STANDING_SECTION = 'Standing';
 const STANDING_ROW = 'NOSEAT';
@@ -51,14 +50,46 @@ const handleGetConcertTicketing = (req, res, concertId) => {
         return;
     }
 
-    const concertQuery = `
+    const runConcertQuery = (sql, params, cb) => pool.query(sql, params, cb);
+
+    const concertQueryWithMin = `
+        SELECT concert_id, capacity, ticket_price, ticket_price_min
+        FROM concerts
+        WHERE concert_id = ?
+        LIMIT 1
+    `;
+
+    const concertQueryFallback = `
         SELECT concert_id, capacity, ticket_price
         FROM concerts
         WHERE concert_id = ?
         LIMIT 1
     `;
 
-    pool.query(concertQuery, [id], (concertErr, concertRows) => {
+    runConcertQuery(concertQueryWithMin, [id], (concertErr, concertRows) => {
+        if (concertErr && concertErr.code === 'ER_BAD_FIELD_ERROR') {
+            runConcertQuery(concertQueryFallback, [id], (fallbackErr, fallbackRows) => {
+                if (fallbackErr) {
+                    console.error('Error fetching concert ticketing info:', fallbackErr);
+                    sendJson(res, 500, { success: false, message: 'Failed to fetch concert ticketing info' });
+                    return;
+                }
+                // Reuse the same handler shape
+                return handleConcertRows(fallbackRows, false);
+            });
+            return;
+        }
+
+        if (concertErr) {
+            console.error('Error fetching concert ticketing info:', concertErr);
+            sendJson(res, 500, { success: false, message: 'Failed to fetch concert ticketing info' });
+            return;
+        }
+
+        return handleConcertRows(concertRows, true);
+    });
+
+    function handleConcertRows(concertRows, hasMinColumn) {
         if (concertErr) {
             console.error('Error fetching concert ticketing info:', concertErr);
             sendJson(res, 500, { success: false, message: 'Failed to fetch concert ticketing info' });
@@ -70,14 +101,23 @@ const handleGetConcertTicketing = (req, res, concertId) => {
         }
 
         const capacity = Math.max(0, Number(concertRows[0].capacity) || 0);
-        const basePrice = Number(concertRows[0].ticket_price);
+        const minCandidate =
+            hasMinColumn && concertRows[0].ticket_price_min != null
+                ? Number(concertRows[0].ticket_price_min)
+                : NaN;
+        const ticketCandidate = Number(concertRows[0].ticket_price);
+        const basePrice = Number.isFinite(minCandidate)
+            ? minCandidate
+            : Number.isFinite(ticketCandidate)
+                ? ticketCandidate
+                : STANDING_MIN_PRICE;
         const standingCapacity = Math.max(0, Math.floor(capacity * STANDING_CAPACITY_FRACTION));
         const standingPrice = Number.isFinite(basePrice)
-            ? Math.max(STANDING_MIN_PRICE, Math.round((basePrice * STANDING_PRICE_FRACTION) * 100) / 100)
+            ? Math.max(STANDING_MIN_PRICE, Math.round(basePrice * 100) / 100)
             : 0;
 
         const soldSeatsQuery = `
-            SELECT section, row_label AS row, seat_number AS seatNumber
+            SELECT section, row_label AS rowLabel, seat_number AS seatNumber
             FROM sold_seats
             WHERE concert_id = ?
         `;
@@ -117,7 +157,7 @@ const handleGetConcertTicketing = (req, res, concertId) => {
                 });
             });
         });
-    });
+    }
 };
 
 const handleGetConcerts = (req, res) => {
