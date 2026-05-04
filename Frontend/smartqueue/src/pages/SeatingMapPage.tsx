@@ -46,7 +46,7 @@ interface ApiConcertResponse {
 
 interface TicketingResponse {
   success: boolean;
-  soldSeats?: Array<{ section?: string; row?: string; seatNumber?: string }>;
+  soldSeats?: Array<{ section?: string; rowLabel?: string; seatNumber?: string }>;
   standing?: { capacity?: number; sold?: number; remaining?: number; price?: number };
   message?: string;
 }
@@ -149,7 +149,7 @@ const SeatingMapPage: React.FC = () => {
         const sold = new Set<string>();
         (payload.soldSeats || []).forEach((s) => {
           const section = String(s.section || 'Orchestra').trim();
-          const row = String(s.row || '').trim();
+          const row = String(s.rowLabel || '').trim();
           const seatNumber = String(s.seatNumber || '').trim();
           if (!row || !seatNumber) return;
           sold.add(`${section}||${row}||${seatNumber}`.toLowerCase());
@@ -523,7 +523,7 @@ const SeatingMapPage: React.FC = () => {
                   {standingRemaining != null ? ` • ${standingRemaining} left` : ''}
                 </span>
                 <span className="standing-price">
-                  {standingPrice != null ? `$${standingPrice.toFixed(2)}` : ''}
+                  {standingPrice != null ? `$${standingPrice.toFixed(2)}` : 'Loading…'}
                 </span>
               </div>
               <div className="standing-controls">
