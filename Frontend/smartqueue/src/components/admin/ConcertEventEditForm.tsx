@@ -97,7 +97,7 @@ const ConcertEventEditForm: React.FC<ConcertEventEditFormProps> = ({
         <div className="event-info-header event-info-header--edit">
           <div className="event-title-field">
             <label className="event-title-label" htmlFor={`edit-event-name-${editingEvent.id}`}>
-              Event name
+              Event name <span className="required-asterisk">*</span>
             </label>
             <input
               id={`edit-event-name-${editingEvent.id}`}
@@ -143,7 +143,9 @@ const ConcertEventEditForm: React.FC<ConcertEventEditFormProps> = ({
         <dl className="event-detail-rows">
           <div className="event-detail-row">
             <dt>
-              <label htmlFor={`edit-artist-${editingEvent.id}`}>Artist</label>
+              <label htmlFor={`edit-artist-${editingEvent.id}`}>
+                Artist <span className="required-asterisk">*</span>
+              </label>
             </dt>
             <dd>
               <input
@@ -175,7 +177,9 @@ const ConcertEventEditForm: React.FC<ConcertEventEditFormProps> = ({
           </div>
           <div className="event-detail-row">
             <dt>
-              <label htmlFor={`edit-genre-${editingEvent.id}`}>Genre</label>
+              <label htmlFor={`edit-genre-${editingEvent.id}`}>
+                Genre <span className="required-asterisk">*</span>
+              </label>
             </dt>
             <dd>
               <select
@@ -204,7 +208,9 @@ const ConcertEventEditForm: React.FC<ConcertEventEditFormProps> = ({
           </div>
           <div className="event-detail-row">
             <dt>
-              <label htmlFor={`edit-date-${editingEvent.id}`}>Date</label>
+              <label htmlFor={`edit-date-${editingEvent.id}`}>
+                Date <span className="required-asterisk">*</span>
+              </label>
             </dt>
             <dd>
               <input
@@ -226,7 +232,9 @@ const ConcertEventEditForm: React.FC<ConcertEventEditFormProps> = ({
           </div>
           <div className="event-detail-row">
             <dt>
-              <label htmlFor={`edit-venue-${editingEvent.id}`}>Venue</label>
+              <label htmlFor={`edit-venue-${editingEvent.id}`}>
+                Venue <span className="required-asterisk">*</span>
+              </label>
             </dt>
             <dd className="event-venue-edit-dd">
               <select
@@ -277,7 +285,9 @@ const ConcertEventEditForm: React.FC<ConcertEventEditFormProps> = ({
           </div>
           <div className="event-detail-row">
             <dt>
-              <label htmlFor={`edit-capacity-${editingEvent.id}`}>Capacity</label>
+              <label htmlFor={`edit-capacity-${editingEvent.id}`}>
+                Capacity <span className="required-asterisk">*</span>
+              </label>
             </dt>
             <dd>
               <input
@@ -302,7 +312,9 @@ const ConcertEventEditForm: React.FC<ConcertEventEditFormProps> = ({
             </dd>
           </div>
           <div className="event-detail-row">
-            <dt>Ticket price (range)</dt>
+            <dt>
+              Ticket price (range) <span className="required-asterisk">*</span>
+            </dt>
             <dd>
               <div className="event-price-range-inputs">
                 <input
@@ -348,6 +360,22 @@ const ConcertEventEditForm: React.FC<ConcertEventEditFormProps> = ({
                   Not valid
                 </span>
               )}
+            </dd>
+          </div>
+          <div className="event-detail-row">
+            <dt>
+              <label htmlFor={`edit-image-${editingEvent.id}`}>Image URL</label>
+            </dt>
+            <dd>
+              <input
+                id={`edit-image-${editingEvent.id}`}
+                type="url"
+                inputMode="url"
+                className="event-field-input"
+                placeholder="https://… (optional)"
+                value={editingEvent.image || ''}
+                onChange={(e) => setEditingEvent({ ...editingEvent, image: e.target.value })}
+              />
             </dd>
           </div>
         </dl>

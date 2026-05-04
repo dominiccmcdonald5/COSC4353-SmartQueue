@@ -60,6 +60,11 @@ function routes(req, res) {
     return concertsLegacy.handleGetConcerts(req, res);
   }
 
+  if (/^\/api\/concerts\/\d+\/ticketing$/.test(pathname) && method === 'GET') {
+    const concertId = pathname.split('/')[3];
+    return concertsLegacy.handleGetConcertTicketing(req, res, concertId);
+  }
+
   if (/^\/api\/concerts\/\d+$/.test(pathname) && method === 'GET') {
     const concertId = pathname.split('/').pop();
     return concertsLegacy.handleGetConcertById(req, res, concertId);

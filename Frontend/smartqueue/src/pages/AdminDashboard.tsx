@@ -122,11 +122,17 @@ function mapApiConcert(c: {
   venue: string;
   capacity: number;
   ticketPrice: number;
+  ticketPriceMin?: number;
+  ticketPriceMax?: number;
   concertImage: string;
   concertStatus: string;
 }): ConcertEvent {
   const soldOut = String(c.concertStatus).toLowerCase() === 'sold_out';
   const price = Number(c.ticketPrice);
+  const rawMin = c.ticketPriceMin ?? price;
+  const rawMax = c.ticketPriceMax ?? price;
+  const min = Number(rawMin);
+  const max = Number(rawMax);
   return {
     id: String(c.concertID),
     name: c.concertName || `Event ${c.concertID}`,
@@ -136,8 +142,8 @@ function mapApiConcert(c: {
     venue: c.venue || '',
     image: c.concertImage || DEFAULT_CONCERT_IMAGE,
     capacity: Number(c.capacity) || 0,
-    ticketPriceMin: Number.isFinite(price) ? price : 0,
-    ticketPriceMax: Number.isFinite(price) ? price : 0,
+    ticketPriceMin: Number.isFinite(min) ? min : 0,
+    ticketPriceMax: Number.isFinite(max) ? max : 0,
     status: soldOut ? 'completed' : 'upcoming',
     published: !soldOut,
   };
@@ -759,7 +765,8 @@ const AdminDashboard: React.FC = () => {
       date: newEvent.date,
       venue: venueTrimmed.slice(0, VENUE_MAX_LEN),
       capacity: newEvent.capacity,
-      ticketPrice: (min + max) / 2,
+      // Backend schema stores one base price; use the low end of the range.
+      ticketPrice: Math.min(min, max),
       concertImage: newEvent.image || DEFAULT_CONCERT_IMAGE,
     };
 
@@ -812,7 +819,8 @@ const AdminDashboard: React.FC = () => {
       date: editingEvent.date,
       venue: venueTrimmed.slice(0, VENUE_MAX_LEN),
       capacity: editingEvent.capacity,
-      ticketPrice: (min + max) / 2,
+      // Backend schema stores one base price; use the low end of the range.
+      ticketPrice: Math.min(min, max),
       concertImage: editingEvent.image || DEFAULT_CONCERT_IMAGE,
       concertStatus: editingEvent.status === 'completed' || editingEvent.status === 'cancelled'
         ? 'sold_out' : 'open',
@@ -1154,6 +1162,9 @@ const AdminDashboard: React.FC = () => {
                 <h4>Add New Concert Event</h4>
                 <div className="form-grid">
                   <div className="form-field-stacked">
+                    <label className="admin-field-label">
+                      Event name <span className="required-asterisk">*</span>
+                    </label>
                     <input
                       type="text"
                       placeholder="Event Name"
@@ -1171,6 +1182,9 @@ const AdminDashboard: React.FC = () => {
                     )}
                   </div>
                   <div className="form-field-stacked">
+                    <label className="admin-field-label">
+                      Artist <span className="required-asterisk">*</span>
+                    </label>
                     <input
                       type="text"
                       placeholder="Artist"
@@ -1200,6 +1214,9 @@ const AdminDashboard: React.FC = () => {
                     )}
                   </div>
                   <div className="form-field-stacked">
+                    <label className="admin-field-label">
+                      Genre <span className="required-asterisk">*</span>
+                    </label>
                     <select
                       className={addRequiredEmpty.genre ? 'is-invalid' : undefined}
                       value={newEvent.genre}
@@ -1223,6 +1240,9 @@ const AdminDashboard: React.FC = () => {
                     )}
                   </div>
                   <div className="form-field-stacked">
+                    <label className="admin-field-label">
+                      Date <span className="required-asterisk">*</span>
+                    </label>
                     <input
                       type="date"
                       className={addRequiredEmpty.date ? 'is-invalid' : undefined}
@@ -1238,8 +1258,20 @@ const AdminDashboard: React.FC = () => {
                       </span>
                     )}
                   </div>
+                  <div className="form-field-stacked form-field-stacked--full-row">
+                    <label className="admin-field-label">Image URL</label>
+                    <input
+                      type="url"
+                      inputMode="url"
+                      placeholder="Image URL (optional)"
+                      value={newEvent.image || ''}
+                      onChange={(e) => setNewEvent({ ...newEvent, image: e.target.value })}
+                    />
+                  </div>
                   <div className="form-field-venue">
-                    <span className="form-field-label">Venue</span>
+                    <span className="form-field-label">
+                      Venue <span className="required-asterisk">*</span>
+                    </span>
                     <select
                       className={`form-field-control${addRequiredEmpty.venue ? ' is-invalid' : ''}`}
                       value={venueSelectValue(newEvent.venue)}
@@ -1285,6 +1317,9 @@ const AdminDashboard: React.FC = () => {
                     )}
                   </div>
                   <div className="form-field-stacked">
+                    <label className="admin-field-label">
+                      Capacity <span className="required-asterisk">*</span>
+                    </label>
                     <input
                       type="number"
                       placeholder="Capacity"
@@ -1303,7 +1338,9 @@ const AdminDashboard: React.FC = () => {
                     )}
                   </div>
                   <div className="form-field-price-range">
-                    <span className="form-field-label">Ticket price range ($)</span>
+                    <span className="form-field-label">
+                      Ticket price range ($) <span className="required-asterisk">*</span>
+                    </span>
                     <div className="event-price-range-inputs">
                       <input
                         type="number"
