@@ -1023,11 +1023,40 @@
   margin-top: 2rem;
 }
 
-.queue-history h3 {
-  color: #333;
+.history-history-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
   margin-bottom: 1.5rem;
+}
+
+.history-history-header h3 {
+  color: #333;
+  margin-bottom: 0;
   font-size: 1.5rem;
   font-weight: 600;
+}
+
+.history-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.history-sort-label {
+  font-size: 0.9rem;
+  color: #6b7280;
+}
+
+.history-sort-select {
+  padding: 0.45rem 0.85rem;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  font-size: 0.9rem;
+  cursor: pointer;
 }
 
 .history-list {
