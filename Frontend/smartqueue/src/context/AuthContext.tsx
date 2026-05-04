@@ -19,6 +19,7 @@ interface AuthContextType {
   updatePassStatus: (passStatus: 'Gold' | 'Silver' | 'None') => void;
   updateMembership: (passStatus: 'Gold' | 'Silver' | 'None', passExpiresAt: string | null) => void;
   isLoading: boolean;
+  isHistoryLoading: boolean;
   isAuthenticated: boolean;
   isAdmin: boolean;
   isUser: boolean;
@@ -42,6 +43,7 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(true);
 
   const normalizeMembership = (u: User): User => {
     if (u.accountType !== 'user') return { ...u, passStatus: 'None', passExpiresAt: null };
@@ -50,35 +52,34 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return active ? u : { ...u, passStatus: 'None' as const };
   };
 
-  // Function to load purchase history and backfill recommendations
   const loadPurchaseHistory = async (userId: string) => {
     try {
       const parsedUserId = Number(userId);
       if (!parsedUserId) return;
 
-      // First, get the user's purchase stats
       const statsResponse = await fetch(`${API_BASE}/api/user/stats`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userID: parsedUserId }),
       });
 
       const statsData = await statsResponse.json();
-      if (!statsData.success || !statsData.spendingByConcert) {
-        return;
-      }
+      if (!statsData.success || !statsData.spendingByConcert) return;
 
-      // For each concert they've spent money on, fetch concert details and track as purchase
       for (const purchase of statsData.spendingByConcert) {
+        // 🔥 CRITICAL FIX: Skip purchases with $0 spent
+        if (purchase.totalSpent <= 0) {
+          console.log(`⏭️ Skipping ${purchase.concertName} - no actual spend ($${purchase.totalSpent})`);
+          continue;
+        }
+
+        console.log(`✅ Processing real purchase: ${purchase.concertName} ($${purchase.totalSpent})`);
+
         try {
-          // Fetch full concert details
           const concertResponse = await fetch(`${API_BASE}/api/concerts/${purchase.concertID}`);
           const concertData = await concertResponse.json();
           
           if (concertData.success && concertData.concert) {
-            // Map the concert data to match our Concert interface
             const concert = {
               id: String(concertData.concert.id),
               name: concertData.concert.name,
@@ -93,9 +94,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               genre: concertData.concert.genre,
             };
             
-            // Track as purchase (weight: 3 points)
             RecommendationEngine.trackInteraction(userId, concert, 'purchase');
-            console.log(`Backfilled purchase for concert: ${concert.name}`);
+            console.log(`✅ Backfilled purchase: ${concert.name} (${concert.genre})`);
           }
         } catch (error) {
           console.error(`Failed to load concert ${purchase.concertID}:`, error);
@@ -106,7 +106,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  // Function to load queue history as additional signals
   const loadQueueHistory = async (userId: string) => {
     try {
       const parsedUserId = Number(userId);
@@ -114,16 +113,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       const response = await fetch(`${API_BASE}/api/user/history`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userID: parsedUserId }),
       });
 
       const data = await response.json();
       if (!data.success || !data.concerts) return;
 
-      // Track each queue join (weight: 2 points)
       for (const concert of data.concerts) {
         const mappedConcert = {
           id: String(concert.concertID ?? concert.concert_id),
@@ -139,39 +135,44 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           genre: concert.genre,
         };
         
-        // Track as queue join (weight: 2 points)
         RecommendationEngine.trackInteraction(userId, mappedConcert, 'queue_join');
       }
-      console.log(`Backfilled ${data.concerts?.length || 0} queue interactions`);
+      console.log(`✅ Backfilled ${data.concerts?.length || 0} queue interactions`);
     } catch (error) {
       console.error('Failed to load queue history:', error);
     }
   };
 
   useEffect(() => {
-    // Check if user is already logged in (from localStorage)
     const savedUser = localStorage.getItem('smartqueue_user');
     if (savedUser) {
       const parsedUser = normalizeMembership(JSON.parse(savedUser));
       setUser(parsedUser);
       
-      // Backfill purchase and queue history for logged-in user
       if (parsedUser.accountType === 'user') {
-        loadPurchaseHistory(parsedUser.id);
-        loadQueueHistory(parsedUser.id);
+        setIsHistoryLoading(true);
+        Promise.all([
+          loadPurchaseHistory(parsedUser.id),
+          loadQueueHistory(parsedUser.id)
+        ]).finally(() => {
+          setIsHistoryLoading(false);
+        });
+      } else {
+        setIsHistoryLoading(false);
       }
+    } else {
+      setIsHistoryLoading(false);
     }
     setIsLoading(false);
   }, []);
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
+    setIsHistoryLoading(true);
     try {
       const response = await fetch(`${API_BASE}/api/login`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
 
@@ -193,18 +194,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(normalizedUser);
       localStorage.setItem('smartqueue_user', JSON.stringify(normalizedUser));
       
-      // Backfill purchase and queue history after successful login
       if (normalizedUser.accountType === 'user') {
-        await loadPurchaseHistory(normalizedUser.id);
-        await loadQueueHistory(normalizedUser.id);
+        await Promise.all([
+          loadPurchaseHistory(normalizedUser.id),
+          loadQueueHistory(normalizedUser.id)
+        ]);
       }
     } catch (error: unknown) {
       if (error instanceof Error) {
         throw new Error(error.message);
       }
-
       throw new Error('Login failed');
     } finally {
+      setIsHistoryLoading(false);
       setIsLoading(false);
     }
   };
@@ -212,12 +214,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const signup = async (email: string, password: string, firstName: string, lastName: string) => {
     setIsLoading(true);
     try {
-      // Replace with your actual signup API call
       const response = await fetch(`${API_BASE}/api/signup`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password, firstName, lastName }),
       });
 
@@ -237,8 +236,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       setUser(userData);
       localStorage.setItem('smartqueue_user', JSON.stringify(userData));
-      
-      // New users won't have history, so no need to backfill
     } catch (error) {
       console.error('Signup error:', error);
       throw new Error('Signup failed');
@@ -250,7 +247,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const logout = () => {
     setUser(null);
     localStorage.removeItem('smartqueue_user');
-    // Note: We keep the recommendation data in localStorage for next login
   };
 
   const updatePassStatus = (passStatus: 'Gold' | 'Silver' | 'None') => {
@@ -279,6 +275,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     updatePassStatus,
     updateMembership,
     isLoading,
+    isHistoryLoading,
     isAuthenticated: !!user,
     isAdmin,
     isUser,

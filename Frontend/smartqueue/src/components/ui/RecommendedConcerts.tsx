@@ -1,11 +1,10 @@
 // src/components/ui/RecommendedConcerts.tsx
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import RecommendationEngine from '../../utils/recommendationEngine';
 import '../../styling/RecommendedConcerts.css';
 
-// Match the Concert interface from HomePage
 interface Concert {
   id: string;
   name: string;
@@ -27,22 +26,21 @@ interface RecommendedConcertsProps {
 }
 
 const RecommendedConcerts: React.FC<RecommendedConcertsProps> = ({ allConcerts, onTrackInteraction }) => {
-  const { user, isAuthenticated, isAdmin } = useAuth();
+  const { user, isAuthenticated, isAdmin, isHistoryLoading } = useAuth(); // Removed refreshRecommendations
   const navigate = useNavigate();
   const [recommendations, setRecommendations] = useState<Concert[]>([]);
   const [loading, setLoading] = useState(true);
   const [topGenres, setTopGenres] = useState<{ genre: string; count: number }[]>([]);
   const [startIndex, setStartIndex] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
-  const autoPlayIntervalRef = useRef<number | null>(null); // Fixed: changed from NodeJS.Timeout to number
+  const autoPlayIntervalRef = useRef<number | null>(null);
   
-  // Number of cards to show based on screen size
   const getCardsToShow = () => {
     if (typeof window !== 'undefined') {
       if (window.innerWidth < 768) return 1;
       if (window.innerWidth < 1024) return 2;
     }
-    return 3; // Desktop shows 3 cards
+    return 3;
   };
   
   const [cardsToShow, setCardsToShow] = useState(getCardsToShow());
@@ -55,45 +53,50 @@ const RecommendedConcerts: React.FC<RecommendedConcertsProps> = ({ allConcerts, 
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  useEffect(() => {
-    if (isAuthenticated && user && !isAdmin && allConcerts.length > 0) {
-      // Get recommendations
-      const recs = RecommendationEngine.getRecommendations(
-        user.id,
-        allConcerts
-      );
-      setRecommendations(recs);
-      
-      // Get user's top genres for personalization
-      const genres = RecommendationEngine.getUserTopGenres(user.id);
-      setTopGenres(genres);
-      
+  const loadRecommendations = useCallback(() => {
+    if (!isAuthenticated || !user || isAdmin || allConcerts.length === 0) {
       setLoading(false);
-      setStartIndex(0); // Reset to first slide when recommendations change
-    } else {
+      return;
+    }
+    
+    const recs = RecommendationEngine.getRecommendations(user.id, allConcerts);
+    setRecommendations(recs);
+    const genres = RecommendationEngine.getUserTopGenres(user.id);
+    setTopGenres(genres);
+    setLoading(false);
+    setStartIndex(0);
+  }, [isAuthenticated, user, isAdmin, allConcerts]);
+
+  // Load recommendations when ready
+  useEffect(() => {
+    if (!isHistoryLoading && isAuthenticated && user && !isAdmin && allConcerts.length > 0) {
+      setLoading(true);
+      // Small delay to ensure all data is written
+      setTimeout(loadRecommendations, 200);
+    } else if (!isHistoryLoading && (!isAuthenticated || isAdmin)) {
       setLoading(false);
     }
-  }, [user, isAuthenticated, allConcerts, isAdmin]);
+  }, [isHistoryLoading, isAuthenticated, user, isAdmin, allConcerts, loadRecommendations]);
 
-  // Auto-play logic (very slow - 8 seconds per slide)
+  // Auto-play logic
   useEffect(() => {
     const maxStartIndex = Math.max(0, recommendations.length - cardsToShow);
     
-    if (isAutoPlaying && recommendations.length > cardsToShow && maxStartIndex > 0) {
-      autoPlayIntervalRef.current = window.setInterval(() => { // Fixed: use window.setInterval
+    if (isAutoPlaying && recommendations.length > cardsToShow && maxStartIndex > 0 && !loading) {
+      autoPlayIntervalRef.current = window.setInterval(() => {
         setStartIndex((prevIndex) => {
           const maxIndex = Math.max(0, recommendations.length - cardsToShow);
           return prevIndex + 1 > maxIndex ? 0 : prevIndex + 1;
         });
-      }, 8000); // 8 seconds per slide - very slow
+      }, 8000);
     }
 
     return () => {
       if (autoPlayIntervalRef.current) {
-        window.clearInterval(autoPlayIntervalRef.current); // Fixed: use window.clearInterval
+        window.clearInterval(autoPlayIntervalRef.current);
       }
     };
-  }, [isAutoPlaying, recommendations.length, cardsToShow]);
+  }, [isAutoPlaying, recommendations.length, cardsToShow, loading]);
 
   const handleInteraction = (concert: Concert, action: 'view' | 'queue_join') => {
     if (user) {
@@ -105,6 +108,9 @@ const RecommendedConcerts: React.FC<RecommendedConcertsProps> = ({ allConcerts, 
       if (action === 'queue_join') {
         navigate(`/queue/${concert.id}`);
       }
+      
+      // Refresh recommendations after interaction
+      setTimeout(loadRecommendations, 500);
     } else {
       navigate('/login');
     }
@@ -130,12 +136,10 @@ const RecommendedConcerts: React.FC<RecommendedConcertsProps> = ({ allConcerts, 
     setIsAutoPlaying(true);
   };
 
-  // Don't show for non-authenticated users or admins
   if (!isAuthenticated || isAdmin || loading || recommendations.length === 0) {
     return null;
   }
 
-  // Get personalized greeting
   const getPersonalizedGreeting = () => {
     if (topGenres.length > 0) {
       return `Based on your interest in ${topGenres[0].genre}`;
@@ -143,7 +147,6 @@ const RecommendedConcerts: React.FC<RecommendedConcertsProps> = ({ allConcerts, 
     return `Recommended just for you`;
   };
 
-  // Format date
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', { 
       month: 'short', 
