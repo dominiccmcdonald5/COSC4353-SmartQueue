@@ -61,6 +61,8 @@ interface TicketingResponse {
   message?: string;
 }
 
+const STANDING_MIN_PRICE = 10;
+
 function groupSeatsByRow(seats: Seat[]): Record<string, Seat[]> {
   const byRow: Record<string, Seat[]> = {};
   seats.forEach((seat) => {
@@ -263,7 +265,13 @@ const SeatingMapPage: React.FC = () => {
 
   const getTotalPrice = () => {
     const seatsTotal = selectedSeats.reduce((total, seat) => total + seat.price, 0);
-    const standTotal = standingPrice != null ? standingQty * standingPrice : 0;
+    const effectiveStandingPrice =
+      standingPrice != null
+        ? standingPrice
+        : priceMin != null
+          ? Math.max(STANDING_MIN_PRICE, priceMin)
+          : null;
+    const standTotal = effectiveStandingPrice != null ? standingQty * effectiveStandingPrice : 0;
     return seatsTotal + standTotal;
   };
 
@@ -284,7 +292,13 @@ const SeatingMapPage: React.FC = () => {
     // Store selected seats in session storage for payment page
     sessionStorage.setItem('selectedSeats', JSON.stringify(selectedSeats));
     sessionStorage.setItem('standingQty', String(standingQty));
-    if (standingPrice != null) sessionStorage.setItem('standingPrice', String(standingPrice));
+    const effectiveStandingPrice =
+      standingPrice != null
+        ? standingPrice
+        : priceMin != null
+          ? Math.max(STANDING_MIN_PRICE, priceMin)
+          : null;
+    if (effectiveStandingPrice != null) sessionStorage.setItem('standingPrice', String(effectiveStandingPrice));
     navigate(`/payment/${concertId}`);
   };
 
@@ -546,7 +560,15 @@ const SeatingMapPage: React.FC = () => {
                   {standingRemaining != null ? ` • ${standingRemaining} left` : ''}
                 </span>
                 <span className="standing-price">
-                  {standingPrice != null ? `$${standingPrice.toFixed(2)}` : 'Loading…'}
+                  {(() => {
+                    const effectiveStandingPrice =
+                      standingPrice != null
+                        ? standingPrice
+                        : priceMin != null
+                          ? Math.max(STANDING_MIN_PRICE, priceMin)
+                          : null;
+                    return effectiveStandingPrice != null ? `$${effectiveStandingPrice.toFixed(2)}` : 'Loading…';
+                  })()}
                 </span>
               </div>
               <div className="standing-controls">
