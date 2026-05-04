@@ -115,7 +115,18 @@ const HomePage: React.FC = () => {
 
       const data = await response.json();
       if (data.success) {
-        setConcerts(data.concerts);
+        // Clean the concert data - fix sold-out concerts
+        const cleanedConcerts = data.concerts.map((concert: Concert) => {
+          // If concert is sold-out, override availableTickets to 0
+          if (concert.status === 'sold-out') {
+            return {
+              ...concert,
+              availableTickets: 0,
+            };
+          }
+          return concert;
+        });
+        setConcerts(cleanedConcerts);
       } else {
         setError('Failed to load concerts');
       }
