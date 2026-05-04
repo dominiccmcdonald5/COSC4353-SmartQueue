@@ -1,7 +1,17 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import '../styling/PassPurchasePage.css';
+import { chargeForPassSelection } from '../utils/passPricing';
+
+interface CheckoutPlan {
+  id: string;
+  name: string;
+  price: number;
+  duration: string;
+  features: string[];
+  chargePrice?: number;
+}
 
 const PassPurchasePage: React.FC = () => {
   const { user, updateMembership } = useAuth();
@@ -10,7 +20,7 @@ const PassPurchasePage: React.FC = () => {
   const [processing, setProcessing] = useState(false);
 
   // Get plan data from navigation state
-  const { selectedPlan } = location.state || {};
+  const { selectedPlan } = (location.state || {}) as { selectedPlan?: CheckoutPlan };
 
   // Check if the selected plan is the same as current pass status
   const isSamePass = selectedPlan && user?.passStatus === (selectedPlan.id.charAt(0).toUpperCase() + selectedPlan.id.slice(1));
@@ -24,6 +34,14 @@ const PassPurchasePage: React.FC = () => {
     city: '',
     zipCode: ''
   });
+
+  const amountCharged = useMemo(() => {
+    if (!selectedPlan) return 0;
+    if (typeof selectedPlan.chargePrice === 'number' && Number.isFinite(selectedPlan.chargePrice)) {
+      return selectedPlan.chargePrice;
+    }
+    return chargeForPassSelection(selectedPlan.id as 'gold' | 'silver', user?.passStatus ?? 'None');
+  }, [selectedPlan, user?.passStatus]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -46,6 +64,12 @@ const PassPurchasePage: React.FC = () => {
       
       // Capitalize the pass status for consistency
       const capitalizedPassStatus = selectedPlan.id.charAt(0).toUpperCase() + selectedPlan.id.slice(1) as 'Gold' | 'Silver' | 'None';
+
+      if (user?.passStatus === 'Gold' && capitalizedPassStatus === 'Silver') {
+        alert('You cannot downgrade from Gold to Silver.');
+        setProcessing(false);
+        return;
+      }
       
       // Call API to update user's pass status
       const response = await fetch('https://cosc4353-smartqueue.onrender.com/api/user/pass/update', {
@@ -129,7 +153,10 @@ const PassPurchasePage: React.FC = () => {
               </ul>
               <div className="total">
                 <span className="total-label">Total: </span>
-                <span className="total-amount">${selectedPlan.price}</span>
+                <span className="total-amount">${amountCharged.toFixed(2)}</span>
+                {user?.passStatus === 'Silver' && selectedPlan.id === 'gold' && (
+                  <p className="upgrade-price-note">Silver → Gold: you pay the difference (Gold − Silver).</p>
+                )}
               </div>
             </div>
 
@@ -241,7 +268,11 @@ const PassPurchasePage: React.FC = () => {
                 disabled={processing || isSamePass}
                 title={isSamePass ? 'You already have this pass' : ''}
               >
-                {processing ? 'Processing...' : isSamePass ? `You already have ${selectedPlan.name}` : `Purchase ${selectedPlan.name} - $${selectedPlan.price}`}
+                {processing
+                  ? 'Processing...'
+                  : isSamePass
+                    ? `You already have ${selectedPlan.name}`
+                    : `Purchase ${selectedPlan.name} - $${amountCharged.toFixed(2)}`}
               </button>
 
               <p className="terms">

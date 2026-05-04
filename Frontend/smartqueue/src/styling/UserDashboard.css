@@ -417,6 +417,22 @@
   gap: 0.5rem;
 }
 
+.pass-badge-tooltip-wrap {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.5rem;
+  cursor: pointer;
+}
+
+/* Use pointer (not help) for clickable badge */
+.pass-badge-tooltip-wrap.styled-tooltip {
+  cursor: pointer;
+}
+
+.pass-badge-tooltip-wrap .pass-badge-icon {
+  margin-left: 0;
+}
+
 .pass-badge-icon {
   font-size: 1.5rem;
   cursor: pointer;

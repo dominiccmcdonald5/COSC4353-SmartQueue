@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { 
@@ -428,7 +428,7 @@ type CsvReportKey = 'users' | 'services' | 'queue-usage';
 
 const AdminDashboard: React.FC = () => {
   const { user, logout } = useAuth();
-  const [activeSection, setActiveSection] = useState<'events' | 'users' | 'analytics' | 'dataReports'>('events');
+  const [activeSection, setActiveSection] = useState<'events' | 'users' | 'analytics' | 'dataReports' | 'queue'>('events');
   const [events, setEvents] = useState<ConcertEvent[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [reportData, setReportData] = useState<ReportData | null>(null);
@@ -438,6 +438,36 @@ const AdminDashboard: React.FC = () => {
   const [dataReportLoading, setDataReportLoading] = useState(false);
   const [dataReportError, setDataReportError] = useState<string | null>(null);
   const [exportingReport, setExportingReport] = useState<CsvReportKey | null>(null);
+  // Queue management state
+  interface QueueEntry {
+    position: number;
+    queueEntryId: number;
+    concertId?: number;
+    userId: number;
+    firstName?: string;
+    lastName?: string;
+    passStatus?: string;
+    concertName?: string;
+    label?: string;
+    joinedAt: string;
+    waitMinutes?: number | null;
+    isDuplicate?: boolean;
+    isSuspectedBot?: boolean;
+  }
+  const [queueEntries, setQueueEntries] = useState<QueueEntry[]>([]);
+  const [queueLoading, setQueueLoading] = useState(false);
+  const [queueError, setQueueError] = useState<string | null>(null);
+  const [kickingId, setKickingId] = useState<number | null>(null);
+  const [reorderingId, setReorderingId] = useState<number | null>(null);
+  const [queueTargetPositions, setQueueTargetPositions] = useState<Record<number, string>>({});
+  const [kickReasons, setKickReasons] = useState<Record<number, string>>({});
+  const [queueSearch, setQueueSearch] = useState('');
+  const [queueConcertFilter, setQueueConcertFilter] = useState('');
+  const [queueGroupByConcert, setQueueGroupByConcert] = useState(true);
+  const [queuePage, setQueuePage] = useState(1);
+  const [queuePageSize, setQueuePageSize] = useState(15);
+  const [queueConcertPages, setQueueConcertPages] = useState<Record<string, number>>({});
+
   const [editingEvent, setEditingEvent] = useState<ConcertEvent | null>(null);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [showAddEventForm, setShowAddEventForm] = useState(false);
@@ -480,6 +510,72 @@ const AdminDashboard: React.FC = () => {
   const [editUserPassword, setEditUserPassword] = useState('');
   const [editUserPasswordConfirm, setEditUserPasswordConfirm] = useState('');
   const [editUserPasswordError, setEditUserPasswordError] = useState<string | null>(null);
+
+  const fetchQueueEntries = useCallback(async () => {
+    setQueueLoading(true);
+    setQueueError(null);
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/queue`);
+      const data = await res.json() as { success: boolean; queue?: QueueEntry[]; message?: string };
+      if (data.success && Array.isArray(data.queue)) {
+        setQueueEntries(data.queue);
+      } else {
+        setQueueError(data.message || 'Failed to load queue.');
+      }
+    } catch {
+      setQueueError('Unable to connect to server.');
+    } finally {
+      setQueueLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeSection === 'queue') void fetchQueueEntries();
+  }, [activeSection, fetchQueueEntries]);
+
+  const handleKickFromQueue = async (historyId: number) => {
+    setKickingId(historyId);
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/queue/${historyId}`, { method: 'DELETE' });
+      const data = await res.json() as { success: boolean; message?: string };
+      if (data.success) {
+        setQueueEntries((prev) =>
+          prev.filter((e) => e.queueEntryId !== historyId).map((e, i) => ({ ...e, position: i + 1 }))
+        );
+      } else {
+        window.alert(data.message || 'Failed to remove user from queue.');
+      }
+    } catch {
+      window.alert('Unable to connect to server.');
+    } finally {
+      setKickingId(null);
+    }
+  };
+
+  const handleReorderQueueEntry = async (
+    historyId: number,
+    options: { direction: 'up' | 'down' } | { targetPosition: number }
+  ) => {
+    setReorderingId(historyId);
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/queue/reorder`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ historyId, ...options }),
+      });
+      const data = await res.json() as { success: boolean; message?: string };
+      if (!data.success) {
+        window.alert(data.message || 'Failed to reorder queue entry.');
+        return;
+      }
+      setQueueTargetPositions((prev) => ({ ...prev, [historyId]: '' }));
+      await fetchQueueEntries();
+    } catch {
+      window.alert('Unable to connect to server.');
+    } finally {
+      setReorderingId(null);
+    }
+  };
 
   useEffect(() => {
     fetch(`${API_BASE}/api/admin/users`)
@@ -986,6 +1082,12 @@ const AdminDashboard: React.FC = () => {
             onClick={() => setActiveSection('users')}
           >
             <MdPeople /> User Management
+          </button>
+          <button
+            className={`nav-btn ${activeSection === 'queue' ? 'active' : ''}`}
+            onClick={() => setActiveSection('queue')}
+          >
+            <MdPeople /> Queue Management
           </button>
           <button 
             className={`nav-btn ${activeSection === 'analytics' ? 'active' : ''}`}
@@ -2139,6 +2241,297 @@ const AdminDashboard: React.FC = () => {
                 </div>
               </>
             )}
+          </section>
+        )}
+
+        {/* Queue Management Section */}
+        {activeSection === 'queue' && (
+          <section className="reports-section">
+            <div className="section-header">
+              <h3>Queue Management</h3>
+              <button type="button" className="add-btn" onClick={() => void fetchQueueEntries()} disabled={queueLoading}>
+                {queueLoading ? 'Refreshing…' : '↻ Refresh'}
+              </button>
+            </div>
+            <p style={{ color: '#6b7280', marginBottom: '1rem' }}>
+              Showing all active queued users across all concerts.
+            </p>
+            <p style={{ color: '#6b7280', marginBottom: '1rem' }}>
+              Remove users for: <strong>no-shows</strong>, <strong>duplicate entries</strong>, <strong>fraud/bots</strong>, <strong>expired passes</strong>, <strong>stuck entries</strong>, or <strong>capacity changes</strong>.
+            </p>
+            {queueLoading && <p>Loading queue…</p>}
+            {queueError && <p style={{ color: '#ef4444' }}>{queueError}</p>}
+            {!queueLoading && !queueError && (() => {
+              const getConcertName = (entry: QueueEntry) => entry.concertName || entry.label?.split(' - ').slice(1).join(' - ') || '';
+              const getConcertKey = (entry: QueueEntry) => {
+                const name = getConcertName(entry);
+                const cid = Number(entry.concertId);
+                return Number.isFinite(cid) && cid > 0 ? `cid:${cid}` : `name:${name || '(unknown)'}`;
+              };
+
+              const concertOptionsMap = new Map<string, string>();
+              queueEntries.forEach((entry) => {
+                const key = getConcertKey(entry);
+                const name = getConcertName(entry);
+                if (!concertOptionsMap.has(key)) {
+                  concertOptionsMap.set(key, name || '(Unknown Concert)');
+                }
+              });
+              const concertOptions = Array.from(concertOptionsMap.entries()).map(([value, label]) => ({ value, label }));
+
+              const filteredEntries = queueEntries.filter((entry) => {
+                const name = `${entry.firstName ?? ''} ${entry.lastName ?? ''}`.trim() || entry.label?.split(' - ')[0] || `User #${entry.userId}`;
+                const concertKey = getConcertKey(entry);
+                const matchesSearch = !queueSearch || name.toLowerCase().includes(queueSearch.toLowerCase());
+                const matchesConcert = !queueConcertFilter || concertKey === queueConcertFilter;
+                return matchesSearch && matchesConcert;
+              });
+
+              // Grouped view: buckets per concert, sorted by position asc (position 1 = closest to ticket)
+              const grouped = new Map<string, QueueEntry[]>();
+              filteredEntries.forEach((entry) => {
+                const key = getConcertKey(entry);
+                if (!grouped.has(key)) grouped.set(key, []);
+                grouped.get(key)!.push(entry);
+              });
+              for (const [key, grpEntries] of grouped) {
+                grouped.set(key, [...grpEntries].sort((a, b) => a.position - b.position));
+              }
+              // Sort concerts: most urgent (lowest min position) first
+              const sortedConcerts = Array.from(grouped.entries()).sort((a, b) => {
+                const minA = Math.min(...a[1].map((e) => e.position));
+                const minB = Math.min(...b[1].map((e) => e.position));
+                return minA - minB;
+              });
+
+              // Flat view pagination
+              const flatTotalPages = Math.max(1, Math.ceil(filteredEntries.length / queuePageSize));
+              const flatPage = Math.min(queuePage, flatTotalPages);
+              const flatPagedEntries = filteredEntries.slice((flatPage - 1) * queuePageSize, flatPage * queuePageSize);
+
+              const renderEntryRow = (entry: QueueEntry, displayPosition?: number) => {
+                const pos = displayPosition ?? entry.position;
+                const parsedLabelUserId = (() => {
+                  const m = (entry.label || '').match(/User\s*#(\d+)/i);
+                  return m ? Number(m[1]) : NaN;
+                })();
+                const displayUserId = Number.isFinite(Number(entry.userId))
+                  ? Number(entry.userId)
+                  : Number.isFinite(parsedLabelUserId)
+                    ? parsedLabelUserId
+                    : null;
+                const waitMins = entry.waitMinutes != null
+                  ? entry.waitMinutes
+                  : entry.joinedAt
+                    ? Math.max(0, Math.round((Date.now() - new Date(entry.joinedAt).getTime()) / 60000))
+                    : null;
+                const flags: { label: string; color: string; reason: string; tip: string }[] = [];
+                if (entry.isDuplicate) flags.push({ label: '👥 Duplicate', color: '#f59e0b', reason: 'duplicate', tip: 'User has multiple entries in the queue' });
+                if (waitMins != null && waitMins > 120) flags.push({ label: '⏱ Stuck Entry', color: '#ef4444', reason: 'no-show', tip: `Stuck ${waitMins} min — auto-expired; user may have abandoned queue` });
+                if (entry.isSuspectedBot) flags.push({ label: '🤖 Bot?', color: '#7c3aed', reason: 'fraud', tip: '3+ queue joins in the last 30 minutes' });
+                const suggestedReason = flags[0]?.reason ?? '';
+                const currentReason = kickReasons[entry.queueEntryId] ?? '';
+                return (
+                  <tr key={entry.queueEntryId} className="admin-users-table-row">
+                    <td>{pos}</td>
+                    <td className="admin-users-table-strong">
+                      <div className="queue-user-cell">
+                        <span>
+                          {`${entry.firstName ?? ''} ${entry.lastName ?? ''}`.trim() || entry.label?.split(' - ')[0] || `User #${displayUserId ?? 'N/A'}`}
+                        </span>
+                        <span className="queue-user-id">User ID: {displayUserId ?? 'N/A'}</span>
+                      </div>
+                      {entry.isDuplicate && (
+                        <span title="This user appears in multiple queues" style={{ marginLeft: '0.4rem', color: '#f59e0b', fontWeight: 700, fontSize: '0.7rem' }}>⚠ Duplicate</span>
+                      )}
+                    </td>
+                    <td>
+                      {(() => {
+                        const pt = (entry.passStatus || 'none').toLowerCase();
+                        return <span className={`pass-type pass-type--pill ${pt}`}>{pt}</span>;
+                      })()}
+                    </td>
+                    <td>
+                      <div className="queue-concert-cell">
+                        <span>{entry.concertName || entry.label?.split(' - ').slice(1).join(' - ') || '—'}</span>
+                        <span className="queue-current-slot">Current queue: #{pos}</span>
+                      </div>
+                    </td>
+                    <td className="admin-users-table-muted">
+                      {waitMins != null ? `${waitMins} min` : 'N/A'}
+                    </td>
+                    <td>
+                      {flags.length === 0
+                        ? <span className="queue-flag-empty">—</span>
+                        : flags.map((f) => (
+                          <span key={f.label} title={f.tip} className="queue-flag-chip"
+                            style={{ background: `${f.color}22`, color: f.color, borderColor: `${f.color}55` }}>
+                            {f.label}
+                          </span>
+                        ))
+                      }
+                    </td>
+                    <td>
+                      <select value={currentReason}
+                        onChange={(e) => setKickReasons((prev) => ({ ...prev, [entry.queueEntryId]: e.target.value }))}
+                        className="queue-reason-select"
+                        style={{ borderColor: currentReason ? '#6366f1' : '#d1d5db', background: currentReason ? '#eef2ff' : undefined }}
+                        aria-label="Removal reason">
+                        <option value="">{suggestedReason ? `Suggested: ${flags[0]?.label}` : 'Select reason…'}</option>
+                        <option value="no-show">No-show / Abandoned</option>
+                        <option value="duplicate">Duplicate entry</option>
+                        <option value="fraud">Fraud / Bot</option>
+                        <option value="expired-pass">Expired pass</option>
+                        <option value="stuck-entry">Stuck / Technical error</option>
+                        <option value="capacity">Capacity change</option>
+                        <option value="conduct">Code of conduct</option>
+                      </select>
+                      {!currentReason && suggestedReason && (
+                        <button type="button" onClick={() => setKickReasons((prev) => ({ ...prev, [entry.queueEntryId]: suggestedReason }))}
+                          className="queue-suggestion-btn">Use suggestion</button>
+                      )}
+                    </td>
+                    <td>
+                      <div className="queue-reorder-arrows">
+                        <button type="button" onClick={() => void handleReorderQueueEntry(entry.queueEntryId, { direction: 'up' })}
+                          disabled={reorderingId === entry.queueEntryId} aria-label="Move user up in queue" title="Move up" className="queue-arrow-btn">↑</button>
+                        <button type="button" onClick={() => void handleReorderQueueEntry(entry.queueEntryId, { direction: 'down' })}
+                          disabled={reorderingId === entry.queueEntryId} aria-label="Move user down in queue" title="Move down" className="queue-arrow-btn">↓</button>
+                      </div>
+                      <div className="queue-target-row">
+                        <input type="number" min={1} value={queueTargetPositions[entry.queueEntryId] ?? ''}
+                          onChange={(e) => { const next = e.target.value; setQueueTargetPositions((prev) => ({ ...prev, [entry.queueEntryId]: next })); }}
+                          placeholder="#" aria-label="Move to exact position" className="queue-target-input" />
+                        <button type="button"
+                          disabled={reorderingId === entry.queueEntryId || !queueTargetPositions[entry.queueEntryId]}
+                          onClick={() => {
+                            const target = Number(queueTargetPositions[entry.queueEntryId]);
+                            if (!Number.isInteger(target) || target <= 0) { window.alert('Enter a valid position number (1 or higher).'); return; }
+                            void handleReorderQueueEntry(entry.queueEntryId, { targetPosition: target });
+                          }}
+                          title="Move to exact position" className="queue-target-go">Go</button>
+                      </div>
+                    </td>
+                    <td className="admin-users-table-actions">
+                      <button type="button" className="delete-btn" disabled={kickingId === entry.queueEntryId}
+                        onClick={() => void handleKickFromQueue(entry.queueEntryId)}
+                        aria-label={`Remove ${entry.firstName ?? 'user'} from queue`} title="Remove from queue">
+                        {kickingId === entry.queueEntryId ? '…' : <MdDelete />}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              };
+
+              const tableHeader = (
+                <thead>
+                  <tr>
+                    <th scope="col">#</th>
+                    <th scope="col">Name</th>
+                    <th scope="col">Pass</th>
+                    <th scope="col">Concert</th>
+                    <th scope="col">Wait</th>
+                    <th scope="col">Flags</th>
+                    <th scope="col">Reason</th>
+                    <th scope="col">Reorder</th>
+                    <th scope="col" className="admin-users-table-actions">Remove</th>
+                  </tr>
+                </thead>
+              );
+
+              return (
+              <>
+              <div className="queue-filters-row">
+                <input type="text" placeholder="Search by name…" value={queueSearch}
+                  onChange={(e) => { setQueueSearch(e.target.value); setQueuePage(1); setQueueConcertPages({}); }}
+                  className="queue-filter-input" aria-label="Search queue by name" />
+                <select value={queueConcertFilter}
+                  onChange={(e) => { setQueueConcertFilter(e.target.value); setQueuePage(1); setQueueConcertPages({}); }}
+                  className="queue-filter-input" aria-label="Filter by concert">
+                  <option value="">All concerts</option>
+                  {concertOptions.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                </select>
+                <select value={queuePageSize}
+                  onChange={(e) => { setQueuePageSize(Number(e.target.value)); setQueuePage(1); setQueueConcertPages({}); }}
+                  className="queue-filter-input queue-pagesize-select" aria-label="Rows per page">
+                  <option value={10}>10 / page</option>
+                  <option value={15}>15 / page</option>
+                  <option value={25}>25 / page</option>
+                  <option value={50}>50 / page</option>
+                </select>
+                <button type="button"
+                  className={`queue-clear-btn${queueGroupByConcert ? ' queue-group-btn--active' : ''}`}
+                  onClick={() => setQueueGroupByConcert((v) => !v)}
+                  title="Toggle grouped/flat view">
+                  {queueGroupByConcert ? '🎵 By Concert' : '≡ Flat List'}
+                </button>
+                {(queueSearch || queueConcertFilter) && (
+                  <button type="button" className="queue-clear-btn" onClick={() => { setQueueSearch(''); setQueueConcertFilter(''); setQueuePage(1); setQueueConcertPages({}); }}>Clear</button>
+                )}
+              </div>
+              {queueGroupByConcert ? (
+                /* ── GROUPED BY CONCERT ── */
+                filteredEntries.length === 0
+                  ? <p className="empty-results">{queueEntries.length === 0 ? 'No users are currently in any queue.' : 'No entries match your filters.'}</p>
+                  : <>{sortedConcerts.map(([concertKey, grpEntries]) => {
+                      const cPage = queueConcertPages[concertKey] ?? 1;
+                      const cTotalPages = Math.max(1, Math.ceil(grpEntries.length / queuePageSize));
+                      const cPageClamped = Math.min(cPage, cTotalPages);
+                      const cPagedEntries = grpEntries.slice((cPageClamped - 1) * queuePageSize, cPageClamped * queuePageSize);
+                      const concertPositionById = new Map(
+                        grpEntries.map((entry, idx) => [entry.queueEntryId, idx + 1])
+                      );
+                      const concertTitle = getConcertName(grpEntries[0]) || '(Unknown Concert)';
+                      return (
+                        <div key={concertKey} className="queue-concert-group">
+                          <div className="queue-concert-group-header">
+                            <span className="queue-concert-group-title">🎵 {concertTitle}</span>
+                            <span className="queue-concert-group-count">{grpEntries.length} in queue</span>
+                          </div>
+                          <div className="admin-users-table-wrap queue-management-wrap" style={{ overflowX: 'auto', marginBottom: 0 }}>
+                            <table className="admin-users-table queue-management-table">
+                              {tableHeader}
+                              <tbody>{cPagedEntries.map((entry) => renderEntryRow(entry, concertPositionById.get(entry.queueEntryId)))}</tbody>
+                            </table>
+                          </div>
+                          {cTotalPages > 1 && (
+                            <div className="queue-pagination">
+                              <button type="button" className="queue-page-btn" disabled={cPageClamped === 1}
+                                onClick={() => setQueueConcertPages((prev) => ({ ...prev, [concertKey]: cPageClamped - 1 }))}>← Prev</button>
+                              <span className="queue-page-info">Page {cPageClamped} of {cTotalPages} · {grpEntries.length} total</span>
+                              <button type="button" className="queue-page-btn" disabled={cPageClamped === cTotalPages}
+                                onClick={() => setQueueConcertPages((prev) => ({ ...prev, [concertKey]: cPageClamped + 1 }))}>Next →</button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}</>
+              ) : (
+                /* ── FLAT PAGINATED LIST ── */
+                <>
+                  <div className="admin-users-table-wrap queue-management-wrap" style={{ overflowX: 'auto' }}>
+                    <table className="admin-users-table queue-management-table">
+                      {tableHeader}
+                      <tbody>{flatPagedEntries.map((entry) => renderEntryRow(entry))}</tbody>
+                    </table>
+                    {filteredEntries.length === 0 && (
+                      <p className="empty-results">{queueEntries.length === 0 ? 'No users are currently in any queue.' : 'No entries match your filters.'}</p>
+                    )}
+                  </div>
+                  {flatTotalPages > 1 && (
+                    <div className="queue-pagination">
+                      <button type="button" className="queue-page-btn" disabled={flatPage === 1}
+                        onClick={() => setQueuePage((p) => Math.max(1, p - 1))}>← Prev</button>
+                      <span className="queue-page-info">Page {flatPage} of {flatTotalPages} · {filteredEntries.length} total</span>
+                      <button type="button" className="queue-page-btn" disabled={flatPage === flatTotalPages}
+                        onClick={() => setQueuePage((p) => Math.min(flatTotalPages, p + 1))}>Next →</button>
+                    </div>
+                  )}
+                </>
+              )}
+              </>
+              );
+            })()}
           </section>
         )}
       </main>

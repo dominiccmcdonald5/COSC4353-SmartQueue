@@ -2,14 +2,20 @@ import { useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
 
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'https://cosc4353-smartqueue.onrender.com').replace(/\/$/, '');
+
 /**
- * Global hook that monitors user's queue status across all pages
- * Displays notification when user is in queue at position 6 (next in line)
- * Syncs with API's isNextInLine flag
+ * Polls queue status for top-5 (banner + proceed) and 6th / next-in-line (banner).
+ * Top 5 is checked first per concert; effect depends only on user id for a stable interval.
  */
 export const useQueueNotificationMonitor = () => {
   const { user } = useAuth();
-  const { isNextInLine, setIsNextInLine } = useNotification();
+  const {
+    setIsNextInLine,
+    setCanProceedToPurchase,
+    setProceedConcertName,
+    setQueueBannerConcertId,
+  } = useNotification();
 
   useEffect(() => {
     if (!user?.id) {
@@ -18,7 +24,7 @@ export const useQueueNotificationMonitor = () => {
 
     const getConcertIds = async (): Promise<number[]> => {
       try {
-        const response = await fetch('https://cosc4353-smartqueue.onrender.com/api/admin/concerts');
+        const response = await fetch(`${API_BASE}/api/admin/concerts`);
         const payload = (await response.json()) as {
           success: boolean;
           concerts?: Array<{ concert_id?: number; concertID?: number }>;
@@ -36,46 +42,56 @@ export const useQueueNotificationMonitor = () => {
       }
     };
 
-    // Check queue status to detect if user is next in line
     const checkQueueStatus = async () => {
       try {
         const concertIds = await getConcertIds();
         for (const concertId of concertIds) {
           try {
             const response = await fetch(
-              `https://cosc4353-smartqueue.onrender.com/api/queue/${concertId}?userId=${encodeURIComponent(user.id)}`
+              `${API_BASE}/api/queue/${concertId}?userId=${encodeURIComponent(user.id)}`
             );
             const payload = (await response.json()) as {
               success: boolean;
-              data?: { isNextInLine: boolean; isInQueue: boolean };
+              data?: {
+                isNextInLine: boolean;
+                isInQueue: boolean;
+                canProceedToSeatSelection?: boolean;
+                concertName?: string;
+              };
             };
 
+            if (payload.success && payload.data?.isInQueue && payload.data?.canProceedToSeatSelection === true) {
+              setQueueBannerConcertId(concertId);
+              setCanProceedToPurchase(true);
+              setProceedConcertName(payload.data?.concertName ?? null);
+              setIsNextInLine(false);
+              return;
+            }
+
             if (payload.success && payload.data?.isInQueue && payload.data?.isNextInLine === true) {
-              // User is next in line in at least one concert
-              if (!isNextInLine) {
-                setIsNextInLine(true);
-              }
-              return; // Found a concert where user is next in line
+              setQueueBannerConcertId(concertId);
+              setIsNextInLine(true);
+              setCanProceedToPurchase(false);
+              setProceedConcertName(null);
+              return;
             }
           } catch {
-            // Continue to next concert if this one fails
             continue;
           }
         }
 
-        // User is not next in line in any concert
-        if (isNextInLine) {
-          setIsNextInLine(false);
-        }
+        setQueueBannerConcertId(null);
+        setIsNextInLine(false);
+        setCanProceedToPurchase(false);
+        setProceedConcertName(null);
       } catch (error) {
         console.error('Error checking queue status:', error);
       }
     };
 
-    // Check queue status on mount and every 5 seconds
     checkQueueStatus();
-    const interval = setInterval(checkQueueStatus, 5000);
+    const interval = setInterval(checkQueueStatus, 8000);
 
     return () => clearInterval(interval);
-  }, [user?.id, isNextInLine, setIsNextInLine]);
+  }, [user?.id, setIsNextInLine, setCanProceedToPurchase, setProceedConcertName, setQueueBannerConcertId]);
 };

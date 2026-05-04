@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS queue_history (
   in_line_status VARCHAR(32) NULL,
   queued_at DATETIME NULL,
   PRIMARY KEY (history_id),
+  UNIQUE KEY unique_active_queue (concert_id, user_id, status),
   KEY idx_queue_history_user (user_id),
   KEY idx_queue_history_concert (concert_id),
   KEY idx_queue_history_priority (concert_id, status, in_line_status, priority_level, queued_at, history_id),

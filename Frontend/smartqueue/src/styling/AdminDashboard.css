@@ -555,6 +555,291 @@
   margin-left: 0.25rem;
 }
 
+.queue-management-wrap {
+  overflow-x: auto;
+}
+
+.queue-management-table {
+  min-width: 920px;
+}
+
+.queue-management-table th,
+.queue-management-table td {
+  padding: 0.5rem 0.6rem;
+}
+
+.queue-management-table th:nth-child(1),
+.queue-management-table td:nth-child(1),
+.queue-management-table th:nth-child(5),
+.queue-management-table td:nth-child(5) {
+  white-space: nowrap;
+}
+
+.queue-management-table th:nth-child(2),
+.queue-management-table td:nth-child(2) {
+  min-width: 190px;
+}
+
+.queue-management-table th:nth-child(6),
+.queue-management-table td:nth-child(6) {
+  min-width: 170px;
+}
+
+.queue-management-table th:nth-child(7),
+.queue-management-table td:nth-child(7) {
+  min-width: 190px;
+}
+
+.queue-management-table th:nth-child(8),
+.queue-management-table td:nth-child(8) {
+  min-width: 170px;
+}
+
+.queue-user-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.queue-user-id {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.queue-filters-row {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.queue-filter-input {
+  flex: 1 1 180px;
+  padding: 0.45rem 0.6rem;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  font-size: 0.85rem;
+}
+
+.queue-filter-input:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.12);
+}
+
+.queue-clear-btn {
+  padding: 0.45rem 0.8rem;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  background: #f3f4f6;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.queue-clear-btn:hover {
+  background: #e5e7eb;
+}
+
+.queue-concert-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.queue-current-slot {
+  font-size: 0.72rem;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+.queue-flag-empty {
+  color: #9ca3af;
+  font-size: 0.75rem;
+}
+
+.queue-flag-chip {
+  display: inline-block;
+  margin-right: 0.25rem;
+  margin-bottom: 0.1rem;
+  border: 1px solid;
+  border-radius: 4px;
+  padding: 0.1rem 0.35rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: help;
+  white-space: nowrap;
+}
+
+.queue-reason-select {
+  font-size: 0.75rem;
+  padding: 0.25rem;
+  border-radius: 4px;
+  border: 1px solid #d1d5db;
+  max-width: 180px;
+}
+
+.queue-suggestion-btn {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.65rem;
+  color: #6366f1;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.queue-reorder-arrows {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.queue-arrow-btn {
+  border: 1px solid #cbd5e1;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  border-radius: 6px;
+  width: 32px;
+  height: 30px;
+  cursor: pointer;
+  font-weight: 700;
+  color: #334155;
+}
+
+.queue-arrow-btn:hover:not(:disabled) {
+  border-color: #94a3b8;
+  background: #eef2ff;
+  color: #3730a3;
+}
+
+.queue-arrow-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.queue-target-row {
+  display: flex;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+}
+
+.queue-target-input {
+  width: 64px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 0.2rem 0.35rem;
+  font-size: 0.75rem;
+}
+
+.queue-target-go {
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  border-radius: 6px;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.queue-target-go:hover:not(:disabled) {
+  background: #e0e7ff;
+  border-color: #a5b4fc;
+}
+
+.queue-target-go:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Concert group headers (grouped view) ── */
+.queue-concert-group {
+  margin-bottom: 1.5rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.queue-concert-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 1rem;
+  background: #f0f4ff;
+  border-bottom: 1px solid #e0e7ff;
+}
+
+.queue-concert-group-title {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #3730a3;
+}
+
+.queue-concert-group-count {
+  font-size: 0.8rem;
+  color: #6366f1;
+  font-weight: 600;
+  background: #e0e7ff;
+  border-radius: 999px;
+  padding: 0.1rem 0.55rem;
+}
+
+/* ── Pagination controls ── */
+.queue-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 0.55rem 1rem;
+  border-top: 1px solid #e5e7eb;
+  background: #fafafa;
+}
+
+.queue-page-btn {
+  padding: 0.3rem 0.8rem;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #374151;
+  transition: background 0.15s;
+}
+
+.queue-page-btn:hover:not(:disabled) {
+  background: #e0e7ff;
+  border-color: #6366f1;
+  color: #4338ca;
+}
+
+.queue-page-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.queue-page-info {
+  font-size: 0.82rem;
+  color: #6b7280;
+  min-width: 120px;
+  text-align: center;
+}
+
+/* ── Page-size select ── */
+.queue-pagesize-select {
+  flex: 0 0 auto;
+  min-width: 110px;
+}
+
+/* ── Active state for the "By Concert" toggle button ── */
+.queue-group-btn--active {
+  background: #e0e7ff;
+  border-color: #6366f1;
+  color: #4338ca;
+  font-weight: 700;
+}
+
 .pass-type--pill {
   font-size: 0.75rem;
   text-transform: capitalize;
