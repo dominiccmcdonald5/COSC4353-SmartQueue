@@ -52,6 +52,11 @@ const HomePage: React.FC = () => {
   const [genres, setGenres] = useState<string[]>([]);
   const [mailboxUnreadCount, setMailboxUnreadCount] = useState(0);
 
+  // Pagination state - ONLY ONE COPY
+  const [currentPage, setCurrentPage] = useState(1);
+  const [concertsPerPage, setConcertsPerPage] = useState(12);
+  const itemsPerPageOptions = [12, 24, 48, 96];
+
   const refreshMailboxUnread = useCallback(async () => {
     if (!user?.id || !/^\d+$/.test(user.id)) {
       setMailboxUnreadCount(0);
@@ -102,6 +107,11 @@ const HomePage: React.FC = () => {
       setGenres(uniqueGenres as string[]);
     }
   }, [concerts]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedGenre, selectedStatus, sortBy, concertsPerPage]);
 
   const fetchConcerts = async () => {
     setLoading(true);
@@ -296,6 +306,7 @@ const HomePage: React.FC = () => {
     setSelectedGenre('all');
     setSelectedStatus('all');
     setSortBy('date');
+    setCurrentPage(1);
   };
 
   if (loading) {
@@ -516,74 +527,199 @@ const HomePage: React.FC = () => {
               No concerts match your filters. Try adjusting your search criteria!
             </div>
           ) : (
-            <div className="concerts-list">
-              {filteredConcerts.map((concert) => {
-                const buttonConfig = getButtonConfig(concert);
+            <>
+              {/* Items Per Page Selector */}
+              <div className="pagination-top-controls">
+                <div className="items-per-page">
+                  <span>Show:</span>
+                  <select 
+                    value={concertsPerPage} 
+                    onChange={(e) => setConcertsPerPage(Number(e.target.value))}
+                    className="items-per-page-select"
+                  >
+                    {itemsPerPageOptions.map(option => (
+                      <option key={option} value={option}>{option} per page</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="results-summary">
+                  {filteredConcerts.length} concert{filteredConcerts.length !== 1 ? 's' : ''} total
+                </div>
+              </div>
+
+              {/* Pagination calculations */}
+              {(() => {
+                const indexOfLastConcert = currentPage * concertsPerPage;
+                const indexOfFirstConcert = indexOfLastConcert - concertsPerPage;
+                const currentConcerts = filteredConcerts.slice(indexOfFirstConcert, indexOfLastConcert);
+                const totalPages = Math.ceil(filteredConcerts.length / concertsPerPage);
+                
+                const goToFirstPage = () => setCurrentPage(1);
+                const goToLastPage = () => setCurrentPage(totalPages);
+                const goToNextPage = () => {
+                  if (currentPage < totalPages) setCurrentPage(currentPage + 1);
+                };
+                const goToPrevPage = () => {
+                  if (currentPage > 1) setCurrentPage(currentPage - 1);
+                };
+                const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
+                
                 return (
-                  <div key={concert.id} className="concert-card">
-                    <div className="concert-image">
-                      <img src={concert.image} alt={concert.name} />
-                      <div className={`status-badge ${getStatusBadgeClass(concert.status)}`}>
-                        {getStatusText(concert.status)}
-                      </div>
-                      
-                      {isComingSoon(concert.date) && (
-                        <div className="coming-soon-badge">
-                          🎵 Coming Soon
-                        </div>
-                      )}
-                      
-                      {concert.genre && (
-                        <div className="genre-badge">
-                          {concert.genre}
-                        </div>
-                      )}
+                  <>
+                    <div className="concerts-list">
+                      {currentConcerts.map((concert) => {
+                        const buttonConfig = getButtonConfig(concert);
+                        return (
+                          <div key={concert.id} className="concert-card">
+                            <div className="concert-image">
+                              <img src={concert.image} alt={concert.name} />
+                              <div className={`status-badge ${getStatusBadgeClass(concert.status)}`}>
+                                {getStatusText(concert.status)}
+                              </div>
+                              
+                              {isComingSoon(concert.date) && (
+                                <div className="coming-soon-badge">
+                                  🎵 Coming Soon
+                                </div>
+                              )}
+                              
+                              {concert.genre && (
+                                <div className="genre-badge">
+                                  {concert.genre}
+                                </div>
+                              )}
+                            </div>
+                            
+                            <div className="concert-info">
+                              <h4>{concert.name}</h4>
+                              <p className="artist">{concert.artist}</p>
+                              <p className="venue">{concert.venue}</p>
+                              <p className="date">{formatDate(concert.date)}</p>
+                              <p className="price">{concert.price}</p>
+                              
+                              {concert.availableTickets !== undefined && concert.totalTickets !== undefined && (
+                                <div className="ticket-progress">
+                                  <div className="progress-bar">
+                                    <div 
+                                      className="progress-fill"
+                                      style={{
+                                        width: `${(concert.availableTickets / concert.totalTickets) * 100}%`,
+                                        background: (() => {
+                                          const percentRemaining = (concert.availableTickets / concert.totalTickets) * 100;
+                                          if (concert.status === 'sold-out') return '#ef4444';
+                                          if (percentRemaining < 10) return '#f59e0b';
+                                          return '#10b981';
+                                        })()
+                                      }}
+                                    ></div>
+                                  </div>
+                                  <div className="ticket-stats">
+                                    <span>{concert.availableTickets} tickets left</span>
+                                    <span>{Math.round((concert.availableTickets / concert.totalTickets) * 100)}% available</span>
+                                  </div>
+                                  {(() => {
+                                    const percentRemaining = (concert.availableTickets / concert.totalTickets) * 100;
+                                    const isAlmostSoldOut = percentRemaining < 10 && percentRemaining > 0;
+                                    return isAlmostSoldOut && concert.status !== 'sold-out' ? (
+                                      <div className="low-ticket-warning">
+                                        🔥 Almost sold out! Only {concert.availableTickets} tickets left!
+                                      </div>
+                                    ) : null;
+                                  })()}
+                                </div>
+                              )}
+                              
+                              <div className="concert-actions">
+                                <button 
+                                  onClick={buttonConfig.action}
+                                  disabled={buttonConfig.disabled}
+                                  className={buttonConfig.className}
+                                >
+                                  {buttonConfig.text}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                     
-                    <div className="concert-info">
-                      <h4>{concert.name}</h4>
-                      <p className="artist">{concert.artist}</p>
-                      <p className="venue">{concert.venue}</p>
-                      <p className="date">{formatDate(concert.date)}</p>
-                      <p className="price">{concert.price}</p>
-                      
-                      {concert.availableTickets !== undefined && concert.totalTickets !== undefined && (
-                        <div className="ticket-progress">
-                          <div className="progress-bar">
-                            <div 
-                              className="progress-fill"
-                              style={{
-                                width: `${(concert.availableTickets / concert.totalTickets) * 100}%`,
-                                background: concert.availableTickets < 100 ? '#f59e0b' : '#10b981'
-                              }}
-                            ></div>
-                          </div>
-                          <div className="ticket-stats">
-                            <span>{concert.availableTickets} tickets left</span>
-                            <span>{Math.round((concert.availableTickets / concert.totalTickets) * 100)}% available</span>
-                          </div>
-                          {concert.availableTickets < 100 && concert.status !== 'sold-out' && (
-                            <div className="low-ticket-warning">
-                              🔥 Almost sold out!
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      
-                      <div className="concert-actions">
+                    {/* Pagination Controls */}
+                    {totalPages > 1 && (
+                      <div className="pagination">
                         <button 
-                          onClick={buttonConfig.action}
-                          disabled={buttonConfig.disabled}
-                          className={buttonConfig.className}
+                          onClick={goToFirstPage} 
+                          disabled={currentPage === 1}
+                          className="pagination-btn"
+                          title="First page"
                         >
-                          {buttonConfig.text}
+                          ⏮ First
+                        </button>
+                        <button 
+                          onClick={goToPrevPage} 
+                          disabled={currentPage === 1}
+                          className="pagination-btn"
+                        >
+                          ← Previous
+                        </button>
+                        
+                        <div className="pagination-numbers">
+                          {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                            let pageNum: number | string;
+                            if (totalPages <= 5) {
+                              pageNum = i + 1;
+                            } else if (currentPage <= 3) {
+                              pageNum = i + 1;
+                              if (i === 4) pageNum = '...';
+                            } else if (currentPage >= totalPages - 2) {
+                              pageNum = totalPages - 4 + i;
+                              if (i === 0) pageNum = '...';
+                            } else {
+                              pageNum = currentPage - 2 + i;
+                              if (i === 0 || i === 4) pageNum = '...';
+                            }
+                            
+                            if (pageNum === '...') {
+                              return <span key={i} className="pagination-dots">...</span>;
+                            }
+                            
+                            return (
+                              <button
+                                key={i}
+                                onClick={() => typeof pageNum === 'number' && paginate(pageNum)}
+                                className={`page-number ${currentPage === pageNum ? 'active' : ''}`}
+                              >
+                                {pageNum}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        
+                        <button 
+                          onClick={goToNextPage} 
+                          disabled={currentPage === totalPages}
+                          className="pagination-btn"
+                        >
+                          Next →
+                        </button>
+                        <button 
+                          onClick={goToLastPage} 
+                          disabled={currentPage === totalPages}
+                          className="pagination-btn"
+                          title="Last page"
+                        >
+                          Last ⏭
                         </button>
                       </div>
+                    )}
+                    
+                    <div className="pagination-info">
+                      Showing {indexOfFirstConcert + 1}-{Math.min(indexOfLastConcert, filteredConcerts.length)} of {filteredConcerts.length} concerts
                     </div>
-                  </div>
+                  </>
                 );
-              })}
-            </div>
+              })()}
+            </>
           )}
         </section>
       </main>
