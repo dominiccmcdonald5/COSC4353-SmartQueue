@@ -32,6 +32,19 @@ interface TicketingResponse {
   message?: string;
 }
 
+interface ApiConcertResponse {
+  success: boolean;
+  concert?: {
+    name?: string;
+    artist?: string;
+    date?: string;
+    venue?: string;
+  };
+  message?: string;
+}
+
+const STANDING_MIN_PRICE = 10;
+
 const PaymentPage: React.FC = () => {
   const { concertId } = useParams<{ concertId: string }>();
   const { user } = useAuth();
@@ -39,6 +52,12 @@ const PaymentPage: React.FC = () => {
   const [selectedSeats, setSelectedSeats] = useState<SelectedSeat[]>([]);
   const [standingQty, setStandingQty] = useState(0);
   const [standingPrice, setStandingPrice] = useState<number | null>(null);
+  const [concertSummary, setConcertSummary] = useState<{
+    name: string;
+    artist: string;
+    venue: string;
+    date: string;
+  } | null>(null);
   const [paymentForm, setPaymentForm] = useState<PaymentForm>({
     cardNumber: '',
     expiryDate: '',
@@ -80,6 +99,37 @@ const PaymentPage: React.FC = () => {
   }, [concertId, navigate]);
 
   useEffect(() => {
+    if (!concertId) {
+      setConcertSummary(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/concerts/${concertId}`);
+        const payload = (await res.json()) as ApiConcertResponse;
+        if (cancelled) return;
+        if (!res.ok || !payload?.success || !payload?.concert) {
+          setConcertSummary(null);
+          return;
+        }
+        setConcertSummary({
+          name: String(payload.concert.name || `Concert ${concertId}`),
+          artist: String(payload.concert.artist || ''),
+          venue: String(payload.concert.venue || ''),
+          date: String(payload.concert.date || ''),
+        });
+      } catch {
+        if (cancelled) return;
+        setConcertSummary(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [concertId]);
+
+  useEffect(() => {
     if (!concertId) return;
     if (standingQty <= 0) return;
     if (standingPrice != null) return;
@@ -92,8 +142,9 @@ const PaymentPage: React.FC = () => {
         const p = payload?.standing?.price;
         const n = Number(p);
         if (res.ok && payload?.success && Number.isFinite(n)) {
-          setStandingPrice(n);
-          sessionStorage.setItem('standingPrice', String(n));
+          const normalized = Math.max(STANDING_MIN_PRICE, n);
+          setStandingPrice(normalized);
+          sessionStorage.setItem('standingPrice', String(normalized));
         }
       } catch {
         /* keep UI */
@@ -260,7 +311,8 @@ const PaymentPage: React.FC = () => {
 
   const getTotalPrice = () => {
     const seatTotal = selectedSeats.reduce((total, seat) => total + seat.price, 0);
-    const standTotal = standingPrice != null ? standingQty * standingPrice : 0;
+    const effectiveStandingPrice = standingPrice != null ? standingPrice : 0;
+    const standTotal = standingQty > 0 ? standingQty * effectiveStandingPrice : 0;
     return seatTotal + standTotal;
   };
 
@@ -292,8 +344,16 @@ const PaymentPage: React.FC = () => {
             <h2>Order Summary</h2>
             
             <div className="concert-info">
-              <h3>Summer Music Festival</h3>
-              <p>Various Artists • Central Park • July 15, 2026</p>
+              <h3>{concertSummary?.name || `Concert ${concertId ?? ''}`}</h3>
+              <p>
+                {[
+                  concertSummary?.artist,
+                  concertSummary?.venue,
+                  concertSummary?.date,
+                ]
+                  .filter((v): v is string => Boolean(v && String(v).trim()))
+                  .join(' • ') || ' '}
+              </p>
             </div>
 
             <div className="selected-seats">
