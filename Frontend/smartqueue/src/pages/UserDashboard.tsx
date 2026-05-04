@@ -480,7 +480,7 @@ const UserDashboard: React.FC = () => {
                     {item.queueStatus === 'sold-out' && (
                       <>
                         <span className="status-dot"></span>
-                        <span className="status-text">Sold Out</span>
+                        <span className="status-text">Left Queue</span>
                       </>
                     )}
                     {item.queueStatus === 'pending' && (
