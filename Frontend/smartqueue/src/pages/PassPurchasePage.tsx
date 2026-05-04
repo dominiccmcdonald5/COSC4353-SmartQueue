@@ -48,7 +48,7 @@ const PassPurchasePage: React.FC = () => {
       const capitalizedPassStatus = selectedPlan.id.charAt(0).toUpperCase() + selectedPlan.id.slice(1) as 'Gold' | 'Silver' | 'None';
       
       // Call API to update user's pass status
-      const response = await fetch('https://cosc-4353-smart-queue-6ixj.vercel.app/api/user/pass/update', {
+      const response = await fetch('https://cosc4353-smartqueue.onrender.com/api/user/pass/update', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

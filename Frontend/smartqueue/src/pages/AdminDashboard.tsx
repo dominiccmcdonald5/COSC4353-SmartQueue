@@ -69,8 +69,8 @@ function parseSpentForSave(s: string): number | null {
 }
 
 const DEFAULT_CONCERT_IMAGE = '/concert1.jpg';
-const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'https://cosc-4353-smart-queue-6ixj.vercel.app').replace(/\/$/, '');
-const LOCAL_API_BASE = 'http://localhost:5000';
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'https://cosc4353-smartqueue.onrender.com').replace(/\/$/, '');
+const LOCAL_API_BASE = 'https://cosc4353-smartqueue.onrender.com';
 const REPORT_API_FALLBACK_BASE = API_BASE === LOCAL_API_BASE ? null : LOCAL_API_BASE;
 /** Matches backend admin user API minimum password length. */
 const ADMIN_USER_PASSWORD_MIN_LEN = 4;

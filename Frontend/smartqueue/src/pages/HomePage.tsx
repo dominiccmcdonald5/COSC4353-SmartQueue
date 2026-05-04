@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { formatLocalDateFromApi, parseLocalDateFromApi } from '../utils/apiDate';
 import '../styling/HomePage.css';
 
-const API_BASE = 'https://cosc-4353-smart-queue-6ixj.vercel.app';
+const API_BASE = 'https://cosc4353-smartqueue.onrender.com';
 
 interface Concert {
   id: string;

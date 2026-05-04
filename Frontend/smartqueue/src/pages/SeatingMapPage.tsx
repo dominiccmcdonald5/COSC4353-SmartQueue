@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { formatLocalDateFromApi } from '../utils/apiDate';
 import '../styling/SeatingMapPage.css';
 
-const API_BASE = 'https://cosc-4353-smart-queue-6ixj.vercel.app';
+const API_BASE = 'https://cosc4353-smartqueue.onrender.com';
 
 interface Seat {
   id: string;

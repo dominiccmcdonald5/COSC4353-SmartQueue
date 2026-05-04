@@ -118,7 +118,7 @@ const PaymentPage: React.FC = () => {
         throw new Error('Missing user or concert information for payment confirmation');
       }
 
-      const paymentResponse = await fetch('https://cosc-4353-smart-queue-6ixj.vercel.app/api/payment/complete', {
+      const paymentResponse = await fetch('https://cosc4353-smartqueue.onrender.com/api/payment/complete', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

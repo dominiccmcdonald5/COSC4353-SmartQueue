@@ -39,7 +39,7 @@ const SignUpPage: React.FC = () => {
     try {
       setIsSubmitting(true);
 
-      const response = await fetch('https://cosc-4353-smart-queue-6ixj.vercel.app/api/signup', {
+      const response = await fetch('https://cosc4353-smartqueue.onrender.com/api/signup', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -18,7 +18,7 @@ export const useQueueNotificationMonitor = () => {
 
     const getConcertIds = async (): Promise<number[]> => {
       try {
-        const response = await fetch('https://cosc-4353-smart-queue-6ixj.vercel.app/api/admin/concerts');
+        const response = await fetch('https://cosc4353-smartqueue.onrender.com/api/admin/concerts');
         const payload = (await response.json()) as {
           success: boolean;
           concerts?: Array<{ concert_id?: number; concertID?: number }>;
@@ -43,7 +43,7 @@ export const useQueueNotificationMonitor = () => {
         for (const concertId of concertIds) {
           try {
             const response = await fetch(
-              `https://cosc-4353-smart-queue-6ixj.vercel.app/api/queue/${concertId}?userId=${encodeURIComponent(user.id)}`
+              `https://cosc4353-smartqueue.onrender.com/api/queue/${concertId}?userId=${encodeURIComponent(user.id)}`
             );
             const payload = (await response.json()) as {
               success: boolean;
