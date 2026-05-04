@@ -90,11 +90,6 @@ const handleGetConcertTicketing = (req, res, concertId) => {
     });
 
     function handleConcertRows(concertRows, hasMinColumn) {
-        if (concertErr) {
-            console.error('Error fetching concert ticketing info:', concertErr);
-            sendJson(res, 500, { success: false, message: 'Failed to fetch concert ticketing info' });
-            return;
-        }
         if (!Array.isArray(concertRows) || concertRows.length === 0) {
             sendJson(res, 404, { success: false, message: 'Concert not found' });
             return;
